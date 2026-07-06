@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\BorrowRequestController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use Illuminate\Support\Facades\Route;
@@ -40,3 +41,18 @@ Route::put('/orders/{id}/approve', [OrderController::class, 'approve']);
 Route::put('/orders/{id}/revision', [OrderController::class, 'revision']);
 Route::put('/orders/{id}/reject', [OrderController::class, 'reject']);
 Route::put('/orders/{id}/complete', [OrderController::class, 'complete']);
+
+/*
+|--------------------------------------------------------------------------
+| Borrow Requests / Peminjaman
+|--------------------------------------------------------------------------
+*/
+Route::get('/borrow-requests', [BorrowRequestController::class, 'index']);
+Route::get('/borrow-requests/{id}', [BorrowRequestController::class, 'show']);
+Route::post('/borrow-requests', [BorrowRequestController::class, 'store']);
+
+Route::put('/borrow-requests/{id}/approve', [BorrowRequestController::class, 'approve']);
+Route::put('/borrow-requests/{id}/revision', [BorrowRequestController::class, 'revision']);
+Route::put('/borrow-requests/{id}/reject', [BorrowRequestController::class, 'reject']);
+Route::put('/borrow-requests/{id}/borrowed', [BorrowRequestController::class, 'borrowed']);
+Route::put('/borrow-requests/{id}/returned', [BorrowRequestController::class, 'returned']);
