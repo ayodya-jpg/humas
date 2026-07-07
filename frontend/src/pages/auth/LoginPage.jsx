@@ -6,7 +6,7 @@ export default function LoginPage() {
     const navigate = useNavigate();
 
     const [formData, setFormData] = useState({
-        username: 'admin',
+        username: 'superadmin',
         password: 'password123',
     });
 
@@ -51,16 +51,23 @@ export default function LoginPage() {
         <div className="login-page">
             <div className="login-card">
                 <div className="login-brand">
-                    <div className="brand-logo">H</div>
+                    <div className="login-logo-box">
+                        <img
+                            src="/images/logo-putih-tus.png"
+                            alt="Telkom University Surabaya"
+                            className="login-logo-image"
+                        />
+                    </div>
+
                     <div>
-                        <h1>HUMAS</h1>
-                        <p>Admin Approval System</p>
+                        <h1>HUMAS & SEKPIM</h1>
+                        <p>Telkom University Surabaya</p>
                     </div>
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    <h2>Login Admin</h2>
-                    <p>Masuk menggunakan username admin.</p>
+                    <h2>Login Sistem</h2>
+                    <p>Masuk untuk mengajukan atau mengelola layanan HUMAS & SEKPIM.</p>
 
                     {errorMessage && (
                         <div className="error-box">
@@ -75,6 +82,7 @@ export default function LoginPage() {
                             name="username"
                             value={formData.username}
                             onChange={handleInputChange}
+                            placeholder="Masukkan username"
                             required
                         />
                     </div>
@@ -86,6 +94,7 @@ export default function LoginPage() {
                             name="password"
                             value={formData.password}
                             onChange={handleInputChange}
+                            placeholder="Masukkan password"
                             required
                         />
                     </div>
@@ -93,6 +102,12 @@ export default function LoginPage() {
                     <button className="btn btn-primary login-button" type="submit" disabled={loading}>
                         {loading ? 'Memproses...' : 'Login'}
                     </button>
+
+                    <div className="login-helper">
+                        <span>Demo akun:</span>
+                        <p>superadmin / admin / user</p>
+                        <p>Password: password123</p>
+                    </div>
                 </form>
             </div>
         </div>

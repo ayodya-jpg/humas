@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
 import api from '../../api/axios';
+import {
+    closeAlert,
+    showConfirmAlert,
+    showErrorAlert,
+    showLoadingAlert,
+    showSuccessAlert,
+    showWarningAlert,
+} from '../../utils/sweetAlert';
 
 const initialForm = {
     name: '',
@@ -22,10 +30,17 @@ export default function UserManagementPage() {
     const fetchUsers = async () => {
         try {
             setLoading(true);
+            setErrorMessage('');
+
             const response = await api.get('/users');
             setUsers(response.data.data);
         } catch (error) {
-            setErrorMessage('Gagal mengambil data user.');
+            const backendMessage =
+                error.response?.data?.message ||
+                'Gagal mengambil data user.';
+
+            setErrorMessage(backendMessage);
+            showErrorAlert('Gagal Mengambil User', backendMessage);
             console.error(error);
         } finally {
             setLoading(false);
@@ -45,9 +60,31 @@ export default function UserManagementPage() {
         }));
     };
 
-    const resetForm = () => {
+    const resetForm = async () => {
+        if (
+            formData.name ||
+            formData.username ||
+            formData.email ||
+            formData.password ||
+            editingUserId
+        ) {
+            const result = await showConfirmAlert({
+                title: 'Batalkan Form?',
+                text: 'Data yang sedang diisi akan dikosongkan.',
+                confirmButtonText: 'Ya, kosongkan',
+                icon: 'warning',
+                confirmButtonColor: '#dc2626',
+            });
+
+            if (!result.isConfirmed) {
+                return;
+            }
+        }
+
         setFormData(initialForm);
         setEditingUserId(null);
+        setMessage('');
+        setErrorMessage('');
     };
 
     const handleSubmit = async (event) => {
@@ -67,28 +104,69 @@ export default function UserManagementPage() {
             payload.password = formData.password;
         }
 
+        if (!editingUserId && !formData.password) {
+            setErrorMessage('Password wajib diisi saat membuat user baru.');
+            showWarningAlert(
+                'Password Wajib Diisi',
+                'Saat membuat user baru, password tidak boleh kosong.'
+            );
+            return;
+        }
+
+        const result = await showConfirmAlert({
+            title: editingUserId ? 'Update User?' : 'Tambah User Baru?',
+            text: editingUserId
+                ? 'Data akun akan diperbarui sesuai input terbaru.'
+                : 'Akun baru akan dibuat dan dapat digunakan untuk login.',
+            confirmButtonText: editingUserId ? 'Ya, update' : 'Ya, simpan',
+            icon: 'question',
+            confirmButtonColor: '#2563eb',
+        });
+
+        if (!result.isConfirmed) {
+            return;
+        }
+
+        showLoadingAlert(
+            editingUserId ? 'Memperbarui User' : 'Menyimpan User',
+            'Mohon tunggu, data sedang diproses.'
+        );
+
         try {
             if (editingUserId) {
                 const response = await api.put(`/users/${editingUserId}`, payload);
-                setMessage(response.data.message);
-            } else {
-                if (!formData.password) {
-                    setErrorMessage('Password wajib diisi saat membuat user baru.');
-                    return;
-                }
 
-                const response = await api.post('/users', payload);
+                closeAlert();
                 setMessage(response.data.message);
+
+                await showSuccessAlert(
+                    'User Berhasil Diperbarui',
+                    'Data akun sudah berhasil diperbarui.'
+                );
+            } else {
+                const response = await api.post('/users', payload);
+
+                closeAlert();
+                setMessage(response.data.message);
+
+                await showSuccessAlert(
+                    'User Berhasil Ditambahkan',
+                    'Akun baru sudah berhasil dibuat.'
+                );
             }
 
-            resetForm();
+            setFormData(initialForm);
+            setEditingUserId(null);
             await fetchUsers();
         } catch (error) {
+            closeAlert();
+
             const backendMessage =
                 error.response?.data?.message ||
                 'Gagal menyimpan user. Periksa kembali data yang diisi.';
 
             setErrorMessage(backendMessage);
+            showErrorAlert('Gagal Menyimpan User', backendMessage);
             console.error(error);
         }
     };
@@ -109,26 +187,53 @@ export default function UserManagementPage() {
         });
     };
 
-    const handleDelete = async (userId) => {
-        const confirmed = window.confirm('Yakin ingin menghapus user ini?');
+    const handleDelete = async (user) => {
+        if (adminUser.id === user.id) {
+            showWarningAlert(
+                'Tidak Bisa Menghapus Akun Sendiri',
+                'Akun yang sedang login tidak dapat dihapus.'
+            );
+            return;
+        }
 
-        if (!confirmed) {
+        const result = await showConfirmAlert({
+            title: 'Hapus User?',
+            text: `Akun ${user.name} dengan username ${user.username} akan dihapus.`,
+            confirmButtonText: 'Ya, hapus',
+            icon: 'warning',
+            confirmButtonColor: '#dc2626',
+        });
+
+        if (!result.isConfirmed) {
             return;
         }
 
         setMessage('');
         setErrorMessage('');
 
+        showLoadingAlert('Menghapus User', 'Mohon tunggu, akun sedang dihapus.');
+
         try {
-            const response = await api.delete(`/users/${userId}`);
+            const response = await api.delete(`/users/${user.id}`);
+
+            closeAlert();
+
             setMessage(response.data.message);
             await fetchUsers();
+
+            showSuccessAlert(
+                'User Berhasil Dihapus',
+                'Akun sudah dihapus dari sistem.'
+            );
         } catch (error) {
+            closeAlert();
+
             const backendMessage =
                 error.response?.data?.message ||
                 'Gagal menghapus user.';
 
             setErrorMessage(backendMessage);
+            showErrorAlert('Gagal Menghapus User', backendMessage);
             console.error(error);
         }
     };
@@ -138,7 +243,7 @@ export default function UserManagementPage() {
             <div className="page-header">
                 <div>
                     <h2>Data User</h2>
-                    <p>Hanya admin yang dapat membuat dan mengelola akun pengguna.</p>
+                    <p>Hanya superadmin yang dapat membuat dan mengelola akun pengguna.</p>
                 </div>
             </div>
 
@@ -148,7 +253,7 @@ export default function UserManagementPage() {
             <form className="form-card" onSubmit={handleSubmit}>
                 <h3>{editingUserId ? 'Edit User' : 'Tambah User'}</h3>
                 <p>
-                    Akun user tidak bisa membuat akun sendiri. Akun hanya dibuat oleh admin.
+                    Akun user tidak bisa membuat akun sendiri. Akun hanya dibuat oleh superadmin.
                 </p>
 
                 <div className="form-grid user-form-grid">
@@ -195,6 +300,7 @@ export default function UserManagementPage() {
                             onChange={handleInputChange}
                             required
                         >
+                            <option value="superadmin">Superadmin</option>
                             <option value="admin">Admin</option>
                             <option value="user">User</option>
                         </select>
@@ -291,7 +397,7 @@ export default function UserManagementPage() {
                                                 <button
                                                     className="btn btn-danger"
                                                     type="button"
-                                                    onClick={() => handleDelete(user.id)}
+                                                    onClick={() => handleDelete(user)}
                                                     disabled={adminUser.id === user.id}
                                                 >
                                                     Hapus

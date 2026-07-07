@@ -12,63 +12,109 @@ use Illuminate\Support\Facades\DB;
 class OrderController extends Controller
 {
     /**
-     * Menampilkan semua order.
-     * Untuk awal belum dibatasi role admin/user.
+     * Menampilkan semua permintaan merchandise.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $orders = Order::with(['items.product.category'])
+        $orders = Order::with(['user', 'items.product.category'])
             ->latest()
             ->get();
 
         return response()->json([
             'success' => true,
-            'message' => 'Daftar order berhasil diambil.',
+            'message' => 'Daftar permintaan merchandise berhasil diambil.',
             'data' => $orders,
         ]);
     }
 
     /**
-     * Menampilkan detail order.
+     * Menampilkan permintaan merchandise milik user yang sedang login.
+     */
+    public function myOrders(Request $request): JsonResponse
+    {
+        $orders = Order::with(['items.product.category'])
+            ->where('user_id', $request->user()->id)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Riwayat permintaan merchandise berhasil diambil.',
+            'data' => $orders,
+        ]);
+    }
+
+    /**
+     * Menampilkan detail permintaan merchandise.
      */
     public function show(string $id): JsonResponse
     {
-        $order = Order::with(['items.product.category'])->find($id);
+        $order = Order::with(['user', 'items.product.category'])->find($id);
 
         if (!$order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order tidak ditemukan.',
+                'message' => 'Permintaan merchandise tidak ditemukan.',
                 'data' => null,
             ], 404);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Detail order berhasil diambil.',
+            'message' => 'Detail permintaan merchandise berhasil diambil.',
             'data' => $order,
         ]);
     }
 
     /**
-     * Membuat checkout tanpa pembayaran.
+     * Membuat permintaan merchandise.
      */
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'user_note' => ['nullable', 'string'],
+            'event_name' => ['required', 'string', 'max:255'],
+            'institution_name' => ['required', 'string', 'max:255'],
+            'guest_name' => ['required', 'string', 'max:255'],
+            'guest_position' => ['required', 'string', 'max:255'],
+            'activity_date' => ['required', 'date'],
+            'user_note' => ['required', 'string'],
+
+            /**
+             * File bukti agar bisa dibuka langsung di browser.
+             * PDF/JPG/PNG biasanya bisa preview tanpa download.
+             */
+            'proof_file' => [
+                'required',
+                'file',
+                'mimes:pdf,jpg,jpeg,png',
+                'max:5120',
+            ],
+
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
         ]);
 
         try {
-            $order = DB::transaction(function () use ($validated) {
+            $order = DB::transaction(function () use ($validated, $request) {
+                $proofFile = $request->file('proof_file');
+
+                $proofFilePath = $proofFile->store('merchandise-proofs', 'public');
+
                 $order = Order::create([
-                    'user_id' => null,
+                    'user_id' => $request->user()->id,
                     'order_code' => $this->generateOrderCode(),
+                    'event_name' => $validated['event_name'],
+                    'institution_name' => $validated['institution_name'],
+                    'guest_name' => $validated['guest_name'],
+                    'guest_position' => $validated['guest_position'],
+                    'activity_date' => $validated['activity_date'],
+                    'proof_link' => null,
+                    'proof_file_path' => $proofFilePath,
+                    'proof_file_name' => $proofFile->getClientOriginalName(),
+                    'proof_file_mime' => $proofFile->getClientMimeType(),
+                    'user_note' => $validated['user_note'],
                     'status' => 'pending',
-                    'user_note' => $validated['user_note'] ?? null,
                     'submitted_at' => now(),
                 ]);
 
@@ -76,15 +122,15 @@ class OrderController extends Controller
                     $product = Product::findOrFail($item['product_id']);
 
                     if (!in_array($product->type, ['checkout', 'both'])) {
-                        throw new \Exception("Produk {$product->name} tidak bisa di-checkout.");
+                        throw new \Exception("Paket {$product->name} tidak bisa diajukan sebagai merchandise.");
                     }
 
                     if ($product->status !== 'active') {
-                        throw new \Exception("Produk {$product->name} sedang tidak aktif.");
+                        throw new \Exception("Paket {$product->name} sedang tidak aktif.");
                     }
 
                     if ($product->stock < $item['quantity']) {
-                        throw new \Exception("Stok produk {$product->name} tidak mencukupi.");
+                        throw new \Exception("Stok paket {$product->name} tidak mencukupi.");
                     }
 
                     $order->items()->create([
@@ -93,12 +139,12 @@ class OrderController extends Controller
                     ]);
                 }
 
-                return $order->load(['items.product.category']);
+                return $order->load(['user', 'items.product.category']);
             });
 
             return response()->json([
                 'success' => true,
-                'message' => 'Checkout berhasil dibuat dan menunggu approval admin.',
+                'message' => 'Permintaan merchandise berhasil diajukan dan menunggu approval.',
                 'data' => $order,
             ], 201);
         } catch (\Exception $exception) {
@@ -111,7 +157,7 @@ class OrderController extends Controller
     }
 
     /**
-     * Admin menyetujui order.
+     * Admin menyetujui permintaan merchandise.
      */
     public function approve(string $id): JsonResponse
     {
@@ -120,7 +166,7 @@ class OrderController extends Controller
         if (!$order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order tidak ditemukan.',
+                'message' => 'Permintaan merchandise tidak ditemukan.',
                 'data' => null,
             ], 404);
         }
@@ -128,7 +174,7 @@ class OrderController extends Controller
         if ($order->status !== 'pending') {
             return response()->json([
                 'success' => false,
-                'message' => 'Order hanya bisa disetujui jika status masih pending.',
+                'message' => 'Permintaan hanya bisa disetujui jika status masih pending.',
                 'data' => $order,
             ], 422);
         }
@@ -139,11 +185,11 @@ class OrderController extends Controller
                     $product = $item->product;
 
                     if (!$product) {
-                        throw new \Exception('Produk pada order tidak ditemukan.');
+                        throw new \Exception('Paket merchandise tidak ditemukan.');
                     }
 
                     if ($product->stock < $item->quantity) {
-                        throw new \Exception("Stok produk {$product->name} tidak mencukupi.");
+                        throw new \Exception("Stok paket {$product->name} tidak mencukupi.");
                     }
 
                     $product->decrement('stock', $item->quantity);
@@ -155,12 +201,10 @@ class OrderController extends Controller
                 ]);
             });
 
-            $order->load(['items.product.category']);
-
             return response()->json([
                 'success' => true,
-                'message' => 'Order berhasil disetujui.',
-                'data' => $order,
+                'message' => 'Permintaan merchandise berhasil disetujui.',
+                'data' => $order->load(['user', 'items.product.category']),
             ]);
         } catch (\Exception $exception) {
             return response()->json([
@@ -172,7 +216,7 @@ class OrderController extends Controller
     }
 
     /**
-     * Admin meminta revisi order.
+     * Admin meminta revisi permintaan merchandise.
      */
     public function revision(Request $request, string $id): JsonResponse
     {
@@ -185,7 +229,7 @@ class OrderController extends Controller
         if (!$order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order tidak ditemukan.',
+                'message' => 'Permintaan merchandise tidak ditemukan.',
                 'data' => null,
             ], 404);
         }
@@ -197,13 +241,13 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Order dikembalikan untuk revisi.',
-            'data' => $order->load(['items.product.category']),
+            'message' => 'Permintaan merchandise dikembalikan untuk revisi.',
+            'data' => $order->load(['user', 'items.product.category']),
         ]);
     }
 
     /**
-     * Admin menolak order.
+     * Admin menolak permintaan merchandise.
      */
     public function reject(Request $request, string $id): JsonResponse
     {
@@ -216,7 +260,7 @@ class OrderController extends Controller
         if (!$order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order tidak ditemukan.',
+                'message' => 'Permintaan merchandise tidak ditemukan.',
                 'data' => null,
             ], 404);
         }
@@ -229,13 +273,13 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Order berhasil ditolak.',
-            'data' => $order->load(['items.product.category']),
+            'message' => 'Permintaan merchandise berhasil ditolak.',
+            'data' => $order->load(['user', 'items.product.category']),
         ]);
     }
 
     /**
-     * Admin menyelesaikan order.
+     * Admin menandai permintaan merchandise selesai.
      */
     public function complete(string $id): JsonResponse
     {
@@ -244,7 +288,7 @@ class OrderController extends Controller
         if (!$order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order tidak ditemukan.',
+                'message' => 'Permintaan merchandise tidak ditemukan.',
                 'data' => null,
             ], 404);
         }
@@ -252,7 +296,7 @@ class OrderController extends Controller
         if ($order->status !== 'approved') {
             return response()->json([
                 'success' => false,
-                'message' => 'Order hanya bisa diselesaikan jika sudah approved.',
+                'message' => 'Permintaan hanya bisa diselesaikan jika status approved.',
                 'data' => $order,
             ], 422);
         }
@@ -264,13 +308,13 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Order berhasil diselesaikan.',
-            'data' => $order->load(['items.product.category']),
+            'message' => 'Permintaan merchandise berhasil diselesaikan.',
+            'data' => $order->load(['user', 'items.product.category']),
         ]);
     }
 
     private function generateOrderCode(): string
     {
-        return 'ORD-' . now()->format('YmdHis') . '-' . random_int(100, 999);
+        return 'MRC-' . now()->format('YmdHis') . '-' . random_int(100, 999);
     }
 }

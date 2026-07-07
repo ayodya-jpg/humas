@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
 import api from '../../api/axios';
+import {
+    closeAlert,
+    showConfirmAlert,
+    showErrorAlert,
+    showLoadingAlert,
+    showSuccessAlert,
+    showWarningAlert,
+} from '../../utils/sweetAlert';
 
 const initialForm = {
     name: '',
@@ -10,6 +18,7 @@ export default function CategoryManagementPage() {
     const [categories, setCategories] = useState([]);
     const [formData, setFormData] = useState(initialForm);
     const [editingCategoryId, setEditingCategoryId] = useState(null);
+
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
@@ -17,10 +26,17 @@ export default function CategoryManagementPage() {
     const fetchCategories = async () => {
         try {
             setLoading(true);
+            setErrorMessage('');
+
             const response = await api.get('/categories');
             setCategories(response.data.data);
         } catch (error) {
-            setErrorMessage('Gagal mengambil data kategori.');
+            const backendMessage =
+                error.response?.data?.message ||
+                'Gagal mengambil data kategori.';
+
+            setErrorMessage(backendMessage);
+            showErrorAlert('Gagal Mengambil Kategori', backendMessage);
             console.error(error);
         } finally {
             setLoading(false);
@@ -40,9 +56,25 @@ export default function CategoryManagementPage() {
         }));
     };
 
-    const resetForm = () => {
+    const resetForm = async () => {
+        if (formData.name || formData.description || editingCategoryId) {
+            const result = await showConfirmAlert({
+                title: 'Batalkan Form?',
+                text: 'Data kategori yang sedang diisi akan dikosongkan.',
+                confirmButtonText: 'Ya, kosongkan',
+                icon: 'warning',
+                confirmButtonColor: '#dc2626',
+            });
+
+            if (!result.isConfirmed) {
+                return;
+            }
+        }
+
         setFormData(initialForm);
         setEditingCategoryId(null);
+        setMessage('');
+        setErrorMessage('');
     };
 
     const handleSubmit = async (event) => {
@@ -51,23 +83,68 @@ export default function CategoryManagementPage() {
         setMessage('');
         setErrorMessage('');
 
+        if (!formData.name.trim()) {
+            showWarningAlert(
+                'Nama Kategori Wajib Diisi',
+                'Isi nama kategori terlebih dahulu sebelum menyimpan.'
+            );
+            return;
+        }
+
+        const result = await showConfirmAlert({
+            title: editingCategoryId ? 'Update Kategori?' : 'Tambah Kategori?',
+            text: editingCategoryId
+                ? 'Data kategori akan diperbarui.'
+                : 'Kategori baru akan ditambahkan ke master data.',
+            confirmButtonText: editingCategoryId ? 'Ya, update' : 'Ya, simpan',
+            icon: 'question',
+            confirmButtonColor: '#2563eb',
+        });
+
+        if (!result.isConfirmed) {
+            return;
+        }
+
+        showLoadingAlert(
+            editingCategoryId ? 'Memperbarui Kategori' : 'Menyimpan Kategori',
+            'Mohon tunggu, data sedang diproses.'
+        );
+
         try {
             if (editingCategoryId) {
                 const response = await api.put(`/categories/${editingCategoryId}`, formData);
+
+                closeAlert();
                 setMessage(response.data.message);
+
+                await showSuccessAlert(
+                    'Kategori Berhasil Diperbarui',
+                    'Data kategori sudah diperbarui.'
+                );
             } else {
                 const response = await api.post('/categories', formData);
+
+                closeAlert();
                 setMessage(response.data.message);
+
+                await showSuccessAlert(
+                    'Kategori Berhasil Ditambahkan',
+                    'Kategori baru sudah masuk ke master data.'
+                );
             }
 
-            resetForm();
+            setFormData(initialForm);
+            setEditingCategoryId(null);
             await fetchCategories();
         } catch (error) {
+            closeAlert();
+
             const backendMessage =
                 error.response?.data?.message ||
                 'Gagal menyimpan kategori. Periksa kembali data yang diisi.';
 
             setErrorMessage(backendMessage);
+            showErrorAlert('Gagal Menyimpan Kategori', backendMessage);
             console.error(error);
         }
     };
@@ -85,26 +162,45 @@ export default function CategoryManagementPage() {
         });
     };
 
-    const handleDelete = async (categoryId) => {
-        const confirmed = window.confirm('Yakin ingin menghapus kategori ini?');
+    const handleDelete = async (category) => {
+        const result = await showConfirmAlert({
+            title: 'Hapus Kategori?',
+            text: `Kategori "${category.name}" akan dihapus dari master data.`,
+            confirmButtonText: 'Ya, hapus',
+            icon: 'warning',
+            confirmButtonColor: '#dc2626',
+        });
 
-        if (!confirmed) {
+        if (!result.isConfirmed) {
             return;
         }
 
         setMessage('');
         setErrorMessage('');
 
+        showLoadingAlert('Menghapus Kategori', 'Mohon tunggu, kategori sedang dihapus.');
+
         try {
-            const response = await api.delete(`/categories/${categoryId}`);
+            const response = await api.delete(`/categories/${category.id}`);
+
+            closeAlert();
             setMessage(response.data.message);
+
             await fetchCategories();
+
+            showSuccessAlert(
+                'Kategori Berhasil Dihapus',
+                'Data kategori sudah dihapus dari sistem.'
+            );
         } catch (error) {
+            closeAlert();
+
             const backendMessage =
                 error.response?.data?.message ||
-                'Gagal menghapus kategori.';
+                'Gagal menghapus kategori. Pastikan kategori tidak sedang digunakan.';
 
             setErrorMessage(backendMessage);
+            showErrorAlert('Gagal Menghapus Kategori', backendMessage);
             console.error(error);
         }
     };
@@ -114,7 +210,10 @@ export default function CategoryManagementPage() {
             <div className="page-header">
                 <div>
                     <h2>Data Kategori</h2>
-                    <p>Admin dapat mengelola kategori produk untuk katalog dan peminjaman.</p>
+                    <p>
+                        Kelola kategori master untuk merchandise, alat Sekpim,
+                        dan kebutuhan pendukung lainnya.
+                    </p>
                 </div>
             </div>
 
@@ -123,9 +222,11 @@ export default function CategoryManagementPage() {
 
             <form className="form-card" onSubmit={handleSubmit}>
                 <h3>{editingCategoryId ? 'Edit Kategori' : 'Tambah Kategori'}</h3>
-                <p>Kategori digunakan untuk mengelompokkan produk.</p>
+                <p>
+                    Kategori digunakan untuk mengelompokkan paket merchandise atau barang.
+                </p>
 
-                <div className="form-grid category-form-grid">
+                <div className="form-grid">
                     <div className="form-group">
                         <label>Nama Kategori</label>
                         <input
@@ -133,19 +234,19 @@ export default function CategoryManagementPage() {
                             name="name"
                             value={formData.name}
                             onChange={handleInputChange}
-                            placeholder="Contoh: Peralatan Kantor"
+                            placeholder="Contoh: Merchandise"
                             required
                         />
                     </div>
 
-                    <div className="form-group span-2">
+                    <div className="form-group">
                         <label>Deskripsi</label>
-                        <textarea
+                        <input
+                            type="text"
                             name="description"
                             value={formData.description}
                             onChange={handleInputChange}
-                            placeholder="Masukkan deskripsi kategori"
-                            rows="4"
+                            placeholder="Contoh: Paket merchandise untuk tamu eksternal"
                         />
                     </div>
                 </div>
@@ -155,13 +256,13 @@ export default function CategoryManagementPage() {
                         {editingCategoryId ? 'Update Kategori' : 'Simpan Kategori'}
                     </button>
 
-                    {editingCategoryId && (
+                    {(editingCategoryId || formData.name || formData.description) && (
                         <button
                             className="btn btn-dark"
                             type="button"
                             onClick={resetForm}
                         >
-                            Batal Edit
+                            Batal
                         </button>
                     )}
                 </div>
@@ -170,7 +271,7 @@ export default function CategoryManagementPage() {
             <div className="page-section">
                 <div className="section-heading">
                     <h3>Daftar Kategori</h3>
-                    <p>Data kategori yang tersimpan di backend Laravel.</p>
+                    <p>Master kategori yang tersedia di sistem.</p>
                 </div>
 
                 {loading && (
@@ -203,7 +304,7 @@ export default function CategoryManagementPage() {
                                         <td>
                                             <strong>{category.name}</strong>
                                         </td>
-                                        <td>{category.slug}</td>
+                                        <td>{category.slug || '-'}</td>
                                         <td>{category.description || '-'}</td>
                                         <td>
                                             <div className="table-actions">
@@ -218,7 +319,7 @@ export default function CategoryManagementPage() {
                                                 <button
                                                     className="btn btn-danger"
                                                     type="button"
-                                                    onClick={() => handleDelete(category.id)}
+                                                    onClick={() => handleDelete(category)}
                                                 >
                                                     Hapus
                                                 </button>

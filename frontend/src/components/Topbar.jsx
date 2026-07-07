@@ -3,7 +3,6 @@ import api from '../api/axios';
 
 export default function Topbar() {
     const navigate = useNavigate();
-
     const adminUser = JSON.parse(localStorage.getItem('admin_user') || '{}');
 
     const handleLogout = async () => {
@@ -20,19 +19,29 @@ export default function Topbar() {
 
     return (
         <header className="topbar">
-            <div>
-                <h1>Admin HUMAS & SEKPIM</h1>
-                <p>Kelola merchandise, layanan humas, dan peminjaman alat Sekpim.</p>
+            <div className="topbar-left">
+                <div className="topbar-logo-box">
+                    <img
+                        src="/images/logo-putih-tus.png"
+                        alt="Telkom University Surabaya"
+                        className="topbar-logo-image"
+                    />
+                </div>
+
+                <div>
+                    <h1>HUMAS & SEKPIM</h1>
+                    <p>Service Request System — Telkom University Surabaya</p>
+                </div>
             </div>
 
             <div className="topbar-user">
                 <div className="user-info">
-                    <strong>{adminUser.name || 'Administrator'}</strong>
-                    <span>{adminUser.role || 'admin'}</span>
+                    <strong>{adminUser.name || 'User'}</strong>
+                    <span>{adminUser.role || 'user'}</span>
                 </div>
 
                 <div className="avatar">
-                    {(adminUser.name || 'A').charAt(0)}
+                    {(adminUser.name || 'U').charAt(0)}
                 </div>
 
                 <button className="btn btn-danger" type="button" onClick={handleLogout}>
