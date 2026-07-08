@@ -80,33 +80,7 @@ class BorrowRequestController extends Controller
 
         try {
             $borrowRequest = DB::transaction(function () use ($request, $validated) {
-                foreach ($validated['items'] as $item) {
-                    $product = Product::findOrFail($item['product_id']);
-
-                    if ($product->status !== 'active') {
-                        abort(response()->json([
-                            'success' => false,
-                            'message' => "Barang {$product->name} sedang tidak aktif.",
-                            'data' => null,
-                        ], 422));
-                    }
-
-                    if (!in_array($product->type, ['borrow', 'both'], true)) {
-                        abort(response()->json([
-                            'success' => false,
-                            'message' => "Barang {$product->name} tidak tersedia untuk peminjaman.",
-                            'data' => null,
-                        ], 422));
-                    }
-
-                    if ($product->stock < $item['quantity']) {
-                        abort(response()->json([
-                            'success' => false,
-                            'message' => "Stok {$product->name} tidak mencukupi.",
-                            'data' => null,
-                        ], 422));
-                    }
-                }
+                $this->validateBorrowItems($validated['items']);
 
                 $borrowRequest = BorrowRequest::create([
                     'user_id' => $request->user()->id,
@@ -143,10 +117,95 @@ class BorrowRequestController extends Controller
                 throw $error;
             }
 
+            report($error);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Pengajuan peminjaman gagal dikirim.',
-                'data' => config('app.debug') ? $error->getMessage() : null,
+                'data' => null,
+            ], 500);
+        }
+    }
+
+    public function resubmit(Request $request, int $id): JsonResponse
+    {
+        $borrowRequest = BorrowRequest::with('items')->findOrFail($id);
+
+        if (!$this->canAccessBorrowRequest($request, $borrowRequest)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak. Kamu tidak memiliki izin mengubah pengajuan peminjaman ini.',
+                'data' => null,
+            ], 403);
+        }
+
+        if ($borrowRequest->status !== 'revision') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pengajuan peminjaman hanya bisa diajukan ulang saat status revision.',
+                'data' => null,
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'purpose' => ['required', 'string'],
+            'borrow_date' => ['required', 'date'],
+            'return_date' => ['required', 'date', 'after_or_equal:borrow_date'],
+
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'exists:products,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+        ]);
+
+        try {
+            $updatedBorrowRequest = DB::transaction(function () use ($borrowRequest, $validated) {
+                $this->validateBorrowItems($validated['items']);
+
+                $borrowRequest->update([
+                    'purpose' => $validated['purpose'],
+                    'borrow_date' => $validated['borrow_date'],
+                    'return_date' => $validated['return_date'],
+                    'status' => 'pending',
+                    'admin_note' => null,
+                    'submitted_at' => now(),
+                    'approved_at' => null,
+                    'rejected_at' => null,
+                    'borrowed_at' => null,
+                    'returned_at' => null,
+                ]);
+
+                $borrowRequest->items()->delete();
+
+                foreach ($validated['items'] as $item) {
+                    BorrowRequestItem::create([
+                        'borrow_request_id' => $borrowRequest->id,
+                        'product_id' => $item['product_id'],
+                        'quantity' => $item['quantity'],
+                    ]);
+                }
+
+                return $borrowRequest->fresh([
+                    'user',
+                    'items.product.category',
+                ]);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengajuan peminjaman berhasil diajukan ulang.',
+                'data' => $updatedBorrowRequest,
+            ]);
+        } catch (\Throwable $error) {
+            if ($error instanceof \Illuminate\Http\Exceptions\HttpResponseException) {
+                throw $error;
+            }
+
+            report($error);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Pengajuan peminjaman gagal diajukan ulang.',
+                'data' => null,
             ], 500);
         }
     }
@@ -200,10 +259,12 @@ class BorrowRequestController extends Controller
                 throw $error;
             }
 
+            report($error);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Approval peminjaman gagal diproses.',
-                'data' => config('app.debug') ? $error->getMessage() : null,
+                'data' => null,
             ], 500);
         }
     }
@@ -341,5 +402,36 @@ class BorrowRequestController extends Controller
         }
 
         return $borrowRequest->user_id === $user->id;
+    }
+
+    private function validateBorrowItems(array $items): void
+    {
+        foreach ($items as $item) {
+            $product = Product::findOrFail($item['product_id']);
+
+            if ($product->status !== 'active') {
+                abort(response()->json([
+                    'success' => false,
+                    'message' => "Barang {$product->name} sedang tidak aktif.",
+                    'data' => null,
+                ], 422));
+            }
+
+            if (!in_array($product->type, ['borrow', 'both'], true)) {
+                abort(response()->json([
+                    'success' => false,
+                    'message' => "Barang {$product->name} tidak tersedia untuk peminjaman.",
+                    'data' => null,
+                ], 422));
+            }
+
+            if ($product->stock < $item['quantity']) {
+                abort(response()->json([
+                    'success' => false,
+                    'message' => "Stok {$product->name} tidak mencukupi.",
+                    'data' => null,
+                ], 422));
+            }
+        }
     }
 }

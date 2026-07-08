@@ -2,38 +2,30 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Topbar from '../components/Topbar';
+import Breadcrumbs from '../components/Breadcrumbs';
 
 export default function DashboardLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    const openSidebar = () => {
-        setSidebarOpen(true);
-    };
-
-    const closeSidebar = () => {
-        setSidebarOpen(false);
-    };
-
     return (
-        <div className="app-shell">
+        <div className="dashboard-shell">
             <Sidebar
-                isOpen={sidebarOpen}
-                onClose={closeSidebar}
+                sidebarOpen={sidebarOpen}
+                setSidebarOpen={setSidebarOpen}
+                isSidebarOpen={sidebarOpen}
+                setIsSidebarOpen={setSidebarOpen}
             />
 
-            {sidebarOpen && (
-                <button
-                    type="button"
-                    className="sidebar-backdrop d-lg-none"
-                    onClick={closeSidebar}
-                    aria-label="Close sidebar"
+            <div className="dashboard-main">
+                <Topbar
+                    sidebarOpen={sidebarOpen}
+                    setSidebarOpen={setSidebarOpen}
+                    isSidebarOpen={sidebarOpen}
+                    setIsSidebarOpen={setSidebarOpen}
                 />
-            )}
 
-            <div className="app-main">
-                <Topbar onOpenSidebar={openSidebar} />
-
-                <main className="app-content">
+                <main className="dashboard-content">
+                    <Breadcrumbs />
                     <Outlet />
                 </main>
             </div>

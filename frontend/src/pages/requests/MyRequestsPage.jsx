@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../api/axios';
+import { showErrorAlert } from '../../utils/sweetAlert';
 
 const statusOptions = [
     { key: 'all', label: 'Semua' },
@@ -60,7 +62,12 @@ export default function MyRequestsPage() {
             setOrders(ordersResponse.data.data || []);
             setBorrowRequests(borrowResponse.data.data || []);
         } catch (error) {
-            console.error(error);
+            console.error('Fetch my requests error:', error.response?.data || error);
+
+            showErrorAlert(
+                'Gagal Memuat Riwayat',
+                error.response?.data?.message || 'Riwayat pengajuan gagal dimuat.'
+            );
         } finally {
             setLoading(false);
         }
@@ -129,7 +136,6 @@ export default function MyRequestsPage() {
             merchandise: histories.filter((item) => item.history_type === 'merchandise').length,
             borrowing: histories.filter((item) => item.history_type === 'borrowing').length,
             pending: histories.filter((item) => item.status === 'pending').length,
-            approved: histories.filter((item) => item.status === 'approved').length,
             revision: histories.filter((item) => item.status === 'revision').length,
         };
     }, [histories]);
@@ -151,16 +157,16 @@ export default function MyRequestsPage() {
                             </span>
 
                             <h1 className="display-6 fw-black mb-3">
-                                Pantau semua pengajuan kamu di satu halaman.
+                                Riwayat pengajuan kamu.
                             </h1>
 
                             <p
                                 className="mb-0 text-white-50"
                                 style={{ maxWidth: 720, lineHeight: 1.8 }}
                             >
-                                Halaman ini menampilkan riwayat pengajuan merchandise dan
-                                peminjaman barang Sekpim, lengkap dengan status approval
-                                serta catatan dari admin.
+                                Halaman ini dibuat ringkas. Untuk melihat detail item,
+                                catatan admin, lampiran, atau mengajukan ulang revisi,
+                                buka halaman detail pengajuan.
                             </p>
                         </div>
 
@@ -284,36 +290,47 @@ export default function MyRequestsPage() {
                         <div className="col-12" key={`${item.history_type}-${item.id}`}>
                             <div className="card border-0 shadow-sm rounded-5 overflow-hidden">
                                 <div className="card-body p-4">
-                                    <div className="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
-                                        <div className="d-flex gap-3">
-                                            <div
-                                                className={`icon-box bg-${item.history_color}-subtle text-${item.history_color}`}
-                                            >
-                                                <i className={`bi ${item.history_icon} fs-4`}></i>
-                                            </div>
-
-                                            <div>
-                                                <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
-                                                    <span className={`badge rounded-pill text-bg-${item.history_color}`}>
-                                                        {item.history_label}
-                                                    </span>
-
-                                                    <span className={`status status-${item.status}`}>
-                                                        {item.status}
-                                                    </span>
+                                    <div className="row g-4 align-items-center">
+                                        <div className="col-lg-6">
+                                            <div className="d-flex gap-3">
+                                                <div
+                                                    className={`icon-box bg-${item.history_color}-subtle text-${item.history_color}`}
+                                                >
+                                                    <i className={`bi ${item.history_icon} fs-4`}></i>
                                                 </div>
 
-                                                <h5 className="fw-black mb-1">
-                                                    {item.title || '-'}
-                                                </h5>
+                                                <div>
+                                                    <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                                        <span className={`badge rounded-pill text-bg-${item.history_color}`}>
+                                                            {item.history_label}
+                                                        </span>
 
-                                                <p className="text-muted mb-0">
-                                                    {item.code || '-'} • {item.subtitle || '-'}
-                                                </p>
+                                                        <span className={`status status-${item.status}`}>
+                                                            {item.status}
+                                                        </span>
+                                                    </div>
+
+                                                    <h5 className="fw-black mb-1">
+                                                        {item.title || '-'}
+                                                    </h5>
+
+                                                    <p className="text-muted mb-0">
+                                                        {item.code || '-'} • {item.subtitle || '-'}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="text-lg-end">
+                                        <div className="col-md-6 col-lg-2">
+                                            <div className="small text-muted">
+                                                Tanggal utama
+                                            </div>
+                                            <div className="fw-bold">
+                                                {formatDate(item.main_date)}
+                                            </div>
+                                        </div>
+
+                                        <div className="col-md-6 col-lg-2">
                                             <div className="small text-muted">
                                                 Tanggal submit
                                             </div>
@@ -321,128 +338,55 @@ export default function MyRequestsPage() {
                                                 {formatDateTime(item.submitted_date)}
                                             </div>
                                         </div>
+
+                                        <div className="col-lg-2 text-lg-end">
+                                            <Link
+                                                to={`/admin/my-requests/${item.history_type}/${item.id}/detail`}
+                                                className={`btn rounded-pill ${
+                                                    item.history_type === 'borrowing'
+                                                        ? 'btn-success'
+                                                        : 'btn-primary'
+                                                }`}
+                                            >
+                                                <i className="bi bi-eye-fill me-2"></i>
+                                                Detail
+                                            </Link>
+                                        </div>
                                     </div>
 
-                                    {item.history_type === 'merchandise' && (
-                                        <div className="row g-3 mb-3">
-                                            <div className="col-md-3">
-                                                <div className="p-3 rounded-4 bg-light h-100">
-                                                    <div className="small text-muted">Nama tamu</div>
-                                                    <div className="fw-bold">{item.guest_name || '-'}</div>
-                                                </div>
-                                            </div>
-
-                                            <div className="col-md-3">
-                                                <div className="p-3 rounded-4 bg-light h-100">
-                                                    <div className="small text-muted">Jabatan tamu</div>
-                                                    <div className="fw-bold">{item.guest_position || '-'}</div>
-                                                </div>
-                                            </div>
-
-                                            <div className="col-md-3">
-                                                <div className="p-3 rounded-4 bg-light h-100">
-                                                    <div className="small text-muted">Tanggal kegiatan</div>
-                                                    <div className="fw-bold">{formatDate(item.activity_date)}</div>
-                                                </div>
-                                            </div>
-
-                                            <div className="col-md-3">
-                                                <div className="p-3 rounded-4 bg-light h-100">
-                                                    <div className="small text-muted">Lampiran</div>
-                                                    {item.proof_file_url ? (
-                                                        <a
-                                                            href={item.proof_file_url}
-                                                            className="fw-bold"
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                        >
-                                                            Buka file
-                                                        </a>
-                                                    ) : (
-                                                        <div className="fw-bold">-</div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {item.history_type === 'borrowing' && (
-                                        <div className="row g-3 mb-3">
-                                            <div className="col-md-4">
-                                                <div className="p-3 rounded-4 bg-light h-100">
-                                                    <div className="small text-muted">Tanggal pinjam</div>
-                                                    <div className="fw-bold">{formatDate(item.borrow_date)}</div>
-                                                </div>
-                                            </div>
-
-                                            <div className="col-md-4">
-                                                <div className="p-3 rounded-4 bg-light h-100">
-                                                    <div className="small text-muted">Tanggal kembali</div>
-                                                    <div className="fw-bold">{formatDate(item.return_date)}</div>
-                                                </div>
-                                            </div>
-
-                                            <div className="col-md-4">
-                                                <div className="p-3 rounded-4 bg-light h-100">
-                                                    <div className="small text-muted">Kode peminjaman</div>
-                                                    <div className="fw-bold">{item.borrow_code || '-'}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="table-responsive rounded-4 border mb-3">
-                                        <table className="table align-middle mb-0">
-                                            <thead className="table-light">
-                                                <tr>
-                                                    <th>Item</th>
-                                                    <th>Kategori</th>
-                                                    <th className="text-end">Qty</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {item.items?.map((requestItem) => (
-                                                    <tr key={requestItem.id}>
-                                                        <td className="fw-bold">
-                                                            {requestItem.product?.name || '-'}
-                                                        </td>
-                                                        <td>
-                                                            {requestItem.product?.category?.name || '-'}
-                                                        </td>
-                                                        <td className="text-end fw-bold">
-                                                            {requestItem.quantity}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <div className="row g-3">
-                                        {item.history_type === 'merchandise' && (
-                                            <div className="col-md-6">
-                                                <div className="p-3 rounded-4 border h-100">
-                                                    <div className="small fw-bold text-muted mb-1">
-                                                        Catatan pemohon
+                                    {item.status === 'revision' && (
+                                        <div className="mt-3 p-3 rounded-4 bg-warning-subtle border border-warning-subtle">
+                                            <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                                                <div>
+                                                    <div className="fw-black text-warning-emphasis">
+                                                        Pengajuan perlu direvisi
                                                     </div>
-                                                    <p className="mb-0 text-muted" style={{ lineHeight: 1.7 }}>
-                                                        {item.user_note || '-'}
-                                                    </p>
+                                                    <div className="small text-muted">
+                                                        Buka detail untuk melihat catatan admin dan mengajukan ulang.
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
 
-                                        <div className={item.history_type === 'merchandise' ? 'col-md-6' : 'col-12'}>
-                                            <div className="p-3 rounded-4 border h-100">
-                                                <div className="small fw-bold text-muted mb-1">
-                                                    Catatan admin
-                                                </div>
-                                                <p className="mb-0 text-muted" style={{ lineHeight: 1.7 }}>
-                                                    {item.admin_note || 'Belum ada catatan admin.'}
-                                                </p>
+                                                <Link
+                                                    to={`/admin/my-requests/${item.history_type}/${item.id}/resubmit`}
+                                                    className="btn btn-warning rounded-pill text-white"
+                                                >
+                                                    <i className="bi bi-pencil-square me-2"></i>
+                                                    Ajukan Ulang
+                                                </Link>
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
+
+                                    {item.admin_note && item.status !== 'revision' && (
+                                        <div className="mt-3 p-3 rounded-4 bg-light border">
+                                            <div className="small fw-bold text-muted mb-1">
+                                                Catatan admin terakhir
+                                            </div>
+                                            <p className="mb-0 text-muted">
+                                                {item.admin_note}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

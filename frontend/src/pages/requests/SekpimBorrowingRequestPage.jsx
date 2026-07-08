@@ -2,168 +2,175 @@ import { useEffect, useMemo, useState } from 'react';
 import api from '../../api/axios';
 import {
     closeAlert,
-    showConfirmAlert,
     showErrorAlert,
     showLoadingAlert,
     showSuccessAlert,
     showWarningAlert,
 } from '../../utils/sweetAlert';
 
-const initialBorrowingForm = {
+const initialForm = {
+    purpose: '',
     borrow_date: '',
     return_date: '',
-    purpose: '',
+};
+
+const formatDate = (date) => {
+    if (!date) return '-';
+
+    return new Date(date).toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
 };
 
 export default function SekpimBorrowingRequestPage() {
-    const [items, setItems] = useState([]);
+    const [products, setProducts] = useState([]);
     const [cart, setCart] = useState([]);
-    const [formData, setFormData] = useState(initialBorrowingForm);
-
-    const [loadingItems, setLoadingItems] = useState(true);
+    const [form, setForm] = useState(initialForm);
+    const [search, setSearch] = useState('');
+    const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
 
-    const [message, setMessage] = useState('');
-    const [errorMessage, setErrorMessage] = useState('');
-    const [searchKeyword, setSearchKeyword] = useState('');
-
-    const fetchBorrowItems = async () => {
+    const fetchProducts = async () => {
         try {
-            setLoadingItems(true);
-            setErrorMessage('');
+            setLoading(true);
 
             const response = await api.get('/products');
+            const productData = response.data.data || [];
 
-            const borrowItems = response.data.data.filter((item) => {
-                return item.status === 'active' && (item.type === 'borrow' || item.type === 'both');
+            const borrowProducts = productData.filter((product) => {
+                return (
+                    product.status === 'active' &&
+                    ['borrow', 'both'].includes(product.type)
+                );
             });
 
-            setItems(borrowItems);
+            setProducts(borrowProducts);
         } catch (error) {
-            const backendMessage =
-                error.response?.data?.message ||
-                'Gagal mengambil data barang peminjaman.';
+            console.error('Fetch borrowing products error:', error.response?.data || error);
 
-            setErrorMessage(backendMessage);
-            showErrorAlert('Gagal Mengambil Barang', backendMessage);
-            console.error(error);
+            showErrorAlert(
+                'Gagal Memuat Data',
+                error.response?.data?.message || 'Data barang peminjaman gagal dimuat dari server.'
+            );
         } finally {
-            setLoadingItems(false);
+            setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchBorrowItems();
+        fetchProducts();
     }, []);
 
-    const filteredItems = useMemo(() => {
-        const keyword = searchKeyword.toLowerCase();
+    const filteredProducts = useMemo(() => {
+        const searchValue = search.toLowerCase();
 
-        return items.filter((item) => {
+        return products.filter((product) => {
             return (
-                item.name?.toLowerCase().includes(keyword) ||
-                item.description?.toLowerCase().includes(keyword) ||
-                item.category?.name?.toLowerCase().includes(keyword)
+                product.name?.toLowerCase().includes(searchValue) ||
+                product.description?.toLowerCase().includes(searchValue) ||
+                product.category?.name?.toLowerCase().includes(searchValue)
             );
         });
-    }, [items, searchKeyword]);
+    }, [products, search]);
 
-    const cartTotalQuantity = useMemo(() => {
-        return cart.reduce((total, item) => total + item.quantity, 0);
-    }, [cart]);
+    const selectedItems = useMemo(() => {
+        return cart
+            .map((cartItem) => {
+                const product = products.find((item) => item.id === cartItem.product_id);
 
-    const getCartItem = (itemId) => {
-        return cart.find((item) => item.product_id === itemId);
+                return {
+                    ...cartItem,
+                    product,
+                };
+            })
+            .filter((item) => item.product);
+    }, [cart, products]);
+
+    const totalQty = useMemo(() => {
+        return selectedItems.reduce((total, item) => total + item.quantity, 0);
+    }, [selectedItems]);
+
+    const getBackendErrorMessage = (error) => {
+        const responseData = error.response?.data;
+
+        if (responseData?.errors) {
+            const firstError = Object.values(responseData.errors)?.[0]?.[0];
+
+            if (firstError) {
+                return firstError;
+            }
+        }
+
+        if (responseData?.message) {
+            return responseData.message;
+        }
+
+        return 'Pengajuan peminjaman gagal dikirim.';
     };
 
-    const handleInputChange = (event) => {
-        const { name, value } = event.target;
-
-        setFormData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-    };
-
-    const handleAddToCart = (item) => {
-        setMessage('');
-        setErrorMessage('');
-
-        if (item.stock <= 0) {
-            setErrorMessage('Stok barang ini sedang kosong.');
-            showWarningAlert('Stok Kosong', 'Barang ini belum tersedia untuk dipinjam.');
+    const handleAddToCart = (product) => {
+        if (product.stock <= 0) {
+            showWarningAlert('Stok Habis', 'Barang ini tidak memiliki stok tersedia.');
             return;
         }
 
         setCart((prevCart) => {
-            const existingItem = prevCart.find((cartItem) => cartItem.product_id === item.id);
+            const existingItem = prevCart.find((item) => item.product_id === product.id);
 
             if (existingItem) {
-                if (existingItem.quantity >= item.stock) {
-                    setErrorMessage('Jumlah barang sudah mencapai batas stok.');
+                if (existingItem.quantity >= product.stock) {
                     showWarningAlert(
-                        'Batas Stok Tercapai',
-                        'Jumlah item di keranjang sudah sesuai stok maksimal yang tersedia.'
+                        'Stok Tidak Cukup',
+                        `Stok ${product.name} hanya tersedia ${product.stock}.`
                     );
+
                     return prevCart;
                 }
 
-                return prevCart.map((cartItem) =>
-                    cartItem.product_id === item.id
-                        ? {
-                            ...cartItem,
-                            quantity: cartItem.quantity + 1,
-                        }
-                        : cartItem
+                return prevCart.map((item) =>
+                    item.product_id === product.id
+                        ? { ...item, quantity: item.quantity + 1 }
+                        : item
                 );
             }
 
             return [
                 ...prevCart,
                 {
-                    product_id: item.id,
-                    name: item.name,
-                    description: item.description,
-                    stock: item.stock,
-                    image: item.image,
-                    category: item.category,
+                    product_id: product.id,
                     quantity: 1,
                 },
             ];
         });
     };
 
-    const handleDecreaseCart = (itemId) => {
+    const handleDecreaseQty = (productId) => {
         setCart((prevCart) => {
             return prevCart
                 .map((item) =>
-                    item.product_id === itemId
-                        ? {
-                            ...item,
-                            quantity: item.quantity - 1,
-                        }
+                    item.product_id === productId
+                        ? { ...item, quantity: item.quantity - 1 }
                         : item
                 )
                 .filter((item) => item.quantity > 0);
         });
     };
 
-    const handleIncreaseCart = (itemId) => {
-        setMessage('');
-        setErrorMessage('');
-
+    const handleIncreaseQty = (product) => {
         setCart((prevCart) => {
             return prevCart.map((item) => {
-                if (item.product_id !== itemId) {
+                if (item.product_id !== product.id) {
                     return item;
                 }
 
-                if (item.quantity >= item.stock) {
-                    setErrorMessage('Jumlah barang sudah mencapai batas stok.');
+                if (item.quantity >= product.stock) {
                     showWarningAlert(
-                        'Batas Stok Tercapai',
-                        'Jumlah item di keranjang sudah sesuai stok maksimal yang tersedia.'
+                        'Stok Tidak Cukup',
+                        `Stok ${product.name} hanya tersedia ${product.stock}.`
                     );
+
                     return item;
                 }
 
@@ -175,85 +182,56 @@ export default function SekpimBorrowingRequestPage() {
         });
     };
 
-    const handleRemoveCart = async (itemId) => {
-        const selectedItem = cart.find((item) => item.product_id === itemId);
-
-        const result = await showConfirmAlert({
-            title: 'Hapus dari Keranjang?',
-            text: selectedItem
-                ? `${selectedItem.name} akan dihapus dari keranjang.`
-                : 'Item ini akan dihapus dari keranjang.',
-            confirmButtonText: 'Ya, hapus',
-            icon: 'warning',
-            confirmButtonColor: '#dc2626',
-        });
-
-        if (!result.isConfirmed) {
-            return;
-        }
-
-        setCart((prevCart) => prevCart.filter((item) => item.product_id !== itemId));
-
-        showSuccessAlert('Berhasil Dihapus', 'Item telah dihapus dari keranjang.');
+    const handleRemoveItem = (productId) => {
+        setCart((prevCart) => prevCart.filter((item) => item.product_id !== productId));
     };
 
-    const resetAll = async () => {
-        const hasData =
-            cart.length > 0 ||
-            formData.borrow_date ||
-            formData.return_date ||
-            formData.purpose;
+    const handleChange = (event) => {
+        const { name, value } = event.target;
 
-        if (hasData) {
-            const result = await showConfirmAlert({
-                title: 'Reset Form?',
-                text: 'Semua data peminjaman dan keranjang akan dikosongkan.',
-                confirmButtonText: 'Ya, reset',
-                icon: 'warning',
-                confirmButtonColor: '#dc2626',
-            });
-
-            if (!result.isConfirmed) {
-                return;
-            }
-        }
-
-        setCart([]);
-        setFormData(initialBorrowingForm);
-        setMessage('');
-        setErrorMessage('');
+        setForm((prevForm) => ({
+            ...prevForm,
+            [name]: value,
+        }));
     };
 
     const validateForm = () => {
-        if (cart.length === 0) {
-            setErrorMessage('Keranjang peminjaman masih kosong.');
-            showWarningAlert('Keranjang Kosong', 'Pilih minimal satu barang sebelum mengajukan peminjaman.');
-            return false;
-        }
-
-        if (!formData.borrow_date || !formData.return_date) {
-            setErrorMessage('Tanggal pinjam dan tanggal kembali wajib diisi.');
+        if (selectedItems.length === 0) {
             showWarningAlert(
-                'Tanggal Wajib Diisi',
-                'Isi tanggal pinjam dan tanggal kembali terlebih dahulu.'
+                'Keranjang Kosong',
+                'Tambahkan minimal satu barang ke keranjang peminjaman.'
             );
             return false;
         }
 
-        if (new Date(formData.return_date) < new Date(formData.borrow_date)) {
-            setErrorMessage('Tanggal kembali tidak boleh lebih awal dari tanggal pinjam.');
+        if (!form.purpose.trim()) {
+            showWarningAlert(
+                'Keperluan Wajib Diisi',
+                'Isi keperluan peminjaman terlebih dahulu.'
+            );
+            return false;
+        }
+
+        if (!form.borrow_date) {
+            showWarningAlert(
+                'Tanggal Pinjam Wajib Diisi',
+                'Pilih tanggal mulai peminjaman.'
+            );
+            return false;
+        }
+
+        if (!form.return_date) {
+            showWarningAlert(
+                'Tanggal Kembali Wajib Diisi',
+                'Pilih tanggal pengembalian barang.'
+            );
+            return false;
+        }
+
+        if (new Date(form.return_date) < new Date(form.borrow_date)) {
             showWarningAlert(
                 'Tanggal Tidak Valid',
                 'Tanggal kembali tidak boleh lebih awal dari tanggal pinjam.'
-            );
-            return false;
-        }
-
-        if (!formData.purpose.trim()) {
-            setErrorMessage('Keperluan peminjaman wajib diisi.');
-            showWarningAlert(
-                'Keperluan Wajib Diisi',
-                'Jelaskan keperluan peminjaman agar admin dapat menilai pengajuan.'
             );
             return false;
         }
@@ -264,411 +242,410 @@ export default function SekpimBorrowingRequestPage() {
     const handleSubmit = async (event) => {
         event.preventDefault();
 
-        setMessage('');
-        setErrorMessage('');
-
-        if (!validateForm()) {
-            return;
-        }
-
-        const result = await showConfirmAlert({
-            title: 'Kirim Pengajuan Peminjaman?',
-            text: 'Pastikan barang, jumlah, tanggal, dan keperluan sudah benar.',
-            confirmButtonText: 'Ya, kirim',
-            icon: 'question',
-            confirmButtonColor: '#2563eb',
-        });
-
-        if (!result.isConfirmed) {
-            return;
-        }
-
-        setSubmitting(true);
-        showLoadingAlert('Mengirim Pengajuan', 'Mohon tunggu, data peminjaman sedang dikirim ke admin.');
+        if (!validateForm()) return;
 
         try {
+            setSubmitting(true);
+            showLoadingAlert('Mengirim Pengajuan', 'Mohon tunggu sebentar.');
+
             const payload = {
-                borrow_date: formData.borrow_date,
-                return_date: formData.return_date,
-                purpose: formData.purpose,
-                items: cart.map((item) => ({
+                purpose: form.purpose,
+                borrow_date: form.borrow_date,
+                return_date: form.return_date,
+                items: selectedItems.map((item) => ({
                     product_id: item.product_id,
                     quantity: item.quantity,
                 })),
             };
 
-            const response = await api.post('/borrow-requests', payload);
+            await api.post('/borrow-requests', payload);
 
             closeAlert();
-
-            setMessage(response.data.message);
-            setCart([]);
-            setFormData(initialBorrowingForm);
-
-            await fetchBorrowItems();
 
             await showSuccessAlert(
-                'Pengajuan Berhasil Dikirim',
-                'Permintaan peminjaman kamu sekarang menunggu approval admin.'
+                'Pengajuan Berhasil',
+                'Pengajuan peminjaman berhasil dikirim.'
             );
 
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth',
-            });
+            setForm(initialForm);
+            setCart([]);
+            fetchProducts();
         } catch (error) {
+            console.error('Submit borrowing request error:', error.response?.data || error);
+
             closeAlert();
 
-            const backendMessage =
-                error.response?.data?.message ||
-                'Pengajuan peminjaman gagal. Periksa kembali data yang diisi.';
-
-            setErrorMessage(backendMessage);
-            showErrorAlert('Pengajuan Gagal', backendMessage);
-            console.error(error);
+            showErrorAlert(
+                'Pengajuan Gagal',
+                getBackendErrorMessage(error)
+            );
         } finally {
             setSubmitting(false);
         }
     };
 
+    const handleReset = () => {
+        setForm(initialForm);
+        setCart([]);
+    };
+
     return (
         <div className="container-fluid px-0">
-            <section className="card border-0 shadow-sm rounded-5 overflow-hidden mb-4">
-                <div
-                    className="card-body p-4 p-lg-5 text-white"
-                    style={{
-                        background:
-                            'radial-gradient(circle at top right, rgba(255,255,255,.22), transparent 28%), linear-gradient(135deg, #0f172a 0%, #0f766e 55%, #2563eb 120%)',
-                    }}
-                >
-                    <div className="row align-items-center g-4">
-                        <div className="col-lg-9">
-                            <span className="text-white-50 small fw-bold text-uppercase">
-                                SEKPIM Borrowing Request
+            <div className="row g-4">
+                <div className="col-xl-8">
+                    <section
+                        className="card border-0 shadow-sm rounded-5 overflow-hidden mb-4"
+                        style={{
+                            background:
+                                'linear-gradient(135deg, rgba(15,118,110,0.96), rgba(15,23,42,0.98))',
+                        }}
+                    >
+                        <div className="card-body p-4 p-lg-5 text-white">
+                            <span className="badge rounded-pill text-bg-light text-success px-3 py-2 mb-3">
+                                Pengajuan Peminjaman
                             </span>
 
-                            <h2 className="display-5 fw-black mt-2 mb-3">
-                                Ajukan Peminjaman Sekpim
-                            </h2>
+                            <h1 className="display-6 fw-black mb-3">
+                                Pilih barang Sekpim yang ingin dipinjam.
+                            </h1>
 
-                            <p className="mb-0 text-white-50" style={{ maxWidth: 820, lineHeight: 1.8 }}>
-                                Pilih barang yang dibutuhkan, tentukan tanggal pinjam dan tanggal kembali,
-                                lalu jelaskan keperluan peminjaman untuk diproses oleh admin.
+                            <p
+                                className="mb-0 text-white-50"
+                                style={{ maxWidth: 760, lineHeight: 1.8 }}
+                            >
+                                Pilih barang dari katalog peminjaman, masukkan ke keranjang,
+                                lalu isi tanggal pinjam, tanggal kembali, dan keperluan
+                                sebelum dikirim untuk approval admin.
                             </p>
                         </div>
+                    </section>
 
-                        <div className="col-lg-3">
-                            <div className="bg-white bg-opacity-10 border border-white border-opacity-25 rounded-5 p-4 text-center">
-                                <span className="d-block text-white-50 small fw-bold text-uppercase">
-                                    Keranjang
-                                </span>
-
-                                <strong className="display-5 fw-black">
-                                    {cartTotalQuantity}
-                                </strong>
-
-                                <p className="mb-0 text-white-50 small">
-                                    Total barang dipilih
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {message && (
-                <div className="alert alert-success rounded-4">
-                    {message}
-                </div>
-            )}
-
-            {errorMessage && (
-                <div className="alert alert-danger rounded-4">
-                    {errorMessage}
-                </div>
-            )}
-
-            <div className="row g-4 align-items-start">
-                <div className="col-xl-8">
-                    <div className="card border-0 shadow-sm rounded-5 mb-4">
+                    <section className="card border-0 shadow-sm rounded-5 mb-4">
                         <div className="card-body p-4">
-                            <div className="row align-items-center g-3">
+                            <div className="row g-3 align-items-end">
                                 <div className="col-lg-7">
-                                    <h4 className="fw-black mb-1">
-                                        Pilih Barang
-                                    </h4>
-
-                                    <p className="text-muted mb-0">
-                                        Pilih satu atau beberapa barang Sekpim yang ingin dipinjam.
-                                    </p>
-                                </div>
-
-                                <div className="col-lg-5">
+                                    <label className="form-label fw-bold">Cari barang</label>
                                     <div className="input-group">
-                                        <span className="input-group-text bg-light border-end-0 rounded-start-4">
+                                        <span className="input-group-text">
                                             <i className="bi bi-search"></i>
                                         </span>
 
                                         <input
                                             type="text"
-                                            value={searchKeyword}
-                                            onChange={(event) => setSearchKeyword(event.target.value)}
-                                            className="form-control border-start-0 rounded-end-4"
-                                            placeholder="Cari barang..."
+                                            className="form-control"
+                                            placeholder="Nama barang, kategori, deskripsi..."
+                                            value={search}
+                                            onChange={(event) => setSearch(event.target.value)}
                                         />
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
 
-                    {loadingItems && (
-                        <div className="alert alert-primary rounded-4">
-                            Sedang mengambil data barang peminjaman...
-                        </div>
-                    )}
-
-                    {!loadingItems && filteredItems.length === 0 && (
-                        <div className="card border-0 shadow-sm rounded-5">
-                            <div className="card-body p-5 text-center">
-                                <div className="icon-box bg-success-subtle text-success mx-auto mb-3">
-                                    <i className="bi bi-search fs-4"></i>
-                                </div>
-
-                                <h4 className="fw-black">
-                                    Barang tidak ditemukan
-                                </h4>
-
-                                <p className="text-muted mb-0">
-                                    Belum ada barang peminjaman aktif atau kata kunci pencarian tidak cocok.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="row g-3">
-                        {filteredItems.map((item) => {
-                            const cartItem = getCartItem(item.id);
-
-                            return (
-                                <div className="col-12 col-md-6 col-xxl-4" key={item.id}>
-                                    <div className="card border-0 shadow-sm rounded-5 h-100 overflow-hidden">
-                                        <div
-                                            className="d-flex align-items-center justify-content-center text-success fw-black"
-                                            style={{
-                                                height: 160,
-                                                background:
-                                                    'radial-gradient(circle at top left, rgba(15,118,110,.16), transparent 35%), linear-gradient(135deg, #ccfbf1, #eef2ff)',
-                                                letterSpacing: '.12em',
-                                            }}
-                                        >
-                                            {item.image ? (
-                                                <img
-                                                    src={item.image}
-                                                    alt={item.name}
-                                                    className="w-100 h-100 object-fit-cover"
-                                                />
-                                            ) : (
-                                                <span>SEKPIM</span>
-                                            )}
-                                        </div>
-
-                                        <div className="card-body p-4">
-                                            <span className="badge rounded-pill text-bg-success mb-3">
-                                                {item.category?.name || 'Barang Sekpim'}
-                                            </span>
-
-                                            <h5 className="fw-black mb-2">
-                                                {item.name}
-                                            </h5>
-
-                                            <p className="text-muted small mb-3" style={{ minHeight: 66 }}>
-                                                {item.description || 'Tidak ada deskripsi barang.'}
-                                            </p>
-
-                                            <div className="d-flex justify-content-between align-items-center bg-light border rounded-4 p-3 mb-3">
-                                                <span className="text-muted fw-bold small">
-                                                    Stok tersedia
-                                                </span>
-
-                                                <strong className="fs-4">
-                                                    {item.stock}
-                                                </strong>
+                                <div className="col-lg-5">
+                                    <div className="p-3 rounded-4 bg-success-subtle">
+                                        <div className="d-flex align-items-center justify-content-between">
+                                            <div>
+                                                <div className="fw-black text-success">
+                                                    Barang tersedia
+                                                </div>
+                                                <div className="small text-muted">
+                                                    Katalog peminjaman aktif
+                                                </div>
                                             </div>
 
-                                            {cartItem ? (
-                                                <div className="d-grid" style={{ gridTemplateColumns: '42px 1fr 42px', gap: 8 }}>
-                                                    <button
-                                                        className="btn btn-success rounded-4 fw-bold"
-                                                        type="button"
-                                                        onClick={() => handleDecreaseCart(item.id)}
-                                                    >
-                                                        −
-                                                    </button>
-
-                                                    <div className="bg-light border rounded-4 d-flex align-items-center justify-content-center fw-black">
-                                                        {cartItem.quantity}
-                                                    </div>
-
-                                                    <button
-                                                        className="btn btn-success rounded-4 fw-bold"
-                                                        type="button"
-                                                        onClick={() => handleIncreaseCart(item.id)}
-                                                    >
-                                                        +
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    className="btn btn-success w-100 rounded-pill fw-bold"
-                                                    type="button"
-                                                    onClick={() => handleAddToCart(item)}
-                                                    disabled={item.stock <= 0}
-                                                >
-                                                    <i className="bi bi-cart-plus-fill me-2"></i>
-                                                    Tambah ke Keranjang
-                                                </button>
-                                            )}
+                                            <div className="fs-3 fw-black text-success">
+                                                {products.length}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            );
-                        })}
-                    </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {loading ? (
+                        <div className="card border-0 shadow-sm rounded-5">
+                            <div className="card-body p-5 text-center">
+                                <div className="spinner-border text-success mb-3" />
+                                <p className="text-muted mb-0">Memuat katalog barang...</p>
+                            </div>
+                        </div>
+                    ) : filteredProducts.length === 0 ? (
+                        <div className="card border-0 shadow-sm rounded-5">
+                            <div className="card-body p-5 text-center">
+                                <div
+                                    className="mx-auto mb-3 d-flex align-items-center justify-content-center rounded-5 bg-light text-secondary"
+                                    style={{ width: 76, height: 76 }}
+                                >
+                                    <i className="bi bi-inbox fs-1"></i>
+                                </div>
+
+                                <h5 className="fw-black mb-2">Barang tidak ditemukan</h5>
+
+                                <p className="text-muted mb-0">
+                                    Tidak ada barang aktif yang sesuai dengan pencarian.
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="row g-4">
+                            {filteredProducts.map((product) => {
+                                const cartItem = cart.find(
+                                    (item) => item.product_id === product.id
+                                );
+
+                                return (
+                                    <div className="col-12 col-md-6 col-xxl-4" key={product.id}>
+                                        <div className="card border-0 shadow-sm rounded-5 overflow-hidden h-100">
+                                            <div
+                                                className="bg-success-subtle d-flex align-items-center justify-content-center"
+                                                style={{ height: 150 }}
+                                            >
+                                                {product.image ? (
+                                                    <img
+                                                        src={product.image}
+                                                        alt={product.name}
+                                                        className="w-100 h-100 object-fit-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="fw-black text-success">
+                                                        SEKPIM
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="card-body p-4 d-flex flex-column">
+                                                <div className="mb-3">
+                                                    <span className="badge rounded-pill text-bg-success mb-3">
+                                                        {product.category?.name || 'Barang'}
+                                                    </span>
+
+                                                    <h5 className="fw-black mb-2">
+                                                        {product.name}
+                                                    </h5>
+
+                                                    <p
+                                                        className="text-muted small mb-0"
+                                                        style={{ lineHeight: 1.7 }}
+                                                    >
+                                                        {product.description || 'Tidak ada deskripsi.'}
+                                                    </p>
+                                                </div>
+
+                                                <div className="mt-auto">
+                                                    <div className="p-3 rounded-4 border bg-light d-flex align-items-center justify-content-between mb-3">
+                                                        <span className="small text-muted fw-bold">
+                                                            Stok tersedia
+                                                        </span>
+
+                                                        <strong className="fs-4">
+                                                            {product.stock}
+                                                        </strong>
+                                                    </div>
+
+                                                    {cartItem ? (
+                                                        <div className="d-flex align-items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-success rounded-pill"
+                                                                onClick={() => handleDecreaseQty(product.id)}
+                                                            >
+                                                                <i className="bi bi-dash-lg"></i>
+                                                            </button>
+
+                                                            <div className="form-control text-center fw-bold rounded-pill">
+                                                                {cartItem.quantity}
+                                                            </div>
+
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-success rounded-pill"
+                                                                onClick={() => handleIncreaseQty(product)}
+                                                            >
+                                                                <i className="bi bi-plus-lg"></i>
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-success rounded-pill w-100"
+                                                            onClick={() => handleAddToCart(product)}
+                                                            disabled={product.stock <= 0}
+                                                        >
+                                                            <i className="bi bi-cart-plus-fill me-2"></i>
+                                                            Tambah ke Keranjang
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
                 <div className="col-xl-4">
-                    <div className="position-sticky" style={{ top: 110 }}>
-                        <div className="card border-0 shadow-sm rounded-5 mb-3">
+                    <div className="position-sticky" style={{ top: 105 }}>
+                        <section className="card border-0 shadow-sm rounded-5 mb-4">
                             <div className="card-body p-4">
-                                <div className="d-flex justify-content-between align-items-start mb-3">
+                                <div className="d-flex align-items-center justify-content-between mb-3">
                                     <div>
-                                        <h4 className="fw-black mb-1">
-                                            Keranjang
-                                        </h4>
-
+                                        <h4 className="fw-black mb-1">Keranjang</h4>
                                         <p className="text-muted mb-0">
-                                            Ringkasan barang yang akan dipinjam.
+                                            {totalQty} barang dipilih
                                         </p>
                                     </div>
 
                                     <div className="icon-box bg-success-subtle text-success">
-                                        <strong>{cartTotalQuantity}</strong>
+                                        <i className="bi bi-cart-fill fs-4"></i>
                                     </div>
                                 </div>
 
-                                {cart.length === 0 && (
-                                    <div className="text-center bg-light border rounded-4 p-4 text-muted fw-bold">
-                                        Belum ada barang dipilih.
+                                {selectedItems.length === 0 ? (
+                                    <div className="p-4 rounded-4 bg-light text-center">
+                                        <i className="bi bi-cart-x fs-1 text-muted"></i>
+                                        <p className="text-muted mb-0 mt-2">
+                                            Keranjang masih kosong.
+                                        </p>
                                     </div>
-                                )}
-
-                                {cart.length > 0 && (
-                                    <div className="d-grid gap-2">
-                                        {cart.map((item) => (
+                                ) : (
+                                    <div className="d-flex flex-column gap-3">
+                                        {selectedItems.map((item) => (
                                             <div
-                                                className="d-flex justify-content-between align-items-start gap-3 bg-light border rounded-4 p-3"
                                                 key={item.product_id}
+                                                className="p-3 rounded-4 border"
                                             >
-                                                <div>
-                                                    <strong>{item.name}</strong>
-                                                    <p className="text-muted small mb-0">
-                                                        Qty: {item.quantity}
-                                                    </p>
-                                                </div>
+                                                <div className="d-flex align-items-start justify-content-between gap-2">
+                                                    <div>
+                                                        <h6 className="fw-black mb-1">
+                                                            {item.product.name}
+                                                        </h6>
 
-                                                <button
-                                                    className="btn btn-sm btn-outline-danger rounded-pill"
-                                                    type="button"
-                                                    onClick={() => handleRemoveCart(item.product_id)}
-                                                >
-                                                    Hapus
-                                                </button>
+                                                        <p className="text-muted small mb-0">
+                                                            Qty: {item.quantity} • Stok: {item.product.stock}
+                                                        </p>
+                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline-danger btn-sm rounded-pill"
+                                                        onClick={() => handleRemoveItem(item.product_id)}
+                                                    >
+                                                        <i className="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        </section>
 
-                        <form className="card border-0 shadow-sm rounded-5" onSubmit={handleSubmit}>
+                        <section className="card border-0 shadow-sm rounded-5">
                             <div className="card-body p-4">
                                 <h4 className="fw-black mb-1">
                                     Detail Peminjaman
                                 </h4>
 
                                 <p className="text-muted mb-4">
-                                    Tanggal dan keperluan digunakan admin untuk memeriksa ketersediaan barang.
+                                    Isi tanggal dan keperluan peminjaman sebelum request
+                                    dikirim ke admin.
                                 </p>
 
-                                <div className="row g-3">
-                                    <div className="col-md-6 col-xl-12">
-                                        <label className="form-label fw-bold">
-                                            Tanggal Pinjam
-                                        </label>
+                                <form onSubmit={handleSubmit}>
+                                    <div className="row g-3 mb-3">
+                                        <div className="col-md-6 col-xl-12">
+                                            <label className="form-label fw-bold">
+                                                Tanggal Pinjam
+                                            </label>
 
-                                        <input
-                                            type="date"
-                                            name="borrow_date"
-                                            value={formData.borrow_date}
-                                            onChange={handleInputChange}
-                                            className="form-control rounded-4"
-                                            required
-                                        />
+                                            <input
+                                                type="date"
+                                                name="borrow_date"
+                                                className="form-control rounded-pill"
+                                                value={form.borrow_date}
+                                                onChange={handleChange}
+                                                required
+                                            />
+                                        </div>
+
+                                        <div className="col-md-6 col-xl-12">
+                                            <label className="form-label fw-bold">
+                                                Tanggal Kembali
+                                            </label>
+
+                                            <input
+                                                type="date"
+                                                name="return_date"
+                                                className="form-control rounded-pill"
+                                                value={form.return_date}
+                                                onChange={handleChange}
+                                                min={form.borrow_date || undefined}
+                                                required
+                                            />
+                                        </div>
                                     </div>
 
-                                    <div className="col-md-6 col-xl-12">
-                                        <label className="form-label fw-bold">
-                                            Tanggal Kembali
-                                        </label>
+                                    {form.borrow_date && form.return_date && (
+                                        <div className="p-3 rounded-4 bg-success-subtle mb-3">
+                                            <div className="small text-muted mb-1">
+                                                Ringkasan tanggal
+                                            </div>
 
-                                        <input
-                                            type="date"
-                                            name="return_date"
-                                            value={formData.return_date}
-                                            onChange={handleInputChange}
-                                            className="form-control rounded-4"
-                                            required
-                                        />
-                                    </div>
+                                            <div className="fw-bold text-success">
+                                                {formatDate(form.borrow_date)} - {formatDate(form.return_date)}
+                                            </div>
+                                        </div>
+                                    )}
 
-                                    <div className="col-12">
+                                    <div className="mb-4">
                                         <label className="form-label fw-bold">
                                             Keperluan Peminjaman
                                         </label>
 
                                         <textarea
                                             name="purpose"
-                                            value={formData.purpose}
-                                            onChange={handleInputChange}
                                             className="form-control rounded-4"
-                                            placeholder="Contoh: Digunakan untuk kegiatan rapat pimpinan / kunjungan tamu / kegiatan resmi."
                                             rows="5"
+                                            placeholder="Contoh: Peminjaman taplak meja untuk kegiatan rapat pimpinan..."
+                                            value={form.purpose}
+                                            onChange={handleChange}
                                             required
                                         />
                                     </div>
-                                </div>
 
-                                <div className="d-grid gap-2 mt-4">
-                                    <button
-                                        className="btn btn-success rounded-pill fw-bold"
-                                        type="submit"
-                                        disabled={submitting || cart.length === 0}
-                                    >
-                                        {submitting ? 'Mengirim...' : 'Kirim Pengajuan'}
-                                    </button>
+                                    <div className="d-grid gap-2">
+                                        <button
+                                            type="submit"
+                                            className="btn btn-success rounded-pill"
+                                            disabled={submitting}
+                                        >
+                                            {submitting ? (
+                                                <>
+                                                    <span className="spinner-border spinner-border-sm me-2" />
+                                                    Mengirim...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <i className="bi bi-send-check-fill me-2"></i>
+                                                    Kirim Pengajuan
+                                                </>
+                                            )}
+                                        </button>
 
-                                    <button
-                                        className="btn btn-outline-dark rounded-pill fw-bold"
-                                        type="button"
-                                        onClick={resetAll}
-                                        disabled={submitting}
-                                    >
-                                        Reset
-                                    </button>
-                                </div>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-dark rounded-pill"
+                                            onClick={handleReset}
+                                            disabled={submitting}
+                                        >
+                                            Reset
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
-                        </form>
+                        </section>
                     </div>
                 </div>
             </div>

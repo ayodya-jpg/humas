@@ -9,6 +9,7 @@ use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class OrderController extends Controller
 {
@@ -84,33 +85,7 @@ class OrderController extends Controller
 
         try {
             $order = DB::transaction(function () use ($request, $validated) {
-                foreach ($validated['items'] as $item) {
-                    $product = Product::findOrFail($item['product_id']);
-
-                    if ($product->status !== 'active') {
-                        abort(response()->json([
-                            'success' => false,
-                            'message' => "Produk {$product->name} sedang tidak aktif.",
-                            'data' => null,
-                        ], 422));
-                    }
-
-                    if (!in_array($product->type, ['checkout', 'both'], true)) {
-                        abort(response()->json([
-                            'success' => false,
-                            'message' => "Produk {$product->name} tidak tersedia untuk pengajuan merchandise.",
-                            'data' => null,
-                        ], 422));
-                    }
-
-                    if ($product->stock < $item['quantity']) {
-                        abort(response()->json([
-                            'success' => false,
-                            'message' => "Stok {$product->name} tidak mencukupi.",
-                            'data' => null,
-                        ], 422));
-                    }
-                }
+                $this->validateOrderItems($validated['items']);
 
                 $proofFile = $request->file('proof_file');
                 $proofFilePath = $proofFile->store('merchandise-proofs', 'public');
@@ -162,6 +137,114 @@ class OrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Pengajuan merchandise gagal dikirim. Silakan periksa kembali data pengajuan atau hubungi admin.',
+                'data' => null,
+            ], 500);
+        }
+    }
+
+    public function resubmit(Request $request, int $id): JsonResponse
+    {
+        $order = Order::with('items')->findOrFail($id);
+
+        if (!$this->canAccessOrder($request, $order)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak. Kamu tidak memiliki izin mengubah pengajuan ini.',
+                'data' => null,
+            ], 403);
+        }
+
+        if ($order->status !== 'revision') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pengajuan hanya bisa diajukan ulang saat status revision.',
+                'data' => null,
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'event_name' => ['required', 'string', 'max:255'],
+            'institution_name' => ['required', 'string', 'max:255'],
+            'guest_name' => ['required', 'string', 'max:255'],
+            'guest_position' => ['required', 'string', 'max:255'],
+            'activity_date' => ['required', 'date'],
+            'user_note' => ['required', 'string'],
+            'proof_file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'exists:products,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+        ]);
+
+        try {
+            $updatedOrder = DB::transaction(function () use ($request, $order, $validated) {
+                $this->validateOrderItems($validated['items']);
+
+                $proofFilePath = $order->proof_file_path;
+                $proofFileName = $order->proof_file_name;
+                $proofFileMime = $order->proof_file_mime;
+
+                if ($request->hasFile('proof_file')) {
+                    if ($order->proof_file_path && Storage::disk('public')->exists($order->proof_file_path)) {
+                        Storage::disk('public')->delete($order->proof_file_path);
+                    }
+
+                    $proofFile = $request->file('proof_file');
+                    $proofFilePath = $proofFile->store('merchandise-proofs', 'public');
+                    $proofFileName = $proofFile->getClientOriginalName();
+                    $proofFileMime = $proofFile->getMimeType();
+                }
+
+                $order->update([
+                    'event_name' => $validated['event_name'],
+                    'institution_name' => $validated['institution_name'],
+                    'guest_name' => $validated['guest_name'],
+                    'guest_position' => $validated['guest_position'],
+                    'activity_date' => $validated['activity_date'],
+                    'proof_link' => null,
+                    'proof_file_path' => $proofFilePath,
+                    'proof_file_name' => $proofFileName,
+                    'proof_file_mime' => $proofFileMime,
+                    'status' => 'pending',
+                    'user_note' => $validated['user_note'],
+                    'admin_note' => null,
+                    'submitted_at' => now(),
+                    'approved_at' => null,
+                    'rejected_at' => null,
+                    'completed_at' => null,
+                ]);
+
+                $order->items()->delete();
+
+                foreach ($validated['items'] as $item) {
+                    OrderItem::create([
+                        'order_id' => $order->id,
+                        'product_id' => $item['product_id'],
+                        'quantity' => $item['quantity'],
+                    ]);
+                }
+
+                return $order->fresh([
+                    'user',
+                    'items.product.category',
+                ]);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengajuan merchandise berhasil diajukan ulang.',
+                'data' => $updatedOrder,
+            ]);
+        } catch (\Throwable $error) {
+            if ($error instanceof \Illuminate\Http\Exceptions\HttpResponseException) {
+                throw $error;
+            }
+
+            report($error);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Pengajuan merchandise gagal diajukan ulang.',
                 'data' => null,
             ], 500);
         }
@@ -325,5 +408,36 @@ class OrderController extends Controller
         }
 
         return $order->user_id === $user->id;
+    }
+
+    private function validateOrderItems(array $items): void
+    {
+        foreach ($items as $item) {
+            $product = Product::findOrFail($item['product_id']);
+
+            if ($product->status !== 'active') {
+                abort(response()->json([
+                    'success' => false,
+                    'message' => "Produk {$product->name} sedang tidak aktif.",
+                    'data' => null,
+                ], 422));
+            }
+
+            if (!in_array($product->type, ['checkout', 'both'], true)) {
+                abort(response()->json([
+                    'success' => false,
+                    'message' => "Produk {$product->name} tidak tersedia untuk pengajuan merchandise.",
+                    'data' => null,
+                ], 422));
+            }
+
+            if ($product->stock < $item['quantity']) {
+                abort(response()->json([
+                    'success' => false,
+                    'message' => "Stok {$product->name} tidak mencukupi.",
+                    'data' => null,
+                ], 422));
+            }
+        }
     }
 }

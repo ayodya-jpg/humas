@@ -35,9 +35,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
+    Route::post('/orders/{id}/resubmit', [OrderController::class, 'resubmit']);
 
     Route::post('/borrow-requests', [BorrowRequestController::class, 'store']);
     Route::get('/borrow-requests/{id}', [BorrowRequestController::class, 'show']);
+    Route::post('/borrow-requests/{id}/resubmit', [BorrowRequestController::class, 'resubmit']);
 
     /*
     |--------------------------------------------------------------------------
