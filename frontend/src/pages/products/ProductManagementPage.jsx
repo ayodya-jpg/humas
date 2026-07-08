@@ -13,46 +13,33 @@ const initialForm = {
     category_id: '',
     name: '',
     description: '',
-    stock: 0,
+    stock: '',
     type: 'checkout',
     image: '',
     status: 'active',
 };
 
 const typeOptions = [
-    {
-        value: 'checkout',
-        label: 'Merchandise / Checkout',
-    },
-    {
-        value: 'borrow',
-        label: 'Peminjaman',
-    },
-    {
-        value: 'both',
-        label: 'Keduanya',
-    },
+    { value: 'checkout', label: 'Merchandise' },
+    { value: 'borrow', label: 'Peminjaman' },
+    { value: 'both', label: 'Keduanya' },
 ];
 
 const statusOptions = [
-    {
-        value: 'active',
-        label: 'Aktif',
-    },
-    {
-        value: 'inactive',
-        label: 'Nonaktif',
-    },
+    { value: 'active', label: 'Aktif' },
+    { value: 'inactive', label: 'Nonaktif' },
 ];
 
 export default function ProductManagementPage() {
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
+
     const [formData, setFormData] = useState(initialForm);
-    const [editingProductId, setEditingProductId] = useState(null);
+    const [editingId, setEditingId] = useState(null);
 
     const [loadingProducts, setLoadingProducts] = useState(true);
     const [loadingCategories, setLoadingCategories] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
 
     const [message, setMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
@@ -66,14 +53,14 @@ export default function ProductManagementPage() {
             setErrorMessage('');
 
             const response = await api.get('/products');
-            setProducts(response.data.data);
+            setProducts(response.data.data || []);
         } catch (error) {
             const backendMessage =
                 error.response?.data?.message ||
-                'Gagal mengambil data paket/barang.';
+                'Gagal mengambil data paket atau barang.';
 
             setErrorMessage(backendMessage);
-            showErrorAlert('Gagal Mengambil Data', backendMessage);
+            showErrorAlert('Gagal Mengambil Produk', backendMessage);
             console.error(error);
         } finally {
             setLoadingProducts(false);
@@ -85,7 +72,7 @@ export default function ProductManagementPage() {
             setLoadingCategories(true);
 
             const response = await api.get('/categories');
-            setCategories(response.data.data);
+            setCategories(response.data.data || []);
         } catch (error) {
             const backendMessage =
                 error.response?.data?.message ||
@@ -98,19 +85,26 @@ export default function ProductManagementPage() {
         }
     };
 
+    const fetchInitialData = async () => {
+        await Promise.all([
+            fetchProducts(),
+            fetchCategories(),
+        ]);
+    };
+
     useEffect(() => {
-        fetchProducts();
-        fetchCategories();
+        fetchInitialData();
     }, []);
 
     const filteredProducts = useMemo(() => {
-        return products.filter((product) => {
-            const keyword = searchKeyword.toLowerCase();
+        const keyword = searchKeyword.toLowerCase();
 
+        return products.filter((product) => {
             const matchKeyword =
                 product.name?.toLowerCase().includes(keyword) ||
                 product.description?.toLowerCase().includes(keyword) ||
-                product.category?.name?.toLowerCase().includes(keyword);
+                product.category?.name?.toLowerCase().includes(keyword) ||
+                product.slug?.toLowerCase().includes(keyword);
 
             const matchType =
                 selectedType === 'all' || product.type === selectedType;
@@ -127,8 +121,9 @@ export default function ProductManagementPage() {
             total: products.length,
             active: products.filter((item) => item.status === 'active').length,
             inactive: products.filter((item) => item.status === 'inactive').length,
-            checkout: products.filter((item) => item.type === 'checkout' || item.type === 'both').length,
-            borrow: products.filter((item) => item.type === 'borrow' || item.type === 'both').length,
+            checkout: products.filter((item) => item.type === 'checkout').length,
+            borrow: products.filter((item) => item.type === 'borrow').length,
+            both: products.filter((item) => item.type === 'both').length,
         };
     }, [products]);
 
@@ -141,19 +136,42 @@ export default function ProductManagementPage() {
         }));
     };
 
+    const handleEdit = (product) => {
+        setEditingId(product.id);
+
+        setFormData({
+            category_id: product.category_id || product.category?.id || '',
+            name: product.name || '',
+            description: product.description || '',
+            stock: product.stock ?? '',
+            type: product.type || 'checkout',
+            image: product.image || '',
+            status: product.status || 'active',
+        });
+
+        setMessage('');
+        setErrorMessage('');
+
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth',
+        });
+    };
+
     const resetForm = async () => {
-        if (
+        const hasData =
             formData.category_id ||
             formData.name ||
             formData.description ||
-            Number(formData.stock) > 0 ||
+            formData.stock ||
             formData.image ||
-            editingProductId
-        ) {
+            editingId;
+
+        if (hasData) {
             const result = await showConfirmAlert({
-                title: 'Batalkan Form?',
-                text: 'Data paket/barang yang sedang diisi akan dikosongkan.',
-                confirmButtonText: 'Ya, kosongkan',
+                title: 'Reset Form?',
+                text: 'Data paket atau barang yang sedang diisi akan dikosongkan.',
+                confirmButtonText: 'Ya, reset',
                 icon: 'warning',
                 confirmButtonColor: '#dc2626',
             });
@@ -164,25 +182,27 @@ export default function ProductManagementPage() {
         }
 
         setFormData(initialForm);
-        setEditingProductId(null);
+        setEditingId(null);
         setMessage('');
         setErrorMessage('');
     };
 
     const validateForm = () => {
-        if (!formData.name.trim()) {
-            showWarningAlert(
-                'Nama Wajib Diisi',
-                'Isi nama paket/barang terlebih dahulu.'
-            );
+        if (!formData.category_id) {
+            setErrorMessage('Kategori wajib dipilih.');
+            showWarningAlert('Kategori Wajib Dipilih', 'Pilih kategori terlebih dahulu.');
             return false;
         }
 
-        if (Number(formData.stock) < 0) {
-            showWarningAlert(
-                'Stok Tidak Valid',
-                'Stok tidak boleh bernilai negatif.'
-            );
+        if (!formData.name.trim()) {
+            setErrorMessage('Nama paket atau barang wajib diisi.');
+            showWarningAlert('Nama Wajib Diisi', 'Isi nama paket atau barang terlebih dahulu.');
+            return false;
+        }
+
+        if (formData.stock === '' || Number(formData.stock) < 0) {
+            setErrorMessage('Stok wajib diisi dan tidak boleh kurang dari 0.');
+            showWarningAlert('Stok Tidak Valid', 'Isi stok dengan angka minimal 0.');
             return false;
         }
 
@@ -199,22 +219,12 @@ export default function ProductManagementPage() {
             return;
         }
 
-        const payload = {
-            category_id: formData.category_id || null,
-            name: formData.name,
-            description: formData.description,
-            stock: Number(formData.stock),
-            type: formData.type,
-            image: formData.image || null,
-            status: formData.status,
-        };
-
         const result = await showConfirmAlert({
-            title: editingProductId ? 'Update Paket/Barang?' : 'Tambah Paket/Barang?',
-            text: editingProductId
-                ? 'Data paket/barang akan diperbarui.'
-                : 'Data baru akan ditambahkan ke master data.',
-            confirmButtonText: editingProductId ? 'Ya, update' : 'Ya, simpan',
+            title: editingId ? 'Update Data?' : 'Tambah Data?',
+            text: editingId
+                ? 'Data paket atau barang akan diperbarui.'
+                : 'Data paket atau barang baru akan ditambahkan.',
+            confirmButtonText: editingId ? 'Ya, update' : 'Ya, tambah',
             icon: 'question',
             confirmButtonColor: '#2563eb',
         });
@@ -223,72 +233,61 @@ export default function ProductManagementPage() {
             return;
         }
 
+        setSubmitting(true);
         showLoadingAlert(
-            editingProductId ? 'Memperbarui Data' : 'Menyimpan Data',
+            editingId ? 'Memperbarui Data' : 'Menambahkan Data',
             'Mohon tunggu, data sedang diproses.'
         );
 
         try {
-            if (editingProductId) {
-                const response = await api.put(`/products/${editingProductId}`, payload);
+            const payload = {
+                category_id: formData.category_id,
+                name: formData.name,
+                description: formData.description,
+                stock: Number(formData.stock),
+                type: formData.type,
+                image: formData.image,
+                status: formData.status,
+            };
 
-                closeAlert();
-                setMessage(response.data.message);
+            const response = editingId
+                ? await api.put(`/products/${editingId}`, payload)
+                : await api.post('/products', payload);
 
-                await showSuccessAlert(
-                    'Data Berhasil Diperbarui',
-                    'Paket/barang sudah berhasil diperbarui.'
-                );
-            } else {
-                const response = await api.post('/products', payload);
+            closeAlert();
 
-                closeAlert();
-                setMessage(response.data.message);
-
-                await showSuccessAlert(
-                    'Data Berhasil Ditambahkan',
-                    'Paket/barang baru sudah masuk ke master data.'
-                );
-            }
-
+            setMessage(response.data.message);
             setFormData(initialForm);
-            setEditingProductId(null);
+            setEditingId(null);
+
             await fetchProducts();
+
+            showSuccessAlert(
+                editingId ? 'Data Diperbarui' : 'Data Ditambahkan',
+                response.data.message
+            );
         } catch (error) {
             closeAlert();
 
             const backendMessage =
                 error.response?.data?.message ||
-                'Gagal menyimpan data. Periksa kembali input yang diisi.';
+                'Data paket atau barang gagal disimpan.';
 
             setErrorMessage(backendMessage);
-            showErrorAlert('Gagal Menyimpan Data', backendMessage);
+            showErrorAlert('Gagal Menyimpan', backendMessage);
             console.error(error);
+        } finally {
+            setSubmitting(false);
         }
     };
 
-    const handleEdit = (product) => {
-        setEditingProductId(product.id);
-        setFormData({
-            category_id: product.category_id || '',
-            name: product.name || '',
-            description: product.description || '',
-            stock: product.stock ?? 0,
-            type: product.type || 'checkout',
-            image: product.image || '',
-            status: product.status || 'active',
-        });
-
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth',
-        });
-    };
-
     const handleDelete = async (product) => {
+        setMessage('');
+        setErrorMessage('');
+
         const result = await showConfirmAlert({
             title: 'Hapus Data?',
-            text: `"${product.name}" akan dihapus dari master data.`,
+            text: `${product.name} akan dihapus dari master data.`,
             confirmButtonText: 'Ya, hapus',
             icon: 'warning',
             confirmButtonColor: '#dc2626',
@@ -298,351 +297,540 @@ export default function ProductManagementPage() {
             return;
         }
 
-        setMessage('');
-        setErrorMessage('');
-
         showLoadingAlert('Menghapus Data', 'Mohon tunggu, data sedang dihapus.');
 
         try {
             const response = await api.delete(`/products/${product.id}`);
 
             closeAlert();
+
             setMessage(response.data.message);
+
+            if (editingId === product.id) {
+                setFormData(initialForm);
+                setEditingId(null);
+            }
 
             await fetchProducts();
 
-            showSuccessAlert(
-                'Data Berhasil Dihapus',
-                'Paket/barang sudah dihapus dari sistem.'
-            );
+            showSuccessAlert('Data Dihapus', response.data.message);
         } catch (error) {
             closeAlert();
 
             const backendMessage =
                 error.response?.data?.message ||
-                'Gagal menghapus data.';
+                'Data gagal dihapus. Kemungkinan data sudah digunakan pada pengajuan.';
 
             setErrorMessage(backendMessage);
-            showErrorAlert('Gagal Menghapus Data', backendMessage);
+            showErrorAlert('Gagal Menghapus', backendMessage);
             console.error(error);
         }
     };
 
     const getTypeLabel = (type) => {
-        const selected = typeOptions.find((item) => item.value === type);
-        return selected ? selected.label : type;
+        return typeOptions.find((item) => item.value === type)?.label || type;
+    };
+
+    const getTypeBadgeClass = (type) => {
+        if (type === 'checkout') {
+            return 'text-bg-primary';
+        }
+
+        if (type === 'borrow') {
+            return 'text-bg-success';
+        }
+
+        return 'text-bg-dark';
     };
 
     return (
-        <div className="page">
-            <div className="page-header">
-                <div>
-                    <h2>Paket Merchandise & Barang</h2>
-                    <p>
-                        Kelola katalog merchandise dan barang peminjaman yang digunakan
-                        dalam layanan HUMAS & SEKPIM.
-                    </p>
-                </div>
-
-                <button className="btn btn-primary" type="button" onClick={fetchProducts}>
-                    Refresh
-                </button>
-            </div>
-
-            {message && <div className="success-box">{message}</div>}
-            {errorMessage && <div className="error-box">{errorMessage}</div>}
-
-            <div className="filter-summary-grid">
-                <button
-                    className={selectedStatus === 'all' && selectedType === 'all' ? 'filter-card active' : 'filter-card'}
-                    type="button"
-                    onClick={() => {
-                        setSelectedStatus('all');
-                        setSelectedType('all');
+        <div className="container-fluid px-0">
+            <section className="card border-0 shadow-sm rounded-5 overflow-hidden mb-4">
+                <div
+                    className="card-body p-4 p-lg-5 text-white"
+                    style={{
+                        background:
+                            'radial-gradient(circle at top right, rgba(255,255,255,.22), transparent 28%), linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #dc2626 120%)',
                     }}
                 >
-                    <span>Total Data</span>
-                    <strong>{summary.total}</strong>
-                </button>
+                    <div className="row align-items-center g-4">
+                        <div className="col-lg-9">
+                            <span className="text-white-50 small fw-bold text-uppercase">
+                                Master Data
+                            </span>
 
-                <button
-                    className={selectedStatus === 'active' ? 'filter-card active' : 'filter-card'}
-                    type="button"
-                    onClick={() => setSelectedStatus('active')}
-                >
-                    <span>Aktif</span>
-                    <strong>{summary.active}</strong>
-                </button>
+                            <h2 className="display-5 fw-black mt-2 mb-3">
+                                Paket Merchandise & Barang
+                            </h2>
 
-                <button
-                    className={selectedStatus === 'inactive' ? 'filter-card active' : 'filter-card'}
-                    type="button"
-                    onClick={() => setSelectedStatus('inactive')}
-                >
-                    <span>Nonaktif</span>
-                    <strong>{summary.inactive}</strong>
-                </button>
+                            <p className="mb-0 text-white-50" style={{ maxWidth: 820, lineHeight: 1.8 }}>
+                                Kelola paket merchandise untuk pengajuan HUMAS dan barang Sekpim
+                                untuk kebutuhan peminjaman internal.
+                            </p>
+                        </div>
 
-                <button
-                    className={selectedType === 'checkout' ? 'filter-card active' : 'filter-card'}
-                    type="button"
-                    onClick={() => setSelectedType('checkout')}
-                >
-                    <span>Merchandise</span>
-                    <strong>{summary.checkout}</strong>
-                </button>
+                        <div className="col-lg-3">
+                            <button
+                                className="btn btn-light rounded-pill fw-bold w-100"
+                                type="button"
+                                onClick={fetchInitialData}
+                            >
+                                <i className="bi bi-arrow-clockwise me-2"></i>
+                                Refresh Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-                <button
-                    className={selectedType === 'borrow' ? 'filter-card active' : 'filter-card'}
-                    type="button"
-                    onClick={() => setSelectedType('borrow')}
-                >
-                    <span>Peminjaman</span>
-                    <strong>{summary.borrow}</strong>
-                </button>
+            {message && (
+                <div className="alert alert-success rounded-4">
+                    {message}
+                </div>
+            )}
+
+            {errorMessage && (
+                <div className="alert alert-danger rounded-4">
+                    {errorMessage}
+                </div>
+            )}
+
+            <div className="row g-3 mb-4">
+                <div className="col-6 col-md-4 col-xl-2">
+                    <div className="card border-0 shadow-sm rounded-5 h-100">
+                        <div className="card-body p-3 p-lg-4">
+                            <p className="text-muted small fw-bold text-uppercase mb-2">
+                                Total
+                            </p>
+                            <h3 className="fw-black mb-0">{summary.total}</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="col-6 col-md-4 col-xl-2">
+                    <div className="card border-0 shadow-sm rounded-5 h-100">
+                        <div className="card-body p-3 p-lg-4">
+                            <p className="text-muted small fw-bold text-uppercase mb-2">
+                                Aktif
+                            </p>
+                            <h3 className="fw-black mb-0">{summary.active}</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="col-6 col-md-4 col-xl-2">
+                    <div className="card border-0 shadow-sm rounded-5 h-100">
+                        <div className="card-body p-3 p-lg-4">
+                            <p className="text-muted small fw-bold text-uppercase mb-2">
+                                Nonaktif
+                            </p>
+                            <h3 className="fw-black mb-0">{summary.inactive}</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="col-6 col-md-4 col-xl-2">
+                    <div className="card border-0 shadow-sm rounded-5 h-100">
+                        <div className="card-body p-3 p-lg-4">
+                            <p className="text-muted small fw-bold text-uppercase mb-2">
+                                Merchandise
+                            </p>
+                            <h3 className="fw-black mb-0">{summary.checkout}</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="col-6 col-md-4 col-xl-2">
+                    <div className="card border-0 shadow-sm rounded-5 h-100">
+                        <div className="card-body p-3 p-lg-4">
+                            <p className="text-muted small fw-bold text-uppercase mb-2">
+                                Peminjaman
+                            </p>
+                            <h3 className="fw-black mb-0">{summary.borrow}</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="col-6 col-md-4 col-xl-2">
+                    <div className="card border-0 shadow-sm rounded-5 h-100">
+                        <div className="card-body p-3 p-lg-4">
+                            <p className="text-muted small fw-bold text-uppercase mb-2">
+                                Keduanya
+                            </p>
+                            <h3 className="fw-black mb-0">{summary.both}</h3>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <form className="form-card" onSubmit={handleSubmit}>
-                <h3>{editingProductId ? 'Edit Paket/Barang' : 'Tambah Paket/Barang'}</h3>
-                <p>
-                    Gunakan tipe <strong>Merchandise / Checkout</strong> untuk katalog merchandise,
-                    dan tipe <strong>Peminjaman</strong> untuk barang Sekpim.
-                </p>
+            <div className="row g-4 align-items-start">
+                <div className="col-xl-4">
+                    <form className="card border-0 shadow-sm rounded-5 position-sticky" style={{ top: 110 }} onSubmit={handleSubmit}>
+                        <div className="card-body p-4">
+                            <div className="d-flex align-items-start justify-content-between gap-3 mb-4">
+                                <div>
+                                    <span className="text-primary small fw-bold text-uppercase">
+                                        {editingId ? 'Edit Product' : 'Create Product'}
+                                    </span>
 
-                <div className="form-grid product-form-grid">
-                    <div className="form-group">
-                        <label>Nama Paket / Barang</label>
-                        <input
-                            type="text"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleInputChange}
-                            placeholder="Contoh: Paket Merchandise VIP"
-                            required
-                        />
-                    </div>
+                                    <h4 className="fw-black mt-1 mb-1">
+                                        {editingId ? 'Edit Paket / Barang' : 'Tambah Paket / Barang'}
+                                    </h4>
 
-                    <div className="form-group">
-                        <label>Kategori</label>
-                        <select
-                            name="category_id"
-                            value={formData.category_id}
-                            onChange={handleInputChange}
-                            disabled={loadingCategories}
-                        >
-                            <option value="">Tanpa kategori</option>
-                            {categories.map((category) => (
-                                <option value={category.id} key={category.id}>
-                                    {category.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                                    <p className="text-muted mb-0">
+                                        Isi data untuk katalog merchandise atau barang peminjaman.
+                                    </p>
+                                </div>
 
-                    <div className="form-group">
-                        <label>Stok</label>
-                        <input
-                            type="number"
-                            name="stock"
-                            min="0"
-                            value={formData.stock}
-                            onChange={handleInputChange}
-                            required
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label>Tipe</label>
-                        <select
-                            name="type"
-                            value={formData.type}
-                            onChange={handleInputChange}
-                            required
-                        >
-                            {typeOptions.map((option) => (
-                                <option value={option.value} key={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="form-group">
-                        <label>Status</label>
-                        <select
-                            name="status"
-                            value={formData.status}
-                            onChange={handleInputChange}
-                            required
-                        >
-                            {statusOptions.map((option) => (
-                                <option value={option.value} key={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="form-group">
-                        <label>URL Gambar</label>
-                        <input
-                            type="text"
-                            name="image"
-                            value={formData.image}
-                            onChange={handleInputChange}
-                            placeholder="Opsional, isi URL gambar jika ada"
-                        />
-                    </div>
-
-                    <div className="form-group span-2">
-                        <label>Deskripsi</label>
-                        <textarea
-                            name="description"
-                            value={formData.description}
-                            onChange={handleInputChange}
-                            placeholder="Jelaskan detail paket merchandise atau barang."
-                            rows="4"
-                        />
-                    </div>
-                </div>
-
-                <div className="form-actions">
-                    <button className="btn btn-primary" type="submit">
-                        {editingProductId ? 'Update Data' : 'Simpan Data'}
-                    </button>
-
-                    {(editingProductId || formData.name || formData.description) && (
-                        <button
-                            className="btn btn-dark"
-                            type="button"
-                            onClick={resetForm}
-                        >
-                            Batal
-                        </button>
-                    )}
-                </div>
-            </form>
-
-            <div className="page-section">
-                <div className="section-heading">
-                    <h3>Daftar Paket Merchandise & Barang</h3>
-                    <p>Data katalog yang digunakan pada pengajuan user.</p>
-                </div>
-
-                <div className="filter-bar">
-                    <div className="filter-field">
-                        <label>Cari Data</label>
-                        <input
-                            type="text"
-                            value={searchKeyword}
-                            onChange={(event) => setSearchKeyword(event.target.value)}
-                            placeholder="Cari nama, deskripsi, atau kategori..."
-                        />
-                    </div>
-
-                    <div className="filter-field">
-                        <label>Tipe</label>
-                        <select
-                            value={selectedType}
-                            onChange={(event) => setSelectedType(event.target.value)}
-                        >
-                            <option value="all">Semua Tipe</option>
-                            {typeOptions.map((option) => (
-                                <option value={option.value} key={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="filter-field">
-                        <label>Status</label>
-                        <select
-                            value={selectedStatus}
-                            onChange={(event) => setSelectedStatus(event.target.value)}
-                        >
-                            <option value="all">Semua Status</option>
-                            {statusOptions.map((option) => (
-                                <option value={option.value} key={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-
-                {loadingProducts && (
-                    <div className="info-box">
-                        Sedang mengambil data paket/barang...
-                    </div>
-                )}
-
-                {!loadingProducts && filteredProducts.length === 0 && (
-                    <div className="info-box">
-                        Tidak ada data sesuai filter.
-                    </div>
-                )}
-
-                <div className="product-management-grid">
-                    {filteredProducts.map((product) => (
-                        <div className="product-management-card" key={product.id}>
-                            <div className="product-management-image">
-                                {product.image ? (
-                                    <img src={product.image} alt={product.name} />
-                                ) : (
-                                    <span>HUMAS</span>
-                                )}
+                                <div className="icon-box bg-primary-subtle text-primary">
+                                    <i className="bi bi-box-seam-fill fs-4"></i>
+                                </div>
                             </div>
 
-                            <div className="product-management-content">
-                                <div className="product-management-top">
-                                    <span>
-                                        {product.category?.name || 'Tanpa Kategori'}
-                                    </span>
+                            <div className="mb-3">
+                                <label className="form-label fw-bold">
+                                    Kategori
+                                </label>
 
-                                    <span className={`status status-${product.status}`}>
-                                        {product.status}
-                                    </span>
+                                <select
+                                    name="category_id"
+                                    value={formData.category_id}
+                                    onChange={handleInputChange}
+                                    className="form-select rounded-4"
+                                    disabled={loadingCategories}
+                                    required
+                                >
+                                    <option value="">
+                                        {loadingCategories ? 'Memuat kategori...' : 'Pilih kategori'}
+                                    </option>
+
+                                    {categories.map((category) => (
+                                        <option value={category.id} key={category.id}>
+                                            {category.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="mb-3">
+                                <label className="form-label fw-bold">
+                                    Nama Paket / Barang
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleInputChange}
+                                    className="form-control rounded-4"
+                                    placeholder="Contoh: Paket Merchandise VIP"
+                                    required
+                                />
+                            </div>
+
+                            <div className="mb-3">
+                                <label className="form-label fw-bold">
+                                    Deskripsi
+                                </label>
+
+                                <textarea
+                                    name="description"
+                                    value={formData.description}
+                                    onChange={handleInputChange}
+                                    className="form-control rounded-4"
+                                    placeholder="Tuliskan isi paket atau keterangan barang."
+                                    rows="4"
+                                />
+                            </div>
+
+                            <div className="row g-3">
+                                <div className="col-md-6 col-xl-12">
+                                    <label className="form-label fw-bold">
+                                        Stok
+                                    </label>
+
+                                    <input
+                                        type="number"
+                                        name="stock"
+                                        value={formData.stock}
+                                        onChange={handleInputChange}
+                                        className="form-control rounded-4"
+                                        placeholder="0"
+                                        min="0"
+                                        required
+                                    />
                                 </div>
 
-                                <h3>{product.name}</h3>
+                                <div className="col-md-6 col-xl-12">
+                                    <label className="form-label fw-bold">
+                                        Jenis Penggunaan
+                                    </label>
 
-                                <p>
-                                    {product.description || 'Tidak ada deskripsi.'}
-                                </p>
+                                    <select
+                                        name="type"
+                                        value={formData.type}
+                                        onChange={handleInputChange}
+                                        className="form-select rounded-4"
+                                        required
+                                    >
+                                        {typeOptions.map((option) => (
+                                            <option value={option.value} key={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
 
-                                <div className="product-management-meta">
-                                    <div>
-                                        <span>Stok</span>
-                                        <strong>{product.stock}</strong>
-                                    </div>
+                            <div className="mt-3">
+                                <label className="form-label fw-bold">
+                                    Link Gambar
+                                </label>
 
-                                    <div>
-                                        <span>Tipe</span>
-                                        <strong>{getTypeLabel(product.type)}</strong>
+                                <input
+                                    type="text"
+                                    name="image"
+                                    value={formData.image}
+                                    onChange={handleInputChange}
+                                    className="form-control rounded-4"
+                                    placeholder="Opsional: https://..."
+                                />
+                            </div>
+
+                            <div className="mt-3 mb-4">
+                                <label className="form-label fw-bold">
+                                    Status
+                                </label>
+
+                                <select
+                                    name="status"
+                                    value={formData.status}
+                                    onChange={handleInputChange}
+                                    className="form-select rounded-4"
+                                    required
+                                >
+                                    {statusOptions.map((option) => (
+                                        <option value={option.value} key={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="d-grid gap-2">
+                                <button
+                                    className="btn btn-primary rounded-pill fw-bold"
+                                    type="submit"
+                                    disabled={submitting}
+                                >
+                                    {submitting
+                                        ? 'Menyimpan...'
+                                        : editingId
+                                            ? 'Update Data'
+                                            : 'Tambah Data'}
+                                </button>
+
+                                <button
+                                    className="btn btn-outline-dark rounded-pill fw-bold"
+                                    type="button"
+                                    onClick={resetForm}
+                                    disabled={submitting}
+                                >
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div className="col-xl-8">
+                    <div className="card border-0 shadow-sm rounded-5 mb-4">
+                        <div className="card-body p-4">
+                            <div className="row g-3 align-items-end">
+                                <div className="col-lg-6">
+                                    <label className="form-label fw-bold">
+                                        Cari Data
+                                    </label>
+
+                                    <div className="input-group">
+                                        <span className="input-group-text bg-light border-end-0 rounded-start-4">
+                                            <i className="bi bi-search"></i>
+                                        </span>
+
+                                        <input
+                                            type="text"
+                                            value={searchKeyword}
+                                            onChange={(event) => setSearchKeyword(event.target.value)}
+                                            className="form-control border-start-0 rounded-end-4"
+                                            placeholder="Cari nama, kategori, slug, atau deskripsi..."
+                                        />
                                     </div>
                                 </div>
 
-                                <div className="table-actions">
-                                    <button
-                                        className="btn btn-warning"
-                                        type="button"
-                                        onClick={() => handleEdit(product)}
-                                    >
-                                        Edit
-                                    </button>
+                                <div className="col-md-6 col-lg-3">
+                                    <label className="form-label fw-bold">
+                                        Jenis
+                                    </label>
 
-                                    <button
-                                        className="btn btn-danger"
-                                        type="button"
-                                        onClick={() => handleDelete(product)}
+                                    <select
+                                        value={selectedType}
+                                        onChange={(event) => setSelectedType(event.target.value)}
+                                        className="form-select rounded-4"
                                     >
-                                        Hapus
-                                    </button>
+                                        <option value="all">Semua Jenis</option>
+                                        {typeOptions.map((option) => (
+                                            <option value={option.value} key={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="col-md-6 col-lg-3">
+                                    <label className="form-label fw-bold">
+                                        Status
+                                    </label>
+
+                                    <select
+                                        value={selectedStatus}
+                                        onChange={(event) => setSelectedStatus(event.target.value)}
+                                        className="form-select rounded-4"
+                                    >
+                                        <option value="all">Semua Status</option>
+                                        {statusOptions.map((option) => (
+                                            <option value={option.value} key={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
                         </div>
-                    ))}
+                    </div>
+
+                    {loadingProducts && (
+                        <div className="alert alert-primary rounded-4">
+                            Sedang mengambil data paket atau barang...
+                        </div>
+                    )}
+
+                    {!loadingProducts && filteredProducts.length === 0 && (
+                        <div className="card border-0 shadow-sm rounded-5">
+                            <div className="card-body p-5 text-center">
+                                <div className="icon-box bg-primary-subtle text-primary mx-auto mb-3">
+                                    <i className="bi bi-inbox-fill fs-4"></i>
+                                </div>
+
+                                <h4 className="fw-black">
+                                    Data tidak ditemukan
+                                </h4>
+
+                                <p className="text-muted mb-0">
+                                    Belum ada paket atau barang yang sesuai dengan filter.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="row g-3">
+                        {filteredProducts.map((product) => (
+                            <div className="col-12 col-md-6 col-xxl-4" key={product.id}>
+                                <div className="card border-0 shadow-sm rounded-5 h-100 overflow-hidden">
+                                    <div
+                                        className="d-flex align-items-center justify-content-center text-primary fw-black"
+                                        style={{
+                                            height: 150,
+                                            background:
+                                                product.type === 'borrow'
+                                                    ? 'linear-gradient(135deg, #ccfbf1, #eef2ff)'
+                                                    : 'linear-gradient(135deg, #dbeafe, #eef2ff)',
+                                            letterSpacing: '.12em',
+                                        }}
+                                    >
+                                        {product.image ? (
+                                            <img
+                                                src={product.image}
+                                                alt={product.name}
+                                                className="w-100 h-100 object-fit-cover"
+                                            />
+                                        ) : (
+                                            <span>
+                                                {product.type === 'borrow' ? 'SEKPIM' : 'HUMAS'}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="card-body p-4">
+                                        <div className="d-flex flex-wrap gap-2 mb-3">
+                                            <span className={`badge rounded-pill ${getTypeBadgeClass(product.type)}`}>
+                                                {getTypeLabel(product.type)}
+                                            </span>
+
+                                            <span className={`status status-${product.status}`}>
+                                                {product.status}
+                                            </span>
+                                        </div>
+
+                                        <h5 className="fw-black mb-2">
+                                            {product.name}
+                                        </h5>
+
+                                        <p className="text-muted small mb-3" style={{ minHeight: 66 }}>
+                                            {product.description || 'Tidak ada deskripsi.'}
+                                        </p>
+
+                                        <div className="d-grid gap-2 mb-3">
+                                            <div className="d-flex justify-content-between align-items-center bg-light border rounded-4 p-3">
+                                                <span className="text-muted fw-bold small">
+                                                    Kategori
+                                                </span>
+
+                                                <strong className="text-end">
+                                                    {product.category?.name || '-'}
+                                                </strong>
+                                            </div>
+
+                                            <div className="d-flex justify-content-between align-items-center bg-light border rounded-4 p-3">
+                                                <span className="text-muted fw-bold small">
+                                                    Stok
+                                                </span>
+
+                                                <strong className="fs-4">
+                                                    {product.stock}
+                                                </strong>
+                                            </div>
+                                        </div>
+
+                                        <div className="d-flex gap-2 flex-wrap">
+                                            <button
+                                                className="btn btn-sm btn-outline-primary rounded-pill px-3"
+                                                type="button"
+                                                onClick={() => handleEdit(product)}
+                                            >
+                                                <i className="bi bi-pencil-square me-1"></i>
+                                                Edit
+                                            </button>
+
+                                            <button
+                                                className="btn btn-sm btn-outline-danger rounded-pill px-3"
+                                                type="button"
+                                                onClick={() => handleDelete(product)}
+                                            >
+                                                <i className="bi bi-trash-fill me-1"></i>
+                                                Hapus
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="alert alert-info rounded-4 mt-3 mb-0">
+                        <strong>Catatan:</strong> gunakan jenis <strong>Merchandise</strong> untuk katalog
+                        pengajuan HUMAS, <strong>Peminjaman</strong> untuk barang Sekpim, dan
+                        <strong> Keduanya</strong> jika data bisa digunakan untuk dua kebutuhan.
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useState } from 'react';
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen = false, onClose }) {
     const adminUser = JSON.parse(localStorage.getItem('admin_user') || '{}');
     const role = adminUser.role || 'user';
 
@@ -27,67 +27,100 @@ export default function Sidebar() {
         }));
     };
 
+    const handleNavigate = () => {
+        if (typeof onClose === 'function') {
+            onClose();
+        }
+    };
+
+    const navClass = ({ isActive }) =>
+        isActive ? 'sidebar-link active' : 'sidebar-link';
+
+    const childClass = ({ isActive }) =>
+        isActive ? 'sidebar-child active' : 'sidebar-child';
+
     return (
-        <aside className="sidebar">
-            <div className="sidebar-brand">
-                <div className="sidebar-logo-box">
-                    <img
-                        src="/images/logo-putih-tus.png"
-                        alt="Telkom University Surabaya"
-                        className="sidebar-logo-image"
-                    />
+        <aside className={`app-sidebar ${isOpen ? 'show' : ''}`}>
+            <div className="d-flex align-items-start justify-content-between gap-3 mb-3">
+                <div className="sidebar-brand mb-0">
+                    <div className="sidebar-logo-wrap">
+                        <img
+                            src="/images/logo-putih-tus.png"
+                            alt="Telkom University Surabaya"
+                            className="sidebar-logo"
+                        />
+                    </div>
+
+                    <div>
+                        <h2>HUMAS</h2>
+                        <p>Telkom University Surabaya</p>
+                    </div>
                 </div>
 
-                <div>
-                    <h2>HUMAS</h2>
-                    <p>Telkom University Surabaya</p>
-                </div>
+                <button
+                    type="button"
+                    className="btn btn-sm btn-light rounded-4 d-lg-none"
+                    onClick={onClose}
+                    aria-label="Close sidebar"
+                >
+                    <i className="bi bi-x-lg"></i>
+                </button>
             </div>
 
-            <nav className="sidebar-nav">
+            <nav className="sidebar-menu">
                 <NavLink
                     to="/admin/dashboard"
-                    className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+                    className={navClass}
+                    onClick={handleNavigate}
                 >
-                    <span className="nav-icon">⌂</span>
+                    <i className="bi bi-grid-1x2-fill"></i>
                     <span>Dashboard</span>
                 </NavLink>
 
-                <div className="nav-group">
-                    <button type="button" className="nav-parent" onClick={() => toggleMenu('myRequest')}>
+                <div className="sidebar-group">
+                    <button
+                        type="button"
+                        className="sidebar-parent"
+                        onClick={() => toggleMenu('myRequest')}
+                    >
                         <span>
-                            <span className="nav-icon">✦</span>
+                            <i className="bi bi-send-check-fill"></i>
                             Pengajuan Saya
                         </span>
-                        <span>{openMenu.myRequest ? '▾' : '▸'}</span>
+
+                        <i className={openMenu.myRequest ? 'bi bi-chevron-down' : 'bi bi-chevron-right'}></i>
                     </button>
 
                     {openMenu.myRequest && (
-                        <div className="nav-children">
+                        <div className="sidebar-children">
                             <NavLink
                                 to="/admin/request/merchandise"
-                                className={({ isActive }) => isActive ? 'nav-child active' : 'nav-child'}
+                                className={childClass}
+                                onClick={handleNavigate}
                             >
                                 Ajukan Merchandise
                             </NavLink>
 
                             <NavLink
                                 to="/admin/request/humas-service"
-                                className={({ isActive }) => isActive ? 'nav-child active' : 'nav-child'}
+                                className={childClass}
+                                onClick={handleNavigate}
                             >
                                 Ajukan Layanan Humas
                             </NavLink>
 
                             <NavLink
                                 to="/admin/request/sekpim-borrowing"
-                                className={({ isActive }) => isActive ? 'nav-child active' : 'nav-child'}
+                                className={childClass}
+                                onClick={handleNavigate}
                             >
                                 Ajukan Peminjaman
                             </NavLink>
 
                             <NavLink
                                 to="/admin/my-requests"
-                                className={({ isActive }) => isActive ? 'nav-child active' : 'nav-child'}
+                                className={childClass}
+                                onClick={handleNavigate}
                             >
                                 Riwayat Saya
                             </NavLink>
@@ -96,34 +129,42 @@ export default function Sidebar() {
                 </div>
 
                 {canApprove && (
-                    <div className="nav-group">
-                        <button type="button" className="nav-parent" onClick={() => toggleMenu('approval')}>
+                    <div className="sidebar-group">
+                        <button
+                            type="button"
+                            className="sidebar-parent"
+                            onClick={() => toggleMenu('approval')}
+                        >
                             <span>
-                                <span className="nav-icon">◇</span>
+                                <i className="bi bi-patch-check-fill"></i>
                                 Approval
                             </span>
-                            <span>{openMenu.approval ? '▾' : '▸'}</span>
+
+                            <i className={openMenu.approval ? 'bi bi-chevron-down' : 'bi bi-chevron-right'}></i>
                         </button>
 
                         {openMenu.approval && (
-                            <div className="nav-children">
+                            <div className="sidebar-children">
                                 <NavLink
                                     to="/admin/orders"
-                                    className={({ isActive }) => isActive ? 'nav-child active' : 'nav-child'}
+                                    className={childClass}
+                                    onClick={handleNavigate}
                                 >
                                     Approval Merchandise
                                 </NavLink>
 
                                 <NavLink
                                     to="/admin/humas-services"
-                                    className={({ isActive }) => isActive ? 'nav-child active' : 'nav-child'}
+                                    className={childClass}
+                                    onClick={handleNavigate}
                                 >
                                     Approval Layanan Humas
                                 </NavLink>
 
                                 <NavLink
                                     to="/admin/borrow-requests"
-                                    className={({ isActive }) => isActive ? 'nav-child active' : 'nav-child'}
+                                    className={childClass}
+                                    onClick={handleNavigate}
                                 >
                                     Approval Peminjaman
                                 </NavLink>
@@ -133,27 +174,34 @@ export default function Sidebar() {
                 )}
 
                 {canManageMaster && (
-                    <div className="nav-group">
-                        <button type="button" className="nav-parent" onClick={() => toggleMenu('masterData')}>
+                    <div className="sidebar-group">
+                        <button
+                            type="button"
+                            className="sidebar-parent"
+                            onClick={() => toggleMenu('masterData')}
+                        >
                             <span>
-                                <span className="nav-icon">▣</span>
+                                <i className="bi bi-archive-fill"></i>
                                 Master Data
                             </span>
-                            <span>{openMenu.masterData ? '▾' : '▸'}</span>
+
+                            <i className={openMenu.masterData ? 'bi bi-chevron-down' : 'bi bi-chevron-right'}></i>
                         </button>
 
                         {openMenu.masterData && (
-                            <div className="nav-children">
+                            <div className="sidebar-children">
                                 <NavLink
                                     to="/admin/categories"
-                                    className={({ isActive }) => isActive ? 'nav-child active' : 'nav-child'}
+                                    className={childClass}
+                                    onClick={handleNavigate}
                                 >
                                     Data Kategori
                                 </NavLink>
 
                                 <NavLink
                                     to="/admin/products"
-                                    className={({ isActive }) => isActive ? 'nav-child active' : 'nav-child'}
+                                    className={childClass}
+                                    onClick={handleNavigate}
                                 >
                                     Paket Merchandise
                                 </NavLink>
@@ -163,20 +211,26 @@ export default function Sidebar() {
                 )}
 
                 {canManageUser && (
-                    <div className="nav-group">
-                        <button type="button" className="nav-parent" onClick={() => toggleMenu('userManagement')}>
+                    <div className="sidebar-group">
+                        <button
+                            type="button"
+                            className="sidebar-parent"
+                            onClick={() => toggleMenu('userManagement')}
+                        >
                             <span>
-                                <span className="nav-icon">◉</span>
+                                <i className="bi bi-people-fill"></i>
                                 Manajemen User
                             </span>
-                            <span>{openMenu.userManagement ? '▾' : '▸'}</span>
+
+                            <i className={openMenu.userManagement ? 'bi bi-chevron-down' : 'bi bi-chevron-right'}></i>
                         </button>
 
                         {openMenu.userManagement && (
-                            <div className="nav-children">
+                            <div className="sidebar-children">
                                 <NavLink
                                     to="/admin/users"
-                                    className={({ isActive }) => isActive ? 'nav-child active' : 'nav-child'}
+                                    className={childClass}
+                                    onClick={handleNavigate}
                                 >
                                     Data User
                                 </NavLink>
@@ -185,26 +239,19 @@ export default function Sidebar() {
                     </div>
                 )}
 
-                {isUser && (
-                    <div className="sidebar-note">
-                        <strong>Akses User</strong>
-                        <p>Kamu dapat membuat pengajuan dan memantau status request.</p>
-                    </div>
-                )}
+                <div className="sidebar-role-card">
+                    <span>
+                        {isSuperadmin && 'Akses Superadmin'}
+                        {isAdmin && 'Akses Admin'}
+                        {isUser && 'Akses User'}
+                    </span>
 
-                {isAdmin && (
-                    <div className="sidebar-note">
-                        <strong>Akses Admin</strong>
-                        <p>Kamu dapat membuat pengajuan dan memproses approval.</p>
-                    </div>
-                )}
-
-                {isSuperadmin && (
-                    <div className="sidebar-note">
-                        <strong>Akses Superadmin</strong>
-                        <p>Kamu memiliki akses penuh ke sistem.</p>
-                    </div>
-                )}
+                    <p>
+                        {isSuperadmin && 'Memiliki akses penuh ke seluruh fitur sistem.'}
+                        {isAdmin && 'Dapat membuat pengajuan dan memproses approval.'}
+                        {isUser && 'Dapat membuat pengajuan dan memantau status request.'}
+                    </p>
+                </div>
             </nav>
         </aside>
     );

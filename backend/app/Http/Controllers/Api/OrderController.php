@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,64 +12,60 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    /**
-     * Menampilkan semua permintaan merchandise.
-     */
-    public function index(Request $request): JsonResponse
+    public function index(): JsonResponse
     {
-        $orders = Order::with(['user', 'items.product.category'])
+        $orders = Order::with([
+            'user',
+            'items.product.category',
+        ])
             ->latest()
             ->get();
 
         return response()->json([
             'success' => true,
-            'message' => 'Daftar permintaan merchandise berhasil diambil.',
+            'message' => 'Data pengajuan merchandise berhasil diambil.',
             'data' => $orders,
         ]);
     }
 
-    /**
-     * Menampilkan permintaan merchandise milik user yang sedang login.
-     */
     public function myOrders(Request $request): JsonResponse
     {
-        $orders = Order::with(['items.product.category'])
+        $orders = Order::with([
+            'items.product.category',
+        ])
             ->where('user_id', $request->user()->id)
             ->latest()
             ->get();
 
         return response()->json([
             'success' => true,
-            'message' => 'Riwayat permintaan merchandise berhasil diambil.',
+            'message' => 'Riwayat pengajuan merchandise berhasil diambil.',
             'data' => $orders,
         ]);
     }
 
-    /**
-     * Menampilkan detail permintaan merchandise.
-     */
-    public function show(string $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
-        $order = Order::with(['user', 'items.product.category'])->find($id);
+        $order = Order::with([
+            'user',
+            'items.product.category',
+        ])->findOrFail($id);
 
-        if (!$order) {
+        if (!$this->canAccessOrder($request, $order)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Permintaan merchandise tidak ditemukan.',
+                'message' => 'Akses ditolak. Kamu tidak memiliki izin melihat pengajuan ini.',
                 'data' => null,
-            ], 404);
+            ], 403);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Detail permintaan merchandise berhasil diambil.',
+            'message' => 'Detail pengajuan merchandise berhasil diambil.',
             'data' => $order,
         ]);
     }
 
-    /**
-     * Membuat permintaan merchandise.
-     */
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -78,17 +75,7 @@ class OrderController extends Controller
             'guest_position' => ['required', 'string', 'max:255'],
             'activity_date' => ['required', 'date'],
             'user_note' => ['required', 'string'],
-
-            /**
-             * File bukti agar bisa dibuka langsung di browser.
-             * PDF/JPG/PNG biasanya bisa preview tanpa download.
-             */
-            'proof_file' => [
-                'required',
-                'file',
-                'mimes:pdf,jpg,jpeg,png',
-                'max:5120',
-            ],
+            'proof_file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
 
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
@@ -96,14 +83,41 @@ class OrderController extends Controller
         ]);
 
         try {
-            $order = DB::transaction(function () use ($validated, $request) {
-                $proofFile = $request->file('proof_file');
+            $order = DB::transaction(function () use ($request, $validated) {
+                foreach ($validated['items'] as $item) {
+                    $product = Product::findOrFail($item['product_id']);
 
+                    if ($product->status !== 'active') {
+                        abort(response()->json([
+                            'success' => false,
+                            'message' => "Produk {$product->name} sedang tidak aktif.",
+                            'data' => null,
+                        ], 422));
+                    }
+
+                    if (!in_array($product->type, ['checkout', 'both'], true)) {
+                        abort(response()->json([
+                            'success' => false,
+                            'message' => "Produk {$product->name} tidak tersedia untuk pengajuan merchandise.",
+                            'data' => null,
+                        ], 422));
+                    }
+
+                    if ($product->stock < $item['quantity']) {
+                        abort(response()->json([
+                            'success' => false,
+                            'message' => "Stok {$product->name} tidak mencukupi.",
+                            'data' => null,
+                        ], 422));
+                    }
+                }
+
+                $proofFile = $request->file('proof_file');
                 $proofFilePath = $proofFile->store('merchandise-proofs', 'public');
 
                 $order = Order::create([
                     'user_id' => $request->user()->id,
-                    'order_code' => $this->generateOrderCode(),
+                    'order_code' => 'MER-' . now()->format('YmdHis') . '-' . random_int(100, 999),
                     'event_name' => $validated['event_name'],
                     'institution_name' => $validated['institution_name'],
                     'guest_name' => $validated['guest_name'],
@@ -112,84 +126,70 @@ class OrderController extends Controller
                     'proof_link' => null,
                     'proof_file_path' => $proofFilePath,
                     'proof_file_name' => $proofFile->getClientOriginalName(),
-                    'proof_file_mime' => $proofFile->getClientMimeType(),
-                    'user_note' => $validated['user_note'],
+                    'proof_file_mime' => $proofFile->getMimeType(),
                     'status' => 'pending',
+                    'user_note' => $validated['user_note'],
+                    'admin_note' => null,
                     'submitted_at' => now(),
                 ]);
 
                 foreach ($validated['items'] as $item) {
-                    $product = Product::findOrFail($item['product_id']);
-
-                    if (!in_array($product->type, ['checkout', 'both'])) {
-                        throw new \Exception("Paket {$product->name} tidak bisa diajukan sebagai merchandise.");
-                    }
-
-                    if ($product->status !== 'active') {
-                        throw new \Exception("Paket {$product->name} sedang tidak aktif.");
-                    }
-
-                    if ($product->stock < $item['quantity']) {
-                        throw new \Exception("Stok paket {$product->name} tidak mencukupi.");
-                    }
-
-                    $order->items()->create([
-                        'product_id' => $product->id,
+                    OrderItem::create([
+                        'order_id' => $order->id,
+                        'product_id' => $item['product_id'],
                         'quantity' => $item['quantity'],
                     ]);
                 }
 
-                return $order->load(['user', 'items.product.category']);
+                return $order->load([
+                    'user',
+                    'items.product.category',
+                ]);
             });
 
             return response()->json([
                 'success' => true,
-                'message' => 'Permintaan merchandise berhasil diajukan dan menunggu approval.',
+                'message' => 'Pengajuan merchandise berhasil dikirim.',
                 'data' => $order,
             ], 201);
-        } catch (\Exception $exception) {
+        } catch (\Throwable $error) {
+            if ($error instanceof \Illuminate\Http\Exceptions\HttpResponseException) {
+                throw $error;
+            }
+
+            report($error);
+
             return response()->json([
                 'success' => false,
-                'message' => $exception->getMessage(),
+                'message' => 'Pengajuan merchandise gagal dikirim. Silakan periksa kembali data pengajuan atau hubungi admin.',
                 'data' => null,
-            ], 422);
+            ], 500);
         }
     }
 
-    /**
-     * Admin menyetujui permintaan merchandise.
-     */
-    public function approve(string $id): JsonResponse
+    public function approve(int $id): JsonResponse
     {
-        $order = Order::with('items.product')->find($id);
-
-        if (!$order) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Permintaan merchandise tidak ditemukan.',
-                'data' => null,
-            ], 404);
-        }
+        $order = Order::with('items.product')->findOrFail($id);
 
         if ($order->status !== 'pending') {
             return response()->json([
                 'success' => false,
-                'message' => 'Permintaan hanya bisa disetujui jika status masih pending.',
-                'data' => $order,
+                'message' => 'Pengajuan hanya bisa di-approve saat status pending.',
+                'data' => null,
             ], 422);
         }
 
         try {
             DB::transaction(function () use ($order) {
                 foreach ($order->items as $item) {
-                    $product = $item->product;
-
-                    if (!$product) {
-                        throw new \Exception('Paket merchandise tidak ditemukan.');
-                    }
+                    $product = Product::lockForUpdate()->findOrFail($item->product_id);
 
                     if ($product->stock < $item->quantity) {
-                        throw new \Exception("Stok paket {$product->name} tidak mencukupi.");
+                        abort(response()->json([
+                            'success' => false,
+                            'message' => "Stok {$product->name} tidak mencukupi.",
+                            'data' => null,
+                        ], 422));
                     }
 
                     $product->decrement('stock', $item->quantity);
@@ -198,40 +198,48 @@ class OrderController extends Controller
                 $order->update([
                     'status' => 'approved',
                     'approved_at' => now(),
+                    'rejected_at' => null,
+                    'admin_note' => null,
                 ]);
             });
 
             return response()->json([
                 'success' => true,
-                'message' => 'Permintaan merchandise berhasil disetujui.',
-                'data' => $order->load(['user', 'items.product.category']),
+                'message' => 'Pengajuan merchandise berhasil di-approve.',
+                'data' => $order->fresh([
+                    'user',
+                    'items.product.category',
+                ]),
             ]);
-        } catch (\Exception $exception) {
+        } catch (\Throwable $error) {
+            if ($error instanceof \Illuminate\Http\Exceptions\HttpResponseException) {
+                throw $error;
+            }
+
+            report($error);
+
             return response()->json([
                 'success' => false,
-                'message' => $exception->getMessage(),
+                'message' => 'Approval merchandise gagal diproses.',
                 'data' => null,
-            ], 422);
+            ], 500);
         }
     }
 
-    /**
-     * Admin meminta revisi permintaan merchandise.
-     */
-    public function revision(Request $request, string $id): JsonResponse
+    public function revision(Request $request, int $id): JsonResponse
     {
         $validated = $request->validate([
             'admin_note' => ['required', 'string'],
         ]);
 
-        $order = Order::find($id);
+        $order = Order::findOrFail($id);
 
-        if (!$order) {
+        if ($order->status !== 'pending') {
             return response()->json([
                 'success' => false,
-                'message' => 'Permintaan merchandise tidak ditemukan.',
+                'message' => 'Revisi hanya bisa diberikan saat status pending.',
                 'data' => null,
-            ], 404);
+            ], 422);
         }
 
         $order->update([
@@ -241,28 +249,28 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Permintaan merchandise dikembalikan untuk revisi.',
-            'data' => $order->load(['user', 'items.product.category']),
+            'message' => 'Catatan revisi berhasil dikirim.',
+            'data' => $order->fresh([
+                'user',
+                'items.product.category',
+            ]),
         ]);
     }
 
-    /**
-     * Admin menolak permintaan merchandise.
-     */
-    public function reject(Request $request, string $id): JsonResponse
+    public function reject(Request $request, int $id): JsonResponse
     {
         $validated = $request->validate([
             'admin_note' => ['required', 'string'],
         ]);
 
-        $order = Order::find($id);
+        $order = Order::findOrFail($id);
 
-        if (!$order) {
+        if ($order->status !== 'pending') {
             return response()->json([
                 'success' => false,
-                'message' => 'Permintaan merchandise tidak ditemukan.',
+                'message' => 'Pengajuan hanya bisa ditolak saat status pending.',
                 'data' => null,
-            ], 404);
+            ], 422);
         }
 
         $order->update([
@@ -273,31 +281,23 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Permintaan merchandise berhasil ditolak.',
-            'data' => $order->load(['user', 'items.product.category']),
+            'message' => 'Pengajuan merchandise berhasil ditolak.',
+            'data' => $order->fresh([
+                'user',
+                'items.product.category',
+            ]),
         ]);
     }
 
-    /**
-     * Admin menandai permintaan merchandise selesai.
-     */
-    public function complete(string $id): JsonResponse
+    public function complete(int $id): JsonResponse
     {
-        $order = Order::find($id);
-
-        if (!$order) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Permintaan merchandise tidak ditemukan.',
-                'data' => null,
-            ], 404);
-        }
+        $order = Order::findOrFail($id);
 
         if ($order->status !== 'approved') {
             return response()->json([
                 'success' => false,
-                'message' => 'Permintaan hanya bisa diselesaikan jika status approved.',
-                'data' => $order,
+                'message' => 'Pengajuan hanya bisa diselesaikan saat status approved.',
+                'data' => null,
             ], 422);
         }
 
@@ -308,13 +308,22 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Permintaan merchandise berhasil diselesaikan.',
-            'data' => $order->load(['user', 'items.product.category']),
+            'message' => 'Pengajuan merchandise berhasil ditandai selesai.',
+            'data' => $order->fresh([
+                'user',
+                'items.product.category',
+            ]),
         ]);
     }
 
-    private function generateOrderCode(): string
+    private function canAccessOrder(Request $request, Order $order): bool
     {
-        return 'MRC-' . now()->format('YmdHis') . '-' . random_int(100, 999);
+        $user = $request->user();
+
+        if (in_array($user->role, ['admin', 'superadmin'], true)) {
+            return true;
+        }
+
+        return $order->user_id === $user->id;
     }
 }

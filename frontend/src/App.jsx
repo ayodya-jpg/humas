@@ -18,6 +18,9 @@ import HumasServiceRequestPage from './pages/requests/HumasServiceRequestPage';
 import SekpimBorrowingRequestPage from './pages/requests/SekpimBorrowingRequestPage';
 import MyRequestsPage from './pages/requests/MyRequestsPage';
 
+import UnauthorizedPage from './pages/errors/UnauthorizedPage';
+import NotFoundPage from './pages/errors/NotFoundPage';
+
 function App() {
     return (
         <Routes>
@@ -34,20 +37,71 @@ function App() {
                 <Route index element={<Navigate to="/admin/dashboard" replace />} />
 
                 <Route path="admin/dashboard" element={<Dashboard />} />
+                <Route path="admin/unauthorized" element={<UnauthorizedPage />} />
 
                 <Route path="admin/request/merchandise" element={<MerchandiseRequestPage />} />
                 <Route path="admin/request/humas-service" element={<HumasServiceRequestPage />} />
                 <Route path="admin/request/sekpim-borrowing" element={<SekpimBorrowingRequestPage />} />
                 <Route path="admin/my-requests" element={<MyRequestsPage />} />
 
-                <Route path="admin/users" element={<UserManagementPage />} />
-                <Route path="admin/categories" element={<CategoryManagementPage />} />
-                <Route path="admin/products" element={<ProductManagementPage />} />
+                <Route
+                    path="admin/orders"
+                    element={
+                        <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+                            <MerchandiseApprovalPage />
+                        </ProtectedRoute>
+                    }
+                />
 
-                <Route path="admin/orders" element={<MerchandiseApprovalPage />} />
-                <Route path="admin/humas-services" element={<HumasServiceApprovalPage />} />
-                <Route path="admin/borrow-requests" element={<BorrowingApprovalPage />} />
+                <Route
+                    path="admin/humas-services"
+                    element={
+                        <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+                            <HumasServiceApprovalPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="admin/borrow-requests"
+                    element={
+                        <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+                            <BorrowingApprovalPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="admin/categories"
+                    element={
+                        <ProtectedRoute allowedRoles={['superadmin']}>
+                            <CategoryManagementPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="admin/products"
+                    element={
+                        <ProtectedRoute allowedRoles={['superadmin']}>
+                            <ProductManagementPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="admin/users"
+                    element={
+                        <ProtectedRoute allowedRoles={['superadmin']}>
+                            <UserManagementPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route path="admin/*" element={<NotFoundPage />} />
             </Route>
+
+            <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
         </Routes>
     );
 }

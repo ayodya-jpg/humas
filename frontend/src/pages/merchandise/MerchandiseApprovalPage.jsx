@@ -35,11 +35,12 @@ export default function MerchandiseApprovalPage() {
             const response = await api.get('/orders');
             setRequests(response.data.data);
         } catch (error) {
-            setErrorMessage('Gagal mengambil data permintaan merchandise.');
-            showErrorAlert(
-                'Gagal Mengambil Data',
-                'Permintaan merchandise tidak berhasil dimuat dari backend.'
-            );
+            const backendMessage =
+                error.response?.data?.message ||
+                'Gagal mengambil data permintaan merchandise.';
+
+            setErrorMessage(backendMessage);
+            showErrorAlert('Gagal Mengambil Data', backendMessage);
             console.error(error);
         } finally {
             setLoadingRequests(false);
@@ -51,11 +52,11 @@ export default function MerchandiseApprovalPage() {
     }, []);
 
     const filteredRequests = useMemo(() => {
+        const keyword = searchKeyword.toLowerCase();
+
         return requests.filter((request) => {
             const matchStatus =
                 selectedStatus === 'all' || request.status === selectedStatus;
-
-            const keyword = searchKeyword.toLowerCase();
 
             const matchKeyword =
                 request.order_code?.toLowerCase().includes(keyword) ||
@@ -313,265 +314,386 @@ export default function MerchandiseApprovalPage() {
         });
     };
 
+    const getStatusCount = (status) => {
+        if (status === 'all') {
+            return summary.total;
+        }
+
+        return summary[status] || 0;
+    };
+
     return (
-        <div className="page">
-            <div className="page-header">
-                <div>
-                    <h2>Approval Merchandise</h2>
-                    <p>
-                        Tinjau kelayakan permintaan merchandise berdasarkan tamu,
-                        jabatan, kegiatan, instansi, dan lampiran pendukung.
-                    </p>
-                </div>
+        <div className="container-fluid px-0">
+            <section className="card border-0 shadow-sm rounded-5 overflow-hidden mb-4">
+                <div
+                    className="card-body p-4 p-lg-5 text-white"
+                    style={{
+                        background:
+                            'radial-gradient(circle at top right, rgba(255,255,255,.22), transparent 28%), linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #dc2626 120%)',
+                    }}
+                >
+                    <div className="row align-items-center g-4">
+                        <div className="col-lg-9">
+                            <span className="text-white-50 small fw-bold text-uppercase">
+                                Merchandise Approval
+                            </span>
 
-                <button className="btn btn-primary" onClick={fetchRequests}>
-                    Refresh
-                </button>
+                            <h2 className="display-5 fw-black mt-2 mb-3">
+                                Approval Merchandise
+                            </h2>
+
+                            <p className="mb-0 text-white-50" style={{ maxWidth: 820, lineHeight: 1.8 }}>
+                                Tinjau kelayakan permintaan merchandise berdasarkan tamu,
+                                jabatan, kegiatan, instansi, dan lampiran pendukung.
+                            </p>
+                        </div>
+
+                        <div className="col-lg-3">
+                            <button
+                                className="btn btn-light rounded-pill fw-bold w-100"
+                                type="button"
+                                onClick={fetchRequests}
+                            >
+                                <i className="bi bi-arrow-clockwise me-2"></i>
+                                Refresh Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {message && (
+                <div className="alert alert-success rounded-4">
+                    {message}
+                </div>
+            )}
+
+            {errorMessage && (
+                <div className="alert alert-danger rounded-4">
+                    {errorMessage}
+                </div>
+            )}
+
+            <div className="row g-3 mb-4">
+                {merchandiseStatusOptions.map((option) => (
+                    <div className="col-6 col-md-4 col-xl" key={option.value}>
+                        <button
+                            type="button"
+                            className={`card border-0 shadow-sm rounded-5 w-100 h-100 text-start ${
+                                selectedStatus === option.value ? 'ring-active' : ''
+                            }`}
+                            onClick={() => setSelectedStatus(option.value)}
+                        >
+                            <div className="card-body p-3 p-lg-4">
+                                <p className="text-muted small fw-bold text-uppercase mb-2">
+                                    {option.label}
+                                </p>
+
+                                <h3 className="fw-black mb-0">
+                                    {getStatusCount(option.value)}
+                                </h3>
+                            </div>
+                        </button>
+                    </div>
+                ))}
             </div>
 
-            {message && <div className="success-box">{message}</div>}
-            {errorMessage && <div className="error-box">{errorMessage}</div>}
+            <div className="card border-0 shadow-sm rounded-5 mb-4">
+                <div className="card-body p-4">
+                    <div className="row g-3 align-items-end">
+                        <div className="col-lg-8">
+                            <label className="form-label fw-bold">
+                                Cari Permintaan
+                            </label>
 
-            <div className="filter-summary-grid">
-                <button
-                    className={selectedStatus === 'all' ? 'filter-card active' : 'filter-card'}
-                    onClick={() => setSelectedStatus('all')}
-                    type="button"
-                >
-                    <span>Semua</span>
-                    <strong>{summary.total}</strong>
-                </button>
+                            <div className="input-group">
+                                <span className="input-group-text bg-light border-end-0 rounded-start-4">
+                                    <i className="bi bi-search"></i>
+                                </span>
 
-                <button
-                    className={selectedStatus === 'pending' ? 'filter-card active' : 'filter-card'}
-                    onClick={() => setSelectedStatus('pending')}
-                    type="button"
-                >
-                    <span>Pending</span>
-                    <strong>{summary.pending}</strong>
-                </button>
+                                <input
+                                    type="text"
+                                    value={searchKeyword}
+                                    onChange={(event) => setSearchKeyword(event.target.value)}
+                                    className="form-control border-start-0 rounded-end-4"
+                                    placeholder="Cari kode, kegiatan, tamu, instansi, jabatan, atau paket..."
+                                />
+                            </div>
+                        </div>
 
-                <button
-                    className={selectedStatus === 'approved' ? 'filter-card active' : 'filter-card'}
-                    onClick={() => setSelectedStatus('approved')}
-                    type="button"
-                >
-                    <span>Approved</span>
-                    <strong>{summary.approved}</strong>
-                </button>
+                        <div className="col-lg-4">
+                            <label className="form-label fw-bold">
+                                Status
+                            </label>
 
-                <button
-                    className={selectedStatus === 'revision' ? 'filter-card active' : 'filter-card'}
-                    onClick={() => setSelectedStatus('revision')}
-                    type="button"
-                >
-                    <span>Revision</span>
-                    <strong>{summary.revision}</strong>
-                </button>
-
-                <button
-                    className={selectedStatus === 'rejected' ? 'filter-card active' : 'filter-card'}
-                    onClick={() => setSelectedStatus('rejected')}
-                    type="button"
-                >
-                    <span>Rejected</span>
-                    <strong>{summary.rejected}</strong>
-                </button>
-
-                <button
-                    className={selectedStatus === 'completed' ? 'filter-card active' : 'filter-card'}
-                    onClick={() => setSelectedStatus('completed')}
-                    type="button"
-                >
-                    <span>Completed</span>
-                    <strong>{summary.completed}</strong>
-                </button>
-            </div>
-
-            <div className="filter-bar">
-                <div className="filter-field">
-                    <label>Cari Permintaan</label>
-                    <input
-                        type="text"
-                        value={searchKeyword}
-                        onChange={(event) => setSearchKeyword(event.target.value)}
-                        placeholder="Cari kode, kegiatan, tamu, instansi, jabatan, atau paket..."
-                    />
-                </div>
-
-                <div className="filter-field">
-                    <label>Status</label>
-                    <select
-                        value={selectedStatus}
-                        onChange={(event) => setSelectedStatus(event.target.value)}
-                    >
-                        {merchandiseStatusOptions.map((option) => (
-                            <option value={option.value} key={option.value}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
+                            <select
+                                value={selectedStatus}
+                                onChange={(event) => setSelectedStatus(event.target.value)}
+                                className="form-select rounded-4"
+                            >
+                                {merchandiseStatusOptions.map((option) => (
+                                    <option value={option.value} key={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             {loadingRequests && (
-                <div className="info-box">
+                <div className="alert alert-primary rounded-4">
                     Sedang mengambil data permintaan merchandise...
                 </div>
             )}
 
             {!loadingRequests && filteredRequests.length === 0 && (
-                <div className="info-box">
-                    Tidak ada permintaan merchandise sesuai filter.
+                <div className="card border-0 shadow-sm rounded-5">
+                    <div className="card-body p-5 text-center">
+                        <div className="icon-box bg-primary-subtle text-primary mx-auto mb-3">
+                            <i className="bi bi-inbox-fill fs-4"></i>
+                        </div>
+
+                        <h4 className="fw-black">
+                            Tidak ada permintaan
+                        </h4>
+
+                        <p className="text-muted mb-0">
+                            Tidak ada permintaan merchandise sesuai filter yang dipilih.
+                        </p>
+                    </div>
                 </div>
             )}
 
-            <div className="merchandise-approval-list">
+            <div className="d-grid gap-3">
                 {filteredRequests.map((request) => (
-                    <div className="merchandise-approval-card" key={request.id}>
-                        <div className="approval-card-header">
-                            <div>
-                                <div className="approval-code-row">
-                                    <h3>{request.order_code}</h3>
-                                    <span className={`status status-${request.status}`}>
-                                        {request.status}
-                                    </span>
+                    <article className="card border-0 shadow-sm rounded-5 overflow-hidden" key={request.id}>
+                        <div className="card-body p-4">
+                            <div className="row g-4 align-items-start">
+                                <div className="col-lg-8">
+                                    <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                        <h4 className="fw-black mb-0">
+                                            {request.order_code}
+                                        </h4>
+
+                                        <span className={`status status-${request.status}`}>
+                                            {request.status}
+                                        </span>
+                                    </div>
+
+                                    <p className="text-muted mb-0">
+                                        Diajukan oleh{' '}
+                                        <strong className="text-dark">
+                                            {request.user?.name || 'User tidak diketahui'}
+                                        </strong>
+                                    </p>
                                 </div>
 
-                                <p>
-                                    Diajukan oleh{' '}
-                                    <strong>{request.user?.name || 'User tidak diketahui'}</strong>
-                                </p>
-                            </div>
+                                <div className="col-lg-4">
+                                    <div className="bg-light border rounded-4 p-3">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Tanggal Kegiatan
+                                        </span>
 
-                            <div className="approval-date-box">
-                                <span>Tanggal Kegiatan</span>
-                                <strong>{formatDate(request.activity_date)}</strong>
-                            </div>
-                        </div>
-
-                        <div className="approval-detail-grid">
-                            <div className="approval-detail-item span-2">
-                                <span>Nama Kegiatan</span>
-                                <strong>{request.event_name || '-'}</strong>
-                            </div>
-
-                            <div className="approval-detail-item">
-                                <span>Instansi / Pihak Eksternal</span>
-                                <strong>{request.institution_name || '-'}</strong>
-                            </div>
-
-                            <div className="approval-detail-item">
-                                <span>Nama Tamu</span>
-                                <strong>{request.guest_name || '-'}</strong>
-                            </div>
-
-                            <div className="approval-detail-item">
-                                <span>Jabatan Tamu</span>
-                                <strong>{request.guest_position || '-'}</strong>
-                            </div>
-
-                            <div className="approval-detail-item">
-                                <span>Lampiran / Bukti Undangan</span>
-
-                                {request.proof_file_url ? (
-                                    <a
-                                        href={request.proof_file_url}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                    >
-                                        Buka Lampiran
-                                    </a>
-                                ) : (
-                                    <strong>-</strong>
-                                )}
-
-                                {request.proof_file_name && (
-                                    <p className="proof-file-name">
-                                        {request.proof_file_name}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="approval-section">
-                            <h4>Paket Merchandise Diajukan</h4>
-
-                            <div className="approval-items">
-                                {request.items.map((item) => (
-                                    <div className="approval-item" key={item.id}>
-                                        <div>
-                                            <strong>
-                                                {item.product?.name || 'Paket tidak ditemukan'}
-                                            </strong>
-                                            <p>
-                                                {item.product?.description ||
-                                                    'Tidak ada deskripsi paket.'}
-                                            </p>
-                                        </div>
-
-                                        <span>Qty {item.quantity}</span>
+                                        <strong>
+                                            {formatDate(request.activity_date)}
+                                        </strong>
                                     </div>
-                                ))}
+                                </div>
+                            </div>
+
+                            <hr className="my-4" />
+
+                            <div className="row g-3 mb-4">
+                                <div className="col-12">
+                                    <div className="bg-light border rounded-4 p-3">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Nama Kegiatan
+                                        </span>
+
+                                        <strong>
+                                            {request.event_name || '-'}
+                                        </strong>
+                                    </div>
+                                </div>
+
+                                <div className="col-md-6 col-xl-3">
+                                    <div className="bg-light border rounded-4 p-3 h-100">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Instansi
+                                        </span>
+
+                                        <strong>
+                                            {request.institution_name || '-'}
+                                        </strong>
+                                    </div>
+                                </div>
+
+                                <div className="col-md-6 col-xl-3">
+                                    <div className="bg-light border rounded-4 p-3 h-100">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Nama Tamu
+                                        </span>
+
+                                        <strong>
+                                            {request.guest_name || '-'}
+                                        </strong>
+                                    </div>
+                                </div>
+
+                                <div className="col-md-6 col-xl-3">
+                                    <div className="bg-light border rounded-4 p-3 h-100">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Jabatan Tamu
+                                        </span>
+
+                                        <strong>
+                                            {request.guest_position || '-'}
+                                        </strong>
+                                    </div>
+                                </div>
+
+                                <div className="col-md-6 col-xl-3">
+                                    <div className="bg-light border rounded-4 p-3 h-100">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Lampiran
+                                        </span>
+
+                                        {request.proof_file_url ? (
+                                            <a
+                                                href={request.proof_file_url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="fw-bold"
+                                            >
+                                                <i className="bi bi-file-earmark-text-fill me-1"></i>
+                                                Buka Lampiran
+                                            </a>
+                                        ) : (
+                                            <strong>-</strong>
+                                        )}
+
+                                        {request.proof_file_name && (
+                                            <p className="text-muted small mb-0 mt-1 text-break">
+                                                {request.proof_file_name}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="row g-3 mb-4">
+                                <div className="col-lg-7">
+                                    <div className="border rounded-4 p-3 h-100">
+                                        <h6 className="fw-black mb-3">
+                                            Paket Merchandise Diajukan
+                                        </h6>
+
+                                        <div className="d-grid gap-2">
+                                            {request.items?.map((item) => (
+                                                <div
+                                                    className="d-flex flex-column flex-md-row justify-content-between gap-3 bg-light border rounded-4 p-3"
+                                                    key={item.id}
+                                                >
+                                                    <div>
+                                                        <strong>
+                                                            {item.product?.name || 'Paket tidak ditemukan'}
+                                                        </strong>
+
+                                                        <p className="text-muted small mb-0 mt-1">
+                                                            {item.product?.description ||
+                                                                'Tidak ada deskripsi paket.'}
+                                                        </p>
+                                                    </div>
+
+                                                    <span className="badge text-bg-primary rounded-pill align-self-start">
+                                                        Qty {item.quantity}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="col-lg-5">
+                                    <div className="bg-light border rounded-4 p-3 h-100">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Catatan Pemohon
+                                        </span>
+
+                                        <p className="mb-0" style={{ lineHeight: 1.7 }}>
+                                            {request.user_note || 'Tidak ada catatan pemohon.'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {request.admin_note && (
+                                <div className="alert alert-warning rounded-4 mb-4">
+                                    <strong>Catatan admin sebelumnya:</strong>
+                                    <div>{request.admin_note}</div>
+                                </div>
+                            )}
+
+                            <div className="mb-4">
+                                <label className="form-label fw-bold">
+                                    Catatan Admin
+                                </label>
+
+                                <textarea
+                                    value={getAdminNote(request.id)}
+                                    onChange={(event) => handleNoteChange(request.id, event.target.value)}
+                                    className="form-control rounded-4"
+                                    placeholder="Isi catatan jika ingin meminta revisi atau menolak pengajuan."
+                                    rows="3"
+                                    disabled={request.status !== 'pending'}
+                                />
+                            </div>
+
+                            <div className="d-flex flex-wrap gap-2">
+                                <button
+                                    className="btn btn-primary rounded-pill fw-bold px-3"
+                                    type="button"
+                                    onClick={() => handleApprove(request)}
+                                    disabled={request.status !== 'pending'}
+                                >
+                                    <i className="bi bi-check-circle-fill me-1"></i>
+                                    Approve
+                                </button>
+
+                                <button
+                                    className="btn btn-warning text-white rounded-pill fw-bold px-3"
+                                    type="button"
+                                    onClick={() => handleRevision(request)}
+                                    disabled={request.status !== 'pending'}
+                                >
+                                    <i className="bi bi-arrow-counterclockwise me-1"></i>
+                                    Revisi
+                                </button>
+
+                                <button
+                                    className="btn btn-danger rounded-pill fw-bold px-3"
+                                    type="button"
+                                    onClick={() => handleReject(request)}
+                                    disabled={request.status !== 'pending'}
+                                >
+                                    <i className="bi bi-x-circle-fill me-1"></i>
+                                    Tolak
+                                </button>
+
+                                <button
+                                    className="btn btn-dark rounded-pill fw-bold px-3"
+                                    type="button"
+                                    onClick={() => handleComplete(request)}
+                                    disabled={request.status !== 'approved'}
+                                >
+                                    <i className="bi bi-flag-fill me-1"></i>
+                                    Selesaikan
+                                </button>
                             </div>
                         </div>
-
-                        <div className="approval-note-box">
-                            <span>Catatan Pemohon</span>
-                            <p>{request.user_note || 'Tidak ada catatan pemohon.'}</p>
-                        </div>
-
-                        {request.admin_note && (
-                            <div className="admin-note">
-                                Catatan admin sebelumnya: {request.admin_note}
-                            </div>
-                        )}
-
-                        <div className="approval-note">
-                            <label>Catatan Admin</label>
-                            <textarea
-                                value={getAdminNote(request.id)}
-                                onChange={(event) => handleNoteChange(request.id, event.target.value)}
-                                placeholder="Isi catatan jika ingin meminta revisi atau menolak pengajuan."
-                                rows="3"
-                                disabled={request.status !== 'pending'}
-                            />
-                        </div>
-
-                        <div className="order-actions">
-                            <button
-                                className="btn btn-primary"
-                                onClick={() => handleApprove(request)}
-                                disabled={request.status !== 'pending'}
-                            >
-                                Approve
-                            </button>
-
-                            <button
-                                className="btn btn-warning"
-                                onClick={() => handleRevision(request)}
-                                disabled={request.status !== 'pending'}
-                            >
-                                Revisi
-                            </button>
-
-                            <button
-                                className="btn btn-danger"
-                                onClick={() => handleReject(request)}
-                                disabled={request.status !== 'pending'}
-                            >
-                                Tolak
-                            </button>
-
-                            <button
-                                className="btn btn-dark"
-                                onClick={() => handleComplete(request)}
-                                disabled={request.status !== 'approved'}
-                            >
-                                Selesaikan
-                            </button>
-                        </div>
-                    </div>
+                    </article>
                 ))}
             </div>
         </div>
