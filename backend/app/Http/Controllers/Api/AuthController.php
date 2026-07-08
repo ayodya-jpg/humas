@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 class AuthController extends Controller
 {
     /**
-     * Login admin menggunakan username dan password.
+     * Login menggunakan username dan password.
      */
     public function login(Request $request): JsonResponse
     {
@@ -32,23 +32,13 @@ class AuthController extends Controller
 
         $user = $request->user();
 
-        if ($user->role !== 'admin') {
-            $user->tokens()->delete();
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Akun ini tidak memiliki akses admin.',
-                'data' => null,
-            ], 403);
-        }
-
         $user->tokens()->delete();
 
-        $token = $user->createToken('admin-token')->plainTextToken;
+        $token = $user->createToken($user->role . '-token')->plainTextToken;
 
         return response()->json([
             'success' => true,
-            'message' => 'Login admin berhasil.',
+            'message' => 'Login berhasil.',
             'data' => [
                 'user' => $user,
                 'token' => $token,
@@ -57,7 +47,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Mengambil data admin yang sedang login.
+     * Mengambil data user yang sedang login.
      */
     public function me(Request $request): JsonResponse
     {
@@ -69,7 +59,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Logout admin.
+     * Logout user.
      */
     public function logout(Request $request): JsonResponse
     {

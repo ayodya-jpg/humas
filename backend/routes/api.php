@@ -8,23 +8,6 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/test', function () {
-    return response()->json([
-        'success' => true,
-        'message' => 'API Laravel berhasil terhubung',
-        'data' => [
-            'project' => 'HUMAS',
-            'backend' => 'Laravel',
-            'frontend' => 'React',
-        ],
-    ]);
-});
-
-/*
-|--------------------------------------------------------------------------
-| Auth Admin
-|--------------------------------------------------------------------------
-*/
 Route::post('/admin/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -33,63 +16,63 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | User Management
-    |--------------------------------------------------------------------------
-    */
-    Route::get('/users', [UserController::class, 'index']);
-    Route::get('/users/{id}', [UserController::class, 'show']);
-    Route::post('/users', [UserController::class, 'store']);
-    Route::put('/users/{id}', [UserController::class, 'update']);
-    Route::delete('/users/{id}', [UserController::class, 'destroy']);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Categories
+    | Public authenticated access
     |--------------------------------------------------------------------------
     */
     Route::get('/categories', [CategoryController::class, 'index']);
-    Route::get('/categories/{id}', [CategoryController::class, 'show']);
-    Route::post('/categories', [CategoryController::class, 'store']);
-    Route::put('/categories/{id}', [CategoryController::class, 'update']);
-    Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
+    Route::get('/categories/{category}', [CategoryController::class, 'show']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Products
-    |--------------------------------------------------------------------------
-    */
     Route::get('/products', [ProductController::class, 'index']);
-    Route::get('/products/{id}', [ProductController::class, 'show']);
-    Route::post('/products', [ProductController::class, 'store']);
-    Route::put('/products/{id}', [ProductController::class, 'update']);
-    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+    Route::get('/products/{product}', [ProductController::class, 'show']);
 
     /*
     |--------------------------------------------------------------------------
-    | Orders / Checkout
+    | User request routes
     |--------------------------------------------------------------------------
     */
-    Route::get('/orders', [OrderController::class, 'index']);
-    Route::get('/orders/{id}', [OrderController::class, 'show']);
+    Route::get('/my-orders', [OrderController::class, 'myOrders']);
+    Route::get('/my-borrow-requests', [BorrowRequestController::class, 'myBorrowRequests']);
+
     Route::post('/orders', [OrderController::class, 'store']);
+    Route::get('/orders/{id}', [OrderController::class, 'show']);
 
-    Route::put('/orders/{id}/approve', [OrderController::class, 'approve']);
-    Route::put('/orders/{id}/revision', [OrderController::class, 'revision']);
-    Route::put('/orders/{id}/reject', [OrderController::class, 'reject']);
-    Route::put('/orders/{id}/complete', [OrderController::class, 'complete']);
+    Route::post('/borrow-requests', [BorrowRequestController::class, 'store']);
+    Route::get('/borrow-requests/{id}', [BorrowRequestController::class, 'show']);
 
     /*
     |--------------------------------------------------------------------------
-    | Borrow Requests / Peminjaman
+    | Admin & Superadmin approval routes
     |--------------------------------------------------------------------------
     */
-    Route::get('/borrow-requests', [BorrowRequestController::class, 'index']);
-    Route::get('/borrow-requests/{id}', [BorrowRequestController::class, 'show']);
-    Route::post('/borrow-requests', [BorrowRequestController::class, 'store']);
+    Route::middleware('role:admin,superadmin')->group(function () {
+        Route::get('/orders', [OrderController::class, 'index']);
+        Route::put('/orders/{id}/approve', [OrderController::class, 'approve']);
+        Route::put('/orders/{id}/revision', [OrderController::class, 'revision']);
+        Route::put('/orders/{id}/reject', [OrderController::class, 'reject']);
+        Route::put('/orders/{id}/complete', [OrderController::class, 'complete']);
 
-    Route::put('/borrow-requests/{id}/approve', [BorrowRequestController::class, 'approve']);
-    Route::put('/borrow-requests/{id}/revision', [BorrowRequestController::class, 'revision']);
-    Route::put('/borrow-requests/{id}/reject', [BorrowRequestController::class, 'reject']);
-    Route::put('/borrow-requests/{id}/borrowed', [BorrowRequestController::class, 'borrowed']);
-    Route::put('/borrow-requests/{id}/returned', [BorrowRequestController::class, 'returned']);
+        Route::get('/borrow-requests', [BorrowRequestController::class, 'index']);
+        Route::put('/borrow-requests/{id}/approve', [BorrowRequestController::class, 'approve']);
+        Route::put('/borrow-requests/{id}/revision', [BorrowRequestController::class, 'revision']);
+        Route::put('/borrow-requests/{id}/reject', [BorrowRequestController::class, 'reject']);
+        Route::put('/borrow-requests/{id}/borrowed', [BorrowRequestController::class, 'borrowed']);
+        Route::put('/borrow-requests/{id}/returned', [BorrowRequestController::class, 'returned']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Superadmin only routes
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('role:superadmin')->group(function () {
+        Route::apiResource('/users', UserController::class)->except(['create', 'edit']);
+
+        Route::post('/categories', [CategoryController::class, 'store']);
+        Route::put('/categories/{category}', [CategoryController::class, 'update']);
+        Route::delete('/categories/{category}', [CategoryController::class, 'destroy']);
+
+        Route::post('/products', [ProductController::class, 'store']);
+        Route::put('/products/{product}', [ProductController::class, 'update']);
+        Route::delete('/products/{product}', [ProductController::class, 'destroy']);
+    });
 });

@@ -9,17 +9,16 @@ import {
     showWarningAlert,
 } from '../../utils/sweetAlert';
 
-const borrowingStatusOptions = [
+const merchandiseStatusOptions = [
     { value: 'all', label: 'Semua' },
     { value: 'pending', label: 'Pending' },
     { value: 'approved', label: 'Approved' },
     { value: 'revision', label: 'Revision' },
     { value: 'rejected', label: 'Rejected' },
-    { value: 'borrowed', label: 'Borrowed' },
-    { value: 'returned', label: 'Returned' },
+    { value: 'completed', label: 'Completed' },
 ];
 
-export default function BorrowingApprovalPage() {
+export default function MerchandiseApprovalPage() {
     const [requests, setRequests] = useState([]);
     const [loadingRequests, setLoadingRequests] = useState(true);
     const [message, setMessage] = useState('');
@@ -33,12 +32,12 @@ export default function BorrowingApprovalPage() {
             setLoadingRequests(true);
             setErrorMessage('');
 
-            const response = await api.get('/borrow-requests');
+            const response = await api.get('/orders');
             setRequests(response.data.data);
         } catch (error) {
             const backendMessage =
                 error.response?.data?.message ||
-                'Gagal mengambil data permintaan peminjaman.';
+                'Gagal mengambil data permintaan merchandise.';
 
             setErrorMessage(backendMessage);
             showErrorAlert('Gagal Mengambil Data', backendMessage);
@@ -60,8 +59,11 @@ export default function BorrowingApprovalPage() {
                 selectedStatus === 'all' || request.status === selectedStatus;
 
             const matchKeyword =
-                request.borrow_code?.toLowerCase().includes(keyword) ||
-                request.purpose?.toLowerCase().includes(keyword) ||
+                request.order_code?.toLowerCase().includes(keyword) ||
+                request.event_name?.toLowerCase().includes(keyword) ||
+                request.institution_name?.toLowerCase().includes(keyword) ||
+                request.guest_name?.toLowerCase().includes(keyword) ||
+                request.guest_position?.toLowerCase().includes(keyword) ||
                 request.user?.name?.toLowerCase().includes(keyword) ||
                 request.items?.some((item) =>
                     item.product?.name?.toLowerCase().includes(keyword)
@@ -78,8 +80,7 @@ export default function BorrowingApprovalPage() {
             approved: requests.filter((item) => item.status === 'approved').length,
             revision: requests.filter((item) => item.status === 'revision').length,
             rejected: requests.filter((item) => item.status === 'rejected').length,
-            borrowed: requests.filter((item) => item.status === 'borrowed').length,
-            returned: requests.filter((item) => item.status === 'returned').length,
+            completed: requests.filter((item) => item.status === 'completed').length,
         };
     }, [requests]);
 
@@ -106,8 +107,8 @@ export default function BorrowingApprovalPage() {
         setErrorMessage('');
 
         const result = await showConfirmAlert({
-            title: 'Approve Peminjaman?',
-            text: `Pengajuan ${request.borrow_code} akan disetujui dan stok barang akan dikurangi.`,
+            title: 'Approve Pengajuan?',
+            text: `Pengajuan ${request.order_code} akan disetujui dan stok merchandise akan dikurangi.`,
             confirmButtonText: 'Ya, approve',
             icon: 'question',
             confirmButtonColor: '#2563eb',
@@ -120,23 +121,23 @@ export default function BorrowingApprovalPage() {
         showLoadingAlert('Memproses Approval', 'Mohon tunggu, pengajuan sedang disetujui.');
 
         try {
-            const response = await api.put(`/borrow-requests/${request.id}/approve`);
+            const response = await api.put(`/orders/${request.id}/approve`);
 
             closeAlert();
-
             setMessage(response.data.message);
+
             await fetchRequests();
 
             showSuccessAlert(
-                'Peminjaman Disetujui',
-                'Pengajuan peminjaman berhasil di-approve.'
+                'Pengajuan Disetujui',
+                'Permintaan merchandise berhasil di-approve.'
             );
         } catch (error) {
             closeAlert();
 
             const backendMessage =
                 error.response?.data?.message ||
-                'Approval peminjaman gagal. Silakan coba lagi.';
+                'Approval merchandise gagal. Silakan coba lagi.';
 
             setErrorMessage(backendMessage);
             showErrorAlert('Approval Gagal', backendMessage);
@@ -160,8 +161,8 @@ export default function BorrowingApprovalPage() {
         }
 
         const result = await showConfirmAlert({
-            title: 'Minta Revisi Peminjaman?',
-            text: `Pengajuan ${request.borrow_code} akan dikembalikan ke pemohon untuk diperbaiki.`,
+            title: 'Minta Revisi Pengajuan?',
+            text: `Pengajuan ${request.order_code} akan dikembalikan ke pemohon untuk diperbaiki.`,
             confirmButtonText: 'Ya, minta revisi',
             icon: 'warning',
             confirmButtonColor: '#f59e0b',
@@ -174,14 +175,14 @@ export default function BorrowingApprovalPage() {
         showLoadingAlert('Mengirim Revisi', 'Mohon tunggu, catatan revisi sedang dikirim.');
 
         try {
-            const response = await api.put(`/borrow-requests/${request.id}/revision`, {
+            const response = await api.put(`/orders/${request.id}/revision`, {
                 admin_note: note,
             });
 
             closeAlert();
-
             setMessage(response.data.message);
             clearAdminNote(request.id);
+
             await fetchRequests();
 
             showSuccessAlert(
@@ -193,7 +194,7 @@ export default function BorrowingApprovalPage() {
 
             const backendMessage =
                 error.response?.data?.message ||
-                'Gagal meminta revisi pengajuan peminjaman.';
+                'Gagal meminta revisi pengajuan merchandise.';
 
             setErrorMessage(backendMessage);
             showErrorAlert('Revisi Gagal', backendMessage);
@@ -217,8 +218,8 @@ export default function BorrowingApprovalPage() {
         }
 
         const result = await showConfirmAlert({
-            title: 'Tolak Peminjaman?',
-            text: `Pengajuan ${request.borrow_code} akan ditolak.`,
+            title: 'Tolak Pengajuan?',
+            text: `Pengajuan ${request.order_code} akan ditolak.`,
             confirmButtonText: 'Ya, tolak',
             icon: 'warning',
             confirmButtonColor: '#dc2626',
@@ -231,26 +232,26 @@ export default function BorrowingApprovalPage() {
         showLoadingAlert('Menolak Pengajuan', 'Mohon tunggu, keputusan sedang diproses.');
 
         try {
-            const response = await api.put(`/borrow-requests/${request.id}/reject`, {
+            const response = await api.put(`/orders/${request.id}/reject`, {
                 admin_note: note,
             });
 
             closeAlert();
-
             setMessage(response.data.message);
             clearAdminNote(request.id);
+
             await fetchRequests();
 
             showSuccessAlert(
-                'Peminjaman Ditolak',
-                'Pengajuan peminjaman berhasil ditolak.'
+                'Pengajuan Ditolak',
+                'Permintaan merchandise berhasil ditolak.'
             );
         } catch (error) {
             closeAlert();
 
             const backendMessage =
                 error.response?.data?.message ||
-                'Gagal menolak pengajuan peminjaman.';
+                'Gagal menolak pengajuan merchandise.';
 
             setErrorMessage(backendMessage);
             showErrorAlert('Penolakan Gagal', backendMessage);
@@ -258,88 +259,45 @@ export default function BorrowingApprovalPage() {
         }
     };
 
-    const handleBorrowed = async (request) => {
+    const handleComplete = async (request) => {
         setMessage('');
         setErrorMessage('');
 
         const result = await showConfirmAlert({
-            title: 'Tandai Sudah Dipinjam?',
-            text: `Barang pada pengajuan ${request.borrow_code} akan ditandai sudah diambil/dipinjam.`,
-            confirmButtonText: 'Ya, tandai dipinjam',
+            title: 'Selesaikan Pengajuan?',
+            text: `Pengajuan ${request.order_code} akan ditandai selesai.`,
+            confirmButtonText: 'Ya, selesaikan',
             icon: 'question',
-            confirmButtonColor: '#2563eb',
+            confirmButtonColor: '#334155',
         });
 
         if (!result.isConfirmed) {
             return;
         }
 
-        showLoadingAlert('Memperbarui Status', 'Mohon tunggu, status sedang diperbarui.');
+        showLoadingAlert('Menyelesaikan Pengajuan', 'Mohon tunggu, status sedang diperbarui.');
 
         try {
-            const response = await api.put(`/borrow-requests/${request.id}/borrowed`);
+            const response = await api.put(`/orders/${request.id}/complete`);
 
             closeAlert();
-
             setMessage(response.data.message);
+
             await fetchRequests();
 
             showSuccessAlert(
-                'Status Diperbarui',
-                'Pengajuan berhasil ditandai sudah dipinjam.'
+                'Pengajuan Selesai',
+                'Permintaan merchandise berhasil ditandai selesai.'
             );
         } catch (error) {
             closeAlert();
 
             const backendMessage =
                 error.response?.data?.message ||
-                'Gagal menandai barang sebagai dipinjam.';
+                'Gagal menyelesaikan pengajuan merchandise.';
 
             setErrorMessage(backendMessage);
-            showErrorAlert('Gagal Memperbarui Status', backendMessage);
-            console.error(error);
-        }
-    };
-
-    const handleReturned = async (request) => {
-        setMessage('');
-        setErrorMessage('');
-
-        const result = await showConfirmAlert({
-            title: 'Tandai Sudah Dikembalikan?',
-            text: `Barang pada pengajuan ${request.borrow_code} akan ditandai sudah dikembalikan dan stok akan dikembalikan.`,
-            confirmButtonText: 'Ya, tandai kembali',
-            icon: 'question',
-            confirmButtonColor: '#0f766e',
-        });
-
-        if (!result.isConfirmed) {
-            return;
-        }
-
-        showLoadingAlert('Memproses Pengembalian', 'Mohon tunggu, stok dan status sedang diperbarui.');
-
-        try {
-            const response = await api.put(`/borrow-requests/${request.id}/returned`);
-
-            closeAlert();
-
-            setMessage(response.data.message);
-            await fetchRequests();
-
-            showSuccessAlert(
-                'Barang Dikembalikan',
-                'Peminjaman berhasil ditandai selesai dan stok sudah dikembalikan.'
-            );
-        } catch (error) {
-            closeAlert();
-
-            const backendMessage =
-                error.response?.data?.message ||
-                'Gagal menandai barang sebagai dikembalikan.';
-
-            setErrorMessage(backendMessage);
-            showErrorAlert('Gagal Memproses Pengembalian', backendMessage);
+            showErrorAlert('Gagal Menyelesaikan', backendMessage);
             console.error(error);
         }
     };
@@ -371,22 +329,22 @@ export default function BorrowingApprovalPage() {
                     className="card-body p-4 p-lg-5 text-white"
                     style={{
                         background:
-                            'radial-gradient(circle at top right, rgba(255,255,255,.22), transparent 28%), linear-gradient(135deg, #0f172a 0%, #0f766e 55%, #2563eb 120%)',
+                            'radial-gradient(circle at top right, rgba(255,255,255,.22), transparent 28%), linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #dc2626 120%)',
                     }}
                 >
                     <div className="row align-items-center g-4">
                         <div className="col-lg-9">
                             <span className="text-white-50 small fw-bold text-uppercase">
-                                Borrowing Approval
+                                Merchandise Approval
                             </span>
 
                             <h2 className="display-5 fw-black mt-2 mb-3">
-                                Approval Peminjaman Sekpim
+                                Approval Merchandise
                             </h2>
 
                             <p className="mb-0 text-white-50" style={{ maxWidth: 820, lineHeight: 1.8 }}>
-                                Tinjau pengajuan peminjaman barang Sekpim berdasarkan barang,
-                                jumlah, tanggal pinjam, tanggal kembali, dan keperluan.
+                                Tinjau kelayakan permintaan merchandise berdasarkan tamu,
+                                jabatan, kegiatan, instansi, dan lampiran pendukung.
                             </p>
                         </div>
 
@@ -417,12 +375,12 @@ export default function BorrowingApprovalPage() {
             )}
 
             <div className="row g-3 mb-4">
-                {borrowingStatusOptions.map((option) => (
+                {merchandiseStatusOptions.map((option) => (
                     <div className="col-6 col-md-4 col-xl" key={option.value}>
                         <button
                             type="button"
                             className={`card border-0 shadow-sm rounded-5 w-100 h-100 text-start ${
-                                selectedStatus === option.value ? 'ring-active-success' : ''
+                                selectedStatus === option.value ? 'ring-active' : ''
                             }`}
                             onClick={() => setSelectedStatus(option.value)}
                         >
@@ -445,7 +403,7 @@ export default function BorrowingApprovalPage() {
                     <div className="row g-3 align-items-end">
                         <div className="col-lg-8">
                             <label className="form-label fw-bold">
-                                Cari Peminjaman
+                                Cari Permintaan
                             </label>
 
                             <div className="input-group">
@@ -458,7 +416,7 @@ export default function BorrowingApprovalPage() {
                                     value={searchKeyword}
                                     onChange={(event) => setSearchKeyword(event.target.value)}
                                     className="form-control border-start-0 rounded-end-4"
-                                    placeholder="Cari kode, pemohon, keperluan, atau nama barang..."
+                                    placeholder="Cari kode, kegiatan, tamu, instansi, jabatan, atau paket..."
                                 />
                             </div>
                         </div>
@@ -473,7 +431,7 @@ export default function BorrowingApprovalPage() {
                                 onChange={(event) => setSelectedStatus(event.target.value)}
                                 className="form-select rounded-4"
                             >
-                                {borrowingStatusOptions.map((option) => (
+                                {merchandiseStatusOptions.map((option) => (
                                     <option value={option.value} key={option.value}>
                                         {option.label}
                                     </option>
@@ -486,14 +444,14 @@ export default function BorrowingApprovalPage() {
 
             {loadingRequests && (
                 <div className="alert alert-primary rounded-4">
-                    Sedang mengambil data permintaan peminjaman...
+                    Sedang mengambil data permintaan merchandise...
                 </div>
             )}
 
             {!loadingRequests && filteredRequests.length === 0 && (
                 <div className="card border-0 shadow-sm rounded-5">
                     <div className="card-body p-5 text-center">
-                        <div className="icon-box bg-success-subtle text-success mx-auto mb-3">
+                        <div className="icon-box bg-primary-subtle text-primary mx-auto mb-3">
                             <i className="bi bi-inbox-fill fs-4"></i>
                         </div>
 
@@ -502,7 +460,7 @@ export default function BorrowingApprovalPage() {
                         </h4>
 
                         <p className="text-muted mb-0">
-                            Tidak ada permintaan peminjaman sesuai filter yang dipilih.
+                            Tidak ada permintaan merchandise sesuai filter yang dipilih.
                         </p>
                     </div>
                 </div>
@@ -513,10 +471,10 @@ export default function BorrowingApprovalPage() {
                     <article className="card border-0 shadow-sm rounded-5 overflow-hidden" key={request.id}>
                         <div className="card-body p-4">
                             <div className="row g-4 align-items-start">
-                                <div className="col-lg-7">
+                                <div className="col-lg-8">
                                     <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
                                         <h4 className="fw-black mb-0">
-                                            {request.borrow_code}
+                                            {request.order_code}
                                         </h4>
 
                                         <span className={`status status-${request.status}`}>
@@ -532,31 +490,15 @@ export default function BorrowingApprovalPage() {
                                     </p>
                                 </div>
 
-                                <div className="col-lg-5">
-                                    <div className="row g-2">
-                                        <div className="col-md-6">
-                                            <div className="bg-light border rounded-4 p-3 h-100">
-                                                <span className="d-block text-muted small fw-bold text-uppercase mb-1">
-                                                    Tanggal Pinjam
-                                                </span>
+                                <div className="col-lg-4">
+                                    <div className="bg-light border rounded-4 p-3">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Tanggal Kegiatan
+                                        </span>
 
-                                                <strong>
-                                                    {formatDate(request.borrow_date)}
-                                                </strong>
-                                            </div>
-                                        </div>
-
-                                        <div className="col-md-6">
-                                            <div className="bg-light border rounded-4 p-3 h-100">
-                                                <span className="d-block text-muted small fw-bold text-uppercase mb-1">
-                                                    Tanggal Kembali
-                                                </span>
-
-                                                <strong>
-                                                    {formatDate(request.return_date)}
-                                                </strong>
-                                            </div>
-                                        </div>
+                                        <strong>
+                                            {formatDate(request.activity_date)}
+                                        </strong>
                                     </div>
                                 </div>
                             </div>
@@ -564,22 +506,88 @@ export default function BorrowingApprovalPage() {
                             <hr className="my-4" />
 
                             <div className="row g-3 mb-4">
-                                <div className="col-lg-5">
-                                    <div className="bg-light border rounded-4 p-3 h-100">
-                                        <span className="d-block text-muted small fw-bold text-uppercase mb-2">
-                                            Keperluan Peminjaman
+                                <div className="col-12">
+                                    <div className="bg-light border rounded-4 p-3">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Nama Kegiatan
                                         </span>
 
-                                        <p className="mb-0" style={{ lineHeight: 1.7 }}>
-                                            {request.purpose || 'Tidak ada keperluan yang diisi.'}
-                                        </p>
+                                        <strong>
+                                            {request.event_name || '-'}
+                                        </strong>
                                     </div>
                                 </div>
 
+                                <div className="col-md-6 col-xl-3">
+                                    <div className="bg-light border rounded-4 p-3 h-100">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Instansi
+                                        </span>
+
+                                        <strong>
+                                            {request.institution_name || '-'}
+                                        </strong>
+                                    </div>
+                                </div>
+
+                                <div className="col-md-6 col-xl-3">
+                                    <div className="bg-light border rounded-4 p-3 h-100">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Nama Tamu
+                                        </span>
+
+                                        <strong>
+                                            {request.guest_name || '-'}
+                                        </strong>
+                                    </div>
+                                </div>
+
+                                <div className="col-md-6 col-xl-3">
+                                    <div className="bg-light border rounded-4 p-3 h-100">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Jabatan Tamu
+                                        </span>
+
+                                        <strong>
+                                            {request.guest_position || '-'}
+                                        </strong>
+                                    </div>
+                                </div>
+
+                                <div className="col-md-6 col-xl-3">
+                                    <div className="bg-light border rounded-4 p-3 h-100">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Lampiran
+                                        </span>
+
+                                        {request.proof_file_url ? (
+                                            <a
+                                                href={request.proof_file_url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="fw-bold"
+                                            >
+                                                <i className="bi bi-file-earmark-text-fill me-1"></i>
+                                                Buka Lampiran
+                                            </a>
+                                        ) : (
+                                            <strong>-</strong>
+                                        )}
+
+                                        {request.proof_file_name && (
+                                            <p className="text-muted small mb-0 mt-1 text-break">
+                                                {request.proof_file_name}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="row g-3 mb-4">
                                 <div className="col-lg-7">
                                     <div className="border rounded-4 p-3 h-100">
                                         <h6 className="fw-black mb-3">
-                                            Barang yang Diajukan
+                                            Paket Merchandise Diajukan
                                         </h6>
 
                                         <div className="d-grid gap-2">
@@ -590,21 +598,33 @@ export default function BorrowingApprovalPage() {
                                                 >
                                                     <div>
                                                         <strong>
-                                                            {item.product?.name || 'Barang tidak ditemukan'}
+                                                            {item.product?.name || 'Paket tidak ditemukan'}
                                                         </strong>
 
                                                         <p className="text-muted small mb-0 mt-1">
                                                             {item.product?.description ||
-                                                                'Tidak ada deskripsi barang.'}
+                                                                'Tidak ada deskripsi paket.'}
                                                         </p>
                                                     </div>
 
-                                                    <span className="badge text-bg-success rounded-pill align-self-start">
+                                                    <span className="badge text-bg-primary rounded-pill align-self-start">
                                                         Qty {item.quantity}
                                                     </span>
                                                 </div>
                                             ))}
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div className="col-lg-5">
+                                    <div className="bg-light border rounded-4 p-3 h-100">
+                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
+                                            Catatan Pemohon
+                                        </span>
+
+                                        <p className="mb-0" style={{ lineHeight: 1.7 }}>
+                                            {request.user_note || 'Tidak ada catatan pemohon.'}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -665,21 +685,11 @@ export default function BorrowingApprovalPage() {
                                 <button
                                     className="btn btn-dark rounded-pill fw-bold px-3"
                                     type="button"
-                                    onClick={() => handleBorrowed(request)}
+                                    onClick={() => handleComplete(request)}
                                     disabled={request.status !== 'approved'}
                                 >
-                                    <i className="bi bi-box-arrow-up-right me-1"></i>
-                                    Tandai Dipinjam
-                                </button>
-
-                                <button
-                                    className="btn btn-success rounded-pill fw-bold px-3"
-                                    type="button"
-                                    onClick={() => handleReturned(request)}
-                                    disabled={request.status !== 'borrowed'}
-                                >
-                                    <i className="bi bi-check2-square me-1"></i>
-                                    Tandai Kembali
+                                    <i className="bi bi-flag-fill me-1"></i>
+                                    Selesaikan
                                 </button>
                             </div>
                         </div>

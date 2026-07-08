@@ -51,12 +51,20 @@ class UserController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if ($request->user()->role !== 'superadmin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hanya superadmin yang dapat membuat akun.',
+                'data' => null,
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:100', 'unique:users,username'],
             'email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
-            'role' => ['required', Rule::in(['admin', 'user'])],
+            'role' => ['required', Rule::in(['superadmin', 'admin', 'user'])],
         ]);
 
         $user = User::create([
@@ -79,6 +87,14 @@ class UserController extends Controller
      */
     public function update(Request $request, string $id): JsonResponse
     {
+        if ($request->user()->role !== 'superadmin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hanya superadmin yang dapat memperbarui akun.',
+                'data' => null,
+            ], 403);
+        }
+
         $user = User::find($id);
 
         if (!$user) {
@@ -104,7 +120,7 @@ class UserController extends Controller
                 Rule::unique('users', 'email')->ignore($user->id),
             ],
             'password' => ['nullable', 'string', 'min:6'],
-            'role' => ['required', Rule::in(['admin', 'user'])],
+            'role' => ['required', Rule::in(['superadmin', 'admin', 'user'])],
         ]);
 
         $payload = [
@@ -132,6 +148,14 @@ class UserController extends Controller
      */
     public function destroy(Request $request, string $id): JsonResponse
     {
+        if ($request->user()->role !== 'superadmin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hanya superadmin yang dapat menghapus akun.',
+                'data' => null,
+            ], 403);
+        }
+
         $user = User::find($id);
 
         if (!$user) {
