@@ -1,517 +1,793 @@
-import { useEffect, useMemo, useState } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from 'react';
+
+import { Link } from 'react-router-dom';
+
 import api from '../../api/axios';
+
 import {
     closeAlert,
     showConfirmAlert,
     showErrorAlert,
     showLoadingAlert,
     showSuccessAlert,
-    showWarningAlert,
 } from '../../utils/sweetAlert';
 
-const initialForm = {
-    name: '',
-    description: '',
+const getCurrentUser = () => {
+    try {
+        return JSON.parse(
+            localStorage.getItem('admin_user') || '{}'
+        );
+    } catch {
+        return {};
+    }
+};
+
+const normalizePermissions = (permissions) => {
+    if (!Array.isArray(permissions)) {
+        return [];
+    }
+
+    return [
+        ...new Set(
+            permissions.filter(Boolean)
+        ),
+    ];
+};
+
+const hasPermission = (
+    currentUser,
+    permission
+) => {
+    if (
+        currentUser?.role ===
+        'superadmin'
+    ) {
+        return true;
+    }
+
+    return normalizePermissions(
+        currentUser?.permissions
+    ).includes(permission);
+};
+
+const extractArray = (response) => {
+    const payload =
+        response?.data?.data;
+
+    if (Array.isArray(payload)) {
+        return payload;
+    }
+
+    if (
+        payload &&
+        Array.isArray(payload.data)
+    ) {
+        return payload.data;
+    }
+
+    return [];
+};
+
+const getBackendErrorMessage = (
+    error,
+    fallbackMessage = 'Proses gagal dilakukan.'
+) => {
+    const responseData =
+        error?.response?.data;
+
+    if (responseData?.errors) {
+        const firstError =
+            Object.values(
+                responseData.errors
+            )?.[0]?.[0];
+
+        if (firstError) {
+            return firstError;
+        }
+    }
+
+    if (responseData?.message) {
+        return responseData.message;
+    }
+
+    return fallbackMessage;
+};
+
+const getStatusLabel = (status) => {
+    const labels = {
+        active: 'Aktif',
+        inactive: 'Nonaktif',
+    };
+
+    return (
+        labels[status] ||
+        status ||
+        '-'
+    );
 };
 
 export default function CategoryManagementPage() {
-    const [categories, setCategories] = useState([]);
-    const [formData, setFormData] = useState(initialForm);
-    const [editingId, setEditingId] = useState(null);
+    const currentUser =
+        useMemo(
+            () => getCurrentUser(),
+            []
+        );
 
-    const [loadingCategories, setLoadingCategories] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
+    const canManage =
+        hasPermission(
+            currentUser,
+            'categories.manage'
+        );
 
-    const [message, setMessage] = useState('');
-    const [errorMessage, setErrorMessage] = useState('');
-    const [searchKeyword, setSearchKeyword] = useState('');
+    const [
+        categories,
+        setCategories,
+    ] = useState([]);
 
-    const fetchCategories = async () => {
-        try {
-            setLoadingCategories(true);
-            setErrorMessage('');
+    const [
+        search,
+        setSearch,
+    ] = useState('');
 
-            const response = await api.get('/categories');
-            setCategories(response.data.data || []);
-        } catch (error) {
-            const backendMessage =
-                error.response?.data?.message ||
-                'Gagal mengambil data kategori.';
+    const [
+        selectedStatus,
+        setSelectedStatus,
+    ] = useState('all');
 
-            setErrorMessage(backendMessage);
-            showErrorAlert('Gagal Mengambil Data', backendMessage);
-            console.error(error);
-        } finally {
-            setLoadingCategories(false);
-        }
-    };
+    const [
+        loading,
+        setLoading,
+    ] = useState(true);
+
+    const [
+        deletingId,
+        setDeletingId,
+    ] = useState(null);
+
+    const fetchCategories =
+        useCallback(
+            async () => {
+                try {
+                    setLoading(true);
+
+                    const response =
+                        await api.get(
+                            '/categories'
+                        );
+
+                    setCategories(
+                        extractArray(response)
+                    );
+                } catch (error) {
+                    console.error(
+                        'Fetch categories error:',
+                        error?.response?.data ||
+                            error
+                    );
+
+                    setCategories([]);
+
+                    await showErrorAlert(
+                        'Gagal Memuat Data',
+                        getBackendErrorMessage(
+                            error,
+                            'Data kategori gagal dimuat dari server.'
+                        )
+                    );
+                } finally {
+                    setLoading(false);
+                }
+            },
+            []
+        );
 
     useEffect(() => {
         fetchCategories();
-    }, []);
+    }, [fetchCategories]);
 
-    const filteredCategories = useMemo(() => {
-        const keyword = searchKeyword.toLowerCase();
+    const filteredCategories =
+        useMemo(() => {
+            const searchValue =
+                search
+                    .trim()
+                    .toLowerCase();
 
-        return categories.filter((category) => {
-            return (
-                category.name?.toLowerCase().includes(keyword) ||
-                category.slug?.toLowerCase().includes(keyword) ||
-                category.description?.toLowerCase().includes(keyword)
+            return categories.filter(
+                (category) => {
+                    const matchSearch =
+                        !searchValue ||
+                        category.name
+                            ?.toLowerCase()
+                            .includes(
+                                searchValue
+                            ) ||
+                        category.slug
+                            ?.toLowerCase()
+                            .includes(
+                                searchValue
+                            ) ||
+                        category.description
+                            ?.toLowerCase()
+                            .includes(
+                                searchValue
+                            );
+
+                    const matchStatus =
+                        selectedStatus ===
+                            'all' ||
+                        category.status ===
+                            selectedStatus;
+
+                    return (
+                        matchSearch &&
+                        matchStatus
+                    );
+                }
             );
-        });
-    }, [categories, searchKeyword]);
+        }, [
+            categories,
+            search,
+            selectedStatus,
+        ]);
 
-    const handleInputChange = (event) => {
-        const { name, value } = event.target;
+    const summary =
+        useMemo(() => {
+            return {
+                total:
+                    categories.length,
 
-        setFormData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-    };
+                active:
+                    categories.filter(
+                        (category) =>
+                            category.status ===
+                            'active'
+                    ).length,
 
-    const handleEdit = (category) => {
-        setEditingId(category.id);
+                inactive:
+                    categories.filter(
+                        (category) =>
+                            category.status ===
+                            'inactive'
+                    ).length,
+            };
+        }, [categories]);
 
-        setFormData({
-            name: category.name || '',
-            description: category.description || '',
-        });
-
-        setMessage('');
-        setErrorMessage('');
-
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth',
-        });
-    };
-
-    const resetForm = async () => {
-        if (formData.name || formData.description || editingId) {
-            const result = await showConfirmAlert({
-                title: 'Reset Form?',
-                text: 'Data yang sedang diisi akan dikosongkan.',
-                confirmButtonText: 'Ya, reset',
-                icon: 'warning',
-                confirmButtonColor: '#dc2626',
-            });
-
-            if (!result.isConfirmed) {
-                return;
-            }
+    const ensureManageAccess = () => {
+        if (canManage) {
+            return true;
         }
 
-        setFormData(initialForm);
-        setEditingId(null);
-        setMessage('');
-        setErrorMessage('');
-    };
-
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-
-        setMessage('');
-        setErrorMessage('');
-
-        if (!formData.name.trim()) {
-            setErrorMessage('Nama kategori wajib diisi.');
-            showWarningAlert('Nama Kategori Wajib Diisi', 'Isi nama kategori terlebih dahulu.');
-            return;
-        }
-
-        const result = await showConfirmAlert({
-            title: editingId ? 'Update Kategori?' : 'Tambah Kategori?',
-            text: editingId
-                ? 'Data kategori akan diperbarui.'
-                : 'Kategori baru akan ditambahkan ke master data.',
-            confirmButtonText: editingId ? 'Ya, update' : 'Ya, tambah',
-            icon: 'question',
-            confirmButtonColor: '#2563eb',
-        });
-
-        if (!result.isConfirmed) {
-            return;
-        }
-
-        setSubmitting(true);
-        showLoadingAlert(
-            editingId ? 'Memperbarui Kategori' : 'Menambahkan Kategori',
-            'Mohon tunggu, data sedang diproses.'
+        showErrorAlert(
+            'Akses Ditolak',
+            'Akun hanya memiliki izin melihat kategori dan tidak dapat mengubah data.'
         );
 
-        try {
-            const payload = {
-                name: formData.name,
-                description: formData.description,
-            };
-
-            const response = editingId
-                ? await api.put(`/categories/${editingId}`, payload)
-                : await api.post('/categories', payload);
-
-            closeAlert();
-
-            setMessage(response.data.message);
-            setFormData(initialForm);
-            setEditingId(null);
-
-            await fetchCategories();
-
-            showSuccessAlert(
-                editingId ? 'Kategori Diperbarui' : 'Kategori Ditambahkan',
-                response.data.message
-            );
-        } catch (error) {
-            closeAlert();
-
-            const backendMessage =
-                error.response?.data?.message ||
-                'Data kategori gagal disimpan.';
-
-            setErrorMessage(backendMessage);
-            showErrorAlert('Gagal Menyimpan', backendMessage);
-            console.error(error);
-        } finally {
-            setSubmitting(false);
-        }
+        return false;
     };
 
-    const handleDelete = async (category) => {
-        setMessage('');
-        setErrorMessage('');
-
-        const result = await showConfirmAlert({
-            title: 'Hapus Kategori?',
-            text: `${category.name} akan dihapus dari master data. Pastikan kategori ini belum digunakan produk.`,
-            confirmButtonText: 'Ya, hapus',
-            icon: 'warning',
-            confirmButtonColor: '#dc2626',
-        });
-
-        if (!result.isConfirmed) {
-            return;
-        }
-
-        showLoadingAlert('Menghapus Kategori', 'Mohon tunggu, data sedang dihapus.');
-
-        try {
-            const response = await api.delete(`/categories/${category.id}`);
-
-            closeAlert();
-
-            setMessage(response.data.message);
-
-            if (editingId === category.id) {
-                setFormData(initialForm);
-                setEditingId(null);
+    const handleDelete =
+        async (category) => {
+            if (
+                !ensureManageAccess()
+            ) {
+                return;
             }
 
-            await fetchCategories();
+            const productsCount =
+                Number(
+                    category.products_count ||
+                        0
+                );
 
-            showSuccessAlert('Kategori Dihapus', response.data.message);
-        } catch (error) {
-            closeAlert();
+            const confirmation =
+                await showConfirmAlert({
+                    title:
+                        'Hapus Kategori?',
 
-            const backendMessage =
-                error.response?.data?.message ||
-                'Kategori gagal dihapus. Kemungkinan kategori masih digunakan produk.';
+                    text:
+                        productsCount > 0
+                            ? `Kategori "${category.name}" masih digunakan oleh ${productsCount} produk. Penghapusan mungkin ditolak oleh sistem.`
+                            : `Kategori "${category.name}" akan dihapus dari sistem.`,
 
-            setErrorMessage(backendMessage);
-            showErrorAlert('Gagal Menghapus', backendMessage);
-            console.error(error);
-        }
+                    confirmButtonText:
+                        'Ya, hapus',
+
+                    icon:
+                        'warning',
+
+                    confirmButtonColor:
+                        '#dc2626',
+                });
+
+            if (
+                !confirmation.isConfirmed
+            ) {
+                return;
+            }
+
+            try {
+                setDeletingId(
+                    category.id
+                );
+
+                showLoadingAlert(
+                    'Menghapus Kategori',
+                    'Mohon tunggu sebentar.'
+                );
+
+                const response =
+                    await api.delete(
+                        `/categories/${category.id}`
+                    );
+
+                closeAlert();
+
+                await showSuccessAlert(
+                    'Kategori Dihapus',
+                    response?.data?.message ||
+                        'Data kategori berhasil dihapus.'
+                );
+
+                await fetchCategories();
+            } catch (error) {
+                console.error(
+                    'Delete category error:',
+                    error?.response?.data ||
+                        error
+                );
+
+                closeAlert();
+
+                await showErrorAlert(
+                    'Hapus Gagal',
+                    getBackendErrorMessage(
+                        error,
+                        'Kategori gagal dihapus.'
+                    )
+                );
+            } finally {
+                setDeletingId(null);
+            }
+        };
+
+    const resetFilters = () => {
+        setSearch('');
+        setSelectedStatus('all');
     };
 
     return (
         <div className="container-fluid px-0">
-            <section className="card border-0 shadow-sm rounded-5 overflow-hidden mb-4">
-                <div
-                    className="card-body p-4 p-lg-5 text-white"
-                    style={{
-                        background:
-                            'radial-gradient(circle at top right, rgba(255,255,255,.22), transparent 28%), linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #dc2626 120%)',
-                    }}
-                >
+            <section
+                className="card border-0 shadow-sm rounded-5 overflow-hidden mb-4"
+                style={{
+                    background:
+                        'linear-gradient(135deg, rgba(124,58,237,0.96), rgba(15,23,42,0.98))',
+                }}
+            >
+                <div className="card-body p-4 p-lg-5 text-white">
                     <div className="row align-items-center g-4">
-                        <div className="col-lg-9">
-                            <span className="text-white-50 small fw-bold text-uppercase">
-                                Master Data
+                        <div className="col-lg-8">
+                            <span className="badge rounded-pill text-bg-light text-primary px-3 py-2 mb-3">
+                                Master Data Kategori
                             </span>
 
-                            <h2 className="display-5 fw-black mt-2 mb-3">
-                                Data Kategori
-                            </h2>
+                            <h1 className="display-6 fw-black mb-3">
+                                {canManage
+                                    ? 'Kelola kategori produk.'
+                                    : 'Daftar kategori produk.'}
+                            </h1>
 
-                            <p className="mb-0 text-white-50" style={{ maxWidth: 820, lineHeight: 1.8 }}>
-                                Kelola kategori untuk membedakan paket merchandise, barang Sekpim,
-                                ATK, atau kategori lain yang digunakan dalam sistem pengajuan.
+                            <p
+                                className="mb-0 text-white-50"
+                                style={{
+                                    maxWidth: 760,
+                                    lineHeight: 1.8,
+                                }}
+                            >
+                                {canManage
+                                    ? 'Tambah, edit, hapus, dan pantau kategori yang digunakan untuk merchandise maupun peminjaman.'
+                                    : 'Akun ini hanya dapat melihat kategori. Perubahan data hanya dapat dilakukan oleh akun yang memiliki permission pengelolaan kategori.'}
                             </p>
                         </div>
 
-                        <div className="col-lg-3">
-                            <button
-                                className="btn btn-light rounded-pill fw-bold w-100"
-                                type="button"
-                                onClick={fetchCategories}
-                            >
-                                <i className="bi bi-arrow-clockwise me-2"></i>
-                                Refresh Data
-                            </button>
+                        <div className="col-lg-4">
+                            <div className="row g-3">
+                                <div className="col-4">
+                                    <div className="bg-white bg-opacity-10 rounded-5 p-3 h-100">
+                                        <div className="fs-3 fw-black">
+                                            {
+                                                summary.total
+                                            }
+                                        </div>
+
+                                        <div className="small text-white-50">
+                                            Total
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="col-4">
+                                    <div className="bg-white bg-opacity-10 rounded-5 p-3 h-100">
+                                        <div className="fs-3 fw-black">
+                                            {
+                                                summary.active
+                                            }
+                                        </div>
+
+                                        <div className="small text-white-50">
+                                            Aktif
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="col-4">
+                                    <div className="bg-white bg-opacity-10 rounded-5 p-3 h-100">
+                                        <div className="fs-3 fw-black">
+                                            {
+                                                summary.inactive
+                                            }
+                                        </div>
+
+                                        <div className="small text-white-50">
+                                            Nonaktif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            {message && (
-                <div className="alert alert-success rounded-4">
-                    {message}
-                </div>
-            )}
+            {!canManage && (
+                <div className="alert alert-info border-0 shadow-sm rounded-4 mb-4">
+                    <div className="d-flex align-items-start gap-3">
+                        <i className="bi bi-eye-fill fs-4" />
 
-            {errorMessage && (
-                <div className="alert alert-danger rounded-4">
-                    {errorMessage}
-                </div>
-            )}
-
-            <div className="row g-4 align-items-start">
-                <div className="col-xl-4">
-                    <form className="card border-0 shadow-sm rounded-5 position-sticky" style={{ top: 110 }} onSubmit={handleSubmit}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-start justify-content-between gap-3 mb-4">
-                                <div>
-                                    <span className="text-primary small fw-bold text-uppercase">
-                                        {editingId ? 'Edit Category' : 'Create Category'}
-                                    </span>
-
-                                    <h4 className="fw-black mt-1 mb-1">
-                                        {editingId ? 'Edit Kategori' : 'Tambah Kategori'}
-                                    </h4>
-
-                                    <p className="text-muted mb-0">
-                                        Isi data kategori untuk master produk.
-                                    </p>
-                                </div>
-
-                                <div className="icon-box bg-primary-subtle text-primary">
-                                    <i className="bi bi-tags-fill fs-4"></i>
-                                </div>
+                        <div>
+                            <div className="fw-black">
+                                Mode hanya lihat
                             </div>
 
-                            <div className="mb-3">
-                                <label className="form-label fw-bold">
-                                    Nama Kategori
-                                </label>
+                            <div className="small">
+                                Tombol tambah, edit, dan hapus disembunyikan karena akun tidak memiliki permission
+                                {' '}
+                                <strong>
+                                    categories.manage
+                                </strong>
+                                .
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <section className="card border-0 shadow-sm rounded-5 mb-4">
+                <div className="card-body p-4">
+                    <div className="row g-3 align-items-end">
+                        <div
+                            className={
+                                canManage
+                                    ? 'col-lg-5'
+                                    : 'col-lg-7'
+                            }
+                        >
+                            <label className="form-label fw-bold">
+                                Cari kategori
+                            </label>
+
+                            <div className="input-group">
+                                <span className="input-group-text">
+                                    <i className="bi bi-search" />
+                                </span>
 
                                 <input
                                     type="text"
-                                    name="name"
-                                    value={formData.name}
-                                    onChange={handleInputChange}
-                                    className="form-control rounded-4"
-                                    placeholder="Contoh: Merchandise"
-                                    required
+                                    className="form-control"
+                                    placeholder="Nama, slug, deskripsi..."
+                                    value={
+                                        search
+                                    }
+                                    onChange={(
+                                        event
+                                    ) =>
+                                        setSearch(
+                                            event
+                                                .target
+                                                .value
+                                        )
+                                    }
                                 />
-                            </div>
-
-                            <div className="mb-4">
-                                <label className="form-label fw-bold">
-                                    Deskripsi
-                                </label>
-
-                                <textarea
-                                    name="description"
-                                    value={formData.description}
-                                    onChange={handleInputChange}
-                                    className="form-control rounded-4"
-                                    placeholder="Tuliskan keterangan kategori."
-                                    rows="5"
-                                />
-                            </div>
-
-                            <div className="d-grid gap-2">
-                                <button
-                                    className="btn btn-primary rounded-pill fw-bold"
-                                    type="submit"
-                                    disabled={submitting}
-                                >
-                                    {submitting
-                                        ? 'Menyimpan...'
-                                        : editingId
-                                            ? 'Update Kategori'
-                                            : 'Tambah Kategori'}
-                                </button>
-
-                                <button
-                                    className="btn btn-outline-dark rounded-pill fw-bold"
-                                    type="button"
-                                    onClick={resetForm}
-                                    disabled={submitting}
-                                >
-                                    Reset
-                                </button>
                             </div>
                         </div>
-                    </form>
-                </div>
 
-                <div className="col-xl-8">
-                    <div className="card border-0 shadow-sm rounded-5 mb-4">
-                        <div className="card-body p-4">
-                            <div className="row g-3 align-items-end">
-                                <div className="col-lg-8">
-                                    <label className="form-label fw-bold">
-                                        Cari Kategori
-                                    </label>
+                        <div
+                            className={
+                                canManage
+                                    ? 'col-lg-4'
+                                    : 'col-lg-4'
+                            }
+                        >
+                            <label className="form-label fw-bold">
+                                Filter status
+                            </label>
 
-                                    <div className="input-group">
-                                        <span className="input-group-text bg-light border-end-0 rounded-start-4">
-                                            <i className="bi bi-search"></i>
-                                        </span>
+                            <select
+                                className="form-select"
+                                value={
+                                    selectedStatus
+                                }
+                                onChange={(
+                                    event
+                                ) =>
+                                    setSelectedStatus(
+                                        event
+                                            .target
+                                            .value
+                                    )
+                                }
+                            >
+                                <option value="all">
+                                    Semua Status
+                                </option>
 
-                                        <input
-                                            type="text"
-                                            value={searchKeyword}
-                                            onChange={(event) => setSearchKeyword(event.target.value)}
-                                            className="form-control border-start-0 rounded-end-4"
-                                            placeholder="Cari nama, slug, atau deskripsi kategori..."
-                                        />
-                                    </div>
-                                </div>
+                                <option value="active">
+                                    Aktif
+                                </option>
 
-                                <div className="col-lg-4">
-                                    <div className="bg-light border rounded-4 p-3 h-100">
-                                        <span className="d-block text-muted small fw-bold text-uppercase mb-1">
-                                            Total Kategori
-                                        </span>
+                                <option value="inactive">
+                                    Nonaktif
+                                </option>
+                            </select>
+                        </div>
 
-                                        <strong className="fs-4">
-                                            {categories.length}
-                                        </strong>
-                                    </div>
-                                </div>
-                            </div>
+                        <div
+                            className={
+                                canManage
+                                    ? 'col-lg-3'
+                                    : 'col-lg-1'
+                            }
+                        >
+                            {canManage ? (
+                                <Link
+                                    to="/admin/categories/create"
+                                    className="btn btn-primary rounded-pill w-100"
+                                >
+                                    <i className="bi bi-plus-lg me-2" />
+
+                                    Tambah Kategori
+                                </Link>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="btn btn-outline-secondary rounded-pill w-100"
+                                    onClick={
+                                        resetFilters
+                                    }
+                                    title="Reset filter"
+                                >
+                                    <i className="bi bi-arrow-counterclockwise" />
+                                </button>
+                            )}
                         </div>
                     </div>
 
-                    {loadingCategories && (
-                        <div className="alert alert-primary rounded-4">
-                            Sedang mengambil data kategori...
+                    {canManage && (
+                        <div className="d-flex justify-content-end mt-3">
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-outline-secondary rounded-pill"
+                                onClick={
+                                    resetFilters
+                                }
+                            >
+                                <i className="bi bi-arrow-counterclockwise me-2" />
+
+                                Reset Filter
+                            </button>
                         </div>
                     )}
+                </div>
+            </section>
 
-                    {!loadingCategories && filteredCategories.length === 0 && (
-                        <div className="card border-0 shadow-sm rounded-5">
-                            <div className="card-body p-5 text-center">
-                                <div className="icon-box bg-primary-subtle text-primary mx-auto mb-3">
-                                    <i className="bi bi-inbox-fill fs-4"></i>
-                                </div>
+            {loading ? (
+                <div className="card border-0 shadow-sm rounded-5">
+                    <div className="card-body p-5 text-center">
+                        <div className="spinner-border text-primary mb-3" />
 
-                                <h4 className="fw-black">
-                                    Kategori tidak ditemukan
-                                </h4>
+                        <h5 className="fw-bold mb-1">
+                            Memuat data kategori
+                        </h5>
 
-                                <p className="text-muted mb-0">
-                                    Belum ada kategori atau kata kunci pencarian tidak cocok.
-                                </p>
-                            </div>
+                        <p className="text-muted mb-0">
+                            Mohon tunggu sebentar.
+                        </p>
+                    </div>
+                </div>
+            ) : filteredCategories.length ===
+              0 ? (
+                <div className="card border-0 shadow-sm rounded-5">
+                    <div className="card-body p-5 text-center">
+                        <div
+                            className="mx-auto mb-3 d-flex align-items-center justify-content-center rounded-5 bg-light text-secondary"
+                            style={{
+                                width: 76,
+                                height: 76,
+                            }}
+                        >
+                            <i className="bi bi-inbox fs-1" />
                         </div>
-                    )}
 
-                    <div className="card border-0 shadow-sm rounded-5 overflow-hidden">
-                        <div className="table-responsive">
-                            <table className="table table-hover align-middle mb-0">
-                                <thead className="table-light">
-                                    <tr>
-                                        <th className="px-4 py-3 small text-muted text-uppercase">
-                                            Kategori
-                                        </th>
-                                        <th className="px-4 py-3 small text-muted text-uppercase">
-                                            Slug
-                                        </th>
-                                        <th className="px-4 py-3 small text-muted text-uppercase">
-                                            Deskripsi
-                                        </th>
-                                        <th className="px-4 py-3 small text-muted text-uppercase text-end">
-                                            Aksi
-                                        </th>
-                                    </tr>
-                                </thead>
+                        <h5 className="fw-black mb-2">
+                            Kategori tidak ditemukan
+                        </h5>
 
-                                <tbody>
-                                    {filteredCategories.map((category) => (
-                                        <tr key={category.id}>
-                                            <td className="px-4 py-3">
-                                                <div className="d-flex align-items-center gap-3">
-                                                    <div className="icon-box bg-primary-subtle text-primary">
-                                                        <i className="bi bi-tag-fill"></i>
+                        <p className="text-muted mb-3">
+                            Tidak ada kategori berdasarkan filter yang dipilih.
+                        </p>
+
+                        <button
+                            type="button"
+                            className="btn btn-outline-secondary rounded-pill"
+                            onClick={
+                                resetFilters
+                            }
+                        >
+                            Reset Filter
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div className="row g-4">
+                    {filteredCategories.map(
+                        (category) => (
+                            <div
+                                className="col-12"
+                                key={
+                                    category.id
+                                }
+                            >
+                                <div className="card border-0 shadow-sm rounded-5 overflow-hidden">
+                                    <div className="card-body p-4">
+                                        <div className="row g-4 align-items-center">
+                                            <div
+                                                className={
+                                                    canManage
+                                                        ? 'col-lg-7'
+                                                        : 'col-lg-8'
+                                                }
+                                            >
+                                                <div className="d-flex gap-3">
+                                                    <div className="icon-box bg-primary-subtle text-primary flex-shrink-0">
+                                                        <i className="bi bi-tags-fill fs-4" />
                                                     </div>
 
-                                                    <div>
-                                                        <strong>{category.name}</strong>
-                                                        <p className="text-muted small mb-0">
-                                                            ID: {category.id}
+                                                    <div className="min-w-0">
+                                                        <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                                            <span className="badge rounded-pill text-bg-primary">
+                                                                Kategori
+                                                            </span>
+
+                                                            <span
+                                                                className={`status status-${category.status}`}
+                                                            >
+                                                                {getStatusLabel(
+                                                                    category.status
+                                                                )}
+                                                            </span>
+                                                        </div>
+
+                                                        <h5 className="fw-black mb-1 text-break">
+                                                            {
+                                                                category.name
+                                                            }
+                                                        </h5>
+
+                                                        <p className="text-muted mb-0">
+                                                            {category.description ||
+                                                                'Tidak ada deskripsi.'}
                                                         </p>
                                                     </div>
                                                 </div>
-                                            </td>
+                                            </div>
 
-                                            <td className="px-4 py-3">
-                                                <span className="badge rounded-pill text-bg-light border">
-                                                    {category.slug || '-'}
-                                                </span>
-                                            </td>
-
-                                            <td className="px-4 py-3">
-                                                <span className="text-muted">
-                                                    {category.description || '-'}
-                                                </span>
-                                            </td>
-
-                                            <td className="px-4 py-3">
-                                                <div className="d-flex justify-content-end gap-2 flex-wrap">
-                                                    <button
-                                                        className="btn btn-sm btn-outline-primary rounded-pill px-3"
-                                                        type="button"
-                                                        onClick={() => handleEdit(category)}
-                                                    >
-                                                        <i className="bi bi-pencil-square me-1"></i>
-                                                        Edit
-                                                    </button>
-
-                                                    <button
-                                                        className="btn btn-sm btn-outline-danger rounded-pill px-3"
-                                                        type="button"
-                                                        onClick={() => handleDelete(category)}
-                                                    >
-                                                        <i className="bi bi-trash-fill me-1"></i>
-                                                        Hapus
-                                                    </button>
+                                            <div className="col-md-6 col-lg-2">
+                                                <div className="small text-muted">
+                                                    Slug
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    ))}
 
-                                    {!loadingCategories && filteredCategories.length === 0 && (
-                                        <tr>
-                                            <td colSpan="4" className="text-center text-muted p-4">
-                                                Tidak ada data kategori.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                                                <div className="fw-bold text-break">
+                                                    {category.slug ||
+                                                        '-'}
+                                                </div>
+                                            </div>
 
-                    <div className="alert alert-info rounded-4 mt-3 mb-0">
-                        <strong>Catatan:</strong> kategori yang sudah digunakan oleh paket atau barang
-                        sebaiknya tidak dihapus agar data pengajuan tetap aman.
-                    </div>
+                                            <div
+                                                className={
+                                                    canManage
+                                                        ? 'col-md-6 col-lg-3 text-lg-end'
+                                                        : 'col-md-6 col-lg-2 text-lg-end'
+                                                }
+                                            >
+                                                {canManage ? (
+                                                    <div className="d-flex flex-wrap justify-content-lg-end gap-2">
+                                                        <Link
+                                                            to={`/admin/categories/${category.id}/edit`}
+                                                            className="btn btn-outline-primary rounded-pill"
+                                                        >
+                                                            <i className="bi bi-pencil-square me-2" />
+
+                                                            Edit
+                                                        </Link>
+
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-outline-danger rounded-pill"
+                                                            onClick={() =>
+                                                                handleDelete(
+                                                                    category
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                deletingId ===
+                                                                category.id
+                                                            }
+                                                        >
+                                                            {deletingId ===
+                                                            category.id ? (
+                                                                <span className="spinner-border spinner-border-sm" />
+                                                            ) : (
+                                                                <>
+                                                                    <i className="bi bi-trash me-2" />
+
+                                                                    Hapus
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="badge rounded-pill text-bg-light border text-dark">
+                                                        <i className="bi bi-eye me-2" />
+
+                                                        Lihat Saja
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {category.products_count !==
+                                            undefined && (
+                                            <div className="mt-3 p-3 rounded-4 bg-light border">
+                                                <div className="d-flex align-items-center justify-content-between gap-3">
+                                                    <div>
+                                                        <div className="small text-muted">
+                                                            Jumlah produk dalam kategori
+                                                        </div>
+
+                                                        <div className="fw-black">
+                                                            {
+                                                                category.products_count
+                                                            }{' '}
+                                                            produk
+                                                        </div>
+                                                    </div>
+
+                                                    <i className="bi bi-box-seam fs-4 text-primary" />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    )}
                 </div>
-            </div>
+            )}
         </div>
     );
 }
