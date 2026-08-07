@@ -17,15 +17,11 @@ use Throwable;
 
 class OrderController extends Controller
 {
-    /**
-     * Menampilkan seluruh pengajuan merchandise.
-     *
-     * Route endpoint ini dilindungi permission:
-     * approval.merchandise.view
-     */
-    public function index(Request $request): JsonResponse
-    {
-        $user = $request->user();
+    public function index(
+        Request $request
+    ): JsonResponse {
+        $user =
+            $request->user();
 
         if (
             !$user ||
@@ -44,7 +40,7 @@ class OrderController extends Controller
                 'user',
                 'items.product.category',
             ])
-            ->latest('submitted_at')
+            ->latest('updated_at')
             ->latest('created_at')
             ->get();
 
@@ -55,15 +51,11 @@ class OrderController extends Controller
         ]);
     }
 
-    /**
-     * Menampilkan riwayat pengajuan merchandise milik user login.
-     *
-     * Pengguna hanya menerima data yang user_id-nya sama
-     * dengan akun yang sedang login.
-     */
-    public function myOrders(Request $request): JsonResponse
-    {
-        $user = $request->user();
+    public function myOrders(
+        Request $request
+    ): JsonResponse {
+        $user =
+            $request->user();
 
         if (
             !$user ||
@@ -86,7 +78,7 @@ class OrderController extends Controller
                 'user_id',
                 $user->id
             )
-            ->latest('submitted_at')
+            ->latest('updated_at')
             ->latest('created_at')
             ->get();
 
@@ -97,15 +89,6 @@ class OrderController extends Controller
         ]);
     }
 
-    /**
-     * Menampilkan detail pengajuan merchandise.
-     *
-     * Aturan akses:
-     * - superadmin dapat melihat seluruh data;
-     * - pemilik approval.merchandise.view dapat melihat seluruh data;
-     * - pemilik request.history.view hanya dapat melihat data miliknya;
-     * - user lain mendapatkan 403.
-     */
     public function show(
         Request $request,
         int $id
@@ -135,15 +118,11 @@ class OrderController extends Controller
         ]);
     }
 
-    /**
-     * Menyimpan pengajuan merchandise baru.
-     *
-     * Stok belum dikurangi pada tahap ini.
-     * Stok baru dikurangi saat pengajuan disetujui admin.
-     */
-    public function store(Request $request): JsonResponse
-    {
-        $user = $request->user();
+    public function store(
+        Request $request
+    ): JsonResponse {
+        $user =
+            $request->user();
 
         if (
             !$user ||
@@ -157,183 +136,123 @@ class OrderController extends Controller
             );
         }
 
-        $validated = $request->validate([
-            'event_name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'institution_name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'guest_name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'guest_position' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'activity_date' => [
-                'required',
-                'date',
-            ],
-
-            'user_note' => [
-                'required',
-                'string',
-                'max:5000',
-            ],
-
-            'proof_file' => [
-                'required',
-                'file',
-                'mimes:pdf,jpg,jpeg,png',
-                'max:5120',
-            ],
-
-            'items' => [
-                'required',
-                'array',
-                'min:1',
-            ],
-
-            'items.*.product_id' => [
-                'required',
-                'integer',
-                'distinct',
-                'exists:products,id',
-            ],
-
-            'items.*.quantity' => [
-                'required',
-                'integer',
-                'min:1',
-            ],
-        ], [
-            'event_name.required' => 'Nama kegiatan wajib diisi.',
-            'event_name.max' => 'Nama kegiatan maksimal 255 karakter.',
-
-            'institution_name.required' => 'Nama instansi wajib diisi.',
-            'institution_name.max' => 'Nama instansi maksimal 255 karakter.',
-
-            'guest_name.required' => 'Nama tamu wajib diisi.',
-            'guest_name.max' => 'Nama tamu maksimal 255 karakter.',
-
-            'guest_position.required' => 'Jabatan tamu wajib diisi.',
-            'guest_position.max' => 'Jabatan tamu maksimal 255 karakter.',
-
-            'activity_date.required' => 'Tanggal kegiatan wajib diisi.',
-            'activity_date.date' => 'Format tanggal kegiatan tidak valid.',
-
-            'user_note.required' => 'Catatan atau tujuan pengajuan wajib diisi.',
-            'user_note.max' => 'Catatan pemohon maksimal 5.000 karakter.',
-
-            'proof_file.required' => 'Dokumen pendukung wajib diunggah.',
-            'proof_file.file' => 'Lampiran harus berupa file.',
-            'proof_file.mimes' => 'Lampiran harus berformat PDF, JPG, JPEG, atau PNG.',
-            'proof_file.max' => 'Ukuran lampiran maksimal 5 MB.',
-
-            'items.required' => 'Pilih minimal satu merchandise.',
-            'items.array' => 'Format daftar merchandise tidak valid.',
-            'items.min' => 'Pilih minimal satu merchandise.',
-
-            'items.*.product_id.required' => 'Produk merchandise wajib dipilih.',
-            'items.*.product_id.distinct' => 'Produk merchandise tidak boleh dipilih lebih dari satu kali.',
-            'items.*.product_id.exists' => 'Produk merchandise tidak ditemukan.',
-
-            'items.*.quantity.required' => 'Jumlah merchandise wajib diisi.',
-            'items.*.quantity.integer' => 'Jumlah merchandise harus berupa angka.',
-            'items.*.quantity.min' => 'Jumlah merchandise minimal satu.',
-        ]);
+        $validated =
+            $this->validateOrderRequest(
+                $request,
+                true
+            );
 
         $proofFilePath = null;
 
         try {
-            $proofFile = $request->file(
-                'proof_file'
-            );
-
-            $proofFilePath = $proofFile->store(
-                'merchandise-proofs',
-                'public'
-            );
-
-            $order = DB::transaction(function () use (
-                $user,
-                $validated,
-                $proofFile,
-                $proofFilePath
-            ): Order {
-                $this->validateOrderItems(
-                    $validated['items']
+            $proofFile =
+                $request->file(
+                    'proof_file'
                 );
 
-                $order = Order::query()->create([
-                    'user_id' => $user->id,
-                    'order_code' => $this->generateOrderCode(),
+            $proofFilePath =
+                $proofFile->store(
+                    'merchandise-proofs',
+                    'public'
+                );
 
-                    'event_name' => trim(
-                        $validated['event_name']
-                    ),
+            $order = DB::transaction(
+                function () use (
+                    $user,
+                    $validated,
+                    $proofFile,
+                    $proofFilePath
+                ): Order {
+                    $this->validateOrderItems(
+                        $validated['items']
+                    );
 
-                    'institution_name' => trim(
-                        $validated['institution_name']
-                    ),
+                    $order = Order::query()
+                        ->create([
+                            'user_id' =>
+                                $user->id,
 
-                    'guest_name' => trim(
-                        $validated['guest_name']
-                    ),
+                            'order_code' =>
+                                $this->generateOrderCode(),
 
-                    'guest_position' => trim(
-                        $validated['guest_position']
-                    ),
+                            'event_name' =>
+                                trim(
+                                    $validated['event_name']
+                                ),
 
-                    'activity_date' => $validated['activity_date'],
+                            'institution_name' =>
+                                trim(
+                                    $validated['institution_name']
+                                ),
 
-                    'proof_link' => null,
-                    'proof_file_path' => $proofFilePath,
-                    'proof_file_name' => $proofFile->getClientOriginalName(),
-                    'proof_file_mime' => $proofFile->getMimeType(),
+                            'guest_name' =>
+                                trim(
+                                    $validated['guest_name']
+                                ),
 
-                    'status' => 'pending',
+                            'guest_position' =>
+                                trim(
+                                    $validated['guest_position']
+                                ),
 
-                    'user_note' => trim(
-                        $validated['user_note']
-                    ),
+                            'activity_date' =>
+                                $validated['activity_date'],
 
-                    'admin_note' => null,
+                            'proof_link' =>
+                                null,
 
-                    'submitted_at' => now(),
-                    'approved_at' => null,
-                    'rejected_at' => null,
-                    'completed_at' => null,
-                ]);
+                            'proof_file_path' =>
+                                $proofFilePath,
 
-                foreach (
-                    $validated['items']
-                    as $item
-                ) {
-                    OrderItem::query()->create([
-                        'order_id' => $order->id,
-                        'product_id' => $item['product_id'],
-                        'quantity' => $item['quantity'],
+                            'proof_file_name' =>
+                                $proofFile
+                                    ->getClientOriginalName(),
+
+                            'proof_file_mime' =>
+                                $proofFile
+                                    ->getMimeType(),
+
+                            'status' =>
+                                'pending',
+
+                            'user_note' =>
+                                trim(
+                                    $validated['user_note']
+                                ),
+
+                            'admin_note' =>
+                                null,
+
+                            'submitted_at' =>
+                                now(),
+
+                            'revision_requested_at' =>
+                                null,
+
+                            'resubmitted_at' =>
+                                null,
+
+                            'approved_at' =>
+                                null,
+
+                            'rejected_at' =>
+                                null,
+
+                            'completed_at' =>
+                                null,
+                        ]);
+
+                    $this->replaceOrderItems(
+                        $order,
+                        $validated['items']
+                    );
+
+                    return $order->load([
+                        'user',
+                        'items.product.category',
                     ]);
                 }
-
-                return $order->load([
-                    'user',
-                    'items.product.category',
-                ]);
-            });
+            );
 
             return response()->json([
                 'success' => true,
@@ -355,18 +274,343 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Pengajuan merchandise gagal dikirim. Silakan periksa kembali data pengajuan atau hubungi admin.',
+                'message' => 'Pengajuan merchandise gagal dikirim.',
                 'data' => null,
             ], 500);
         }
     }
 
     /**
-     * Menyetujui pengajuan merchandise.
-     *
-     * Stok dipotong tepat satu kali saat status berubah
-     * dari pending menjadi approved.
+     * Admin meminta user memperbaiki pengajuan.
      */
+    public function revision(
+        Request $request,
+        int $id
+    ): JsonResponse {
+        if (
+            !$this->canProcessOrder(
+                $request
+            )
+        ) {
+            return $this->forbiddenResponse(
+                'Kamu tidak memiliki izin meminta revisi pengajuan merchandise.'
+            );
+        }
+
+        $validated =
+            $request->validate([
+                'admin_note' => [
+                    'required',
+                    'string',
+                    'min:5',
+                    'max:2000',
+                ],
+            ], [
+                'admin_note.required' =>
+                    'Catatan revisi wajib diisi.',
+
+                'admin_note.min' =>
+                    'Catatan revisi minimal lima karakter.',
+
+                'admin_note.max' =>
+                    'Catatan revisi maksimal 2.000 karakter.',
+            ]);
+
+        try {
+            $order = DB::transaction(
+                function () use (
+                    $id,
+                    $validated
+                ): Order {
+                    $lockedOrder =
+                        Order::query()
+                            ->lockForUpdate()
+                            ->findOrFail($id);
+
+                    if (
+                        $lockedOrder->status !==
+                        'pending'
+                    ) {
+                        $this->abortJson(
+                            'Revisi hanya dapat diminta saat status pengajuan masih menunggu.',
+                            422
+                        );
+                    }
+
+                    $lockedOrder->update([
+                        'status' =>
+                            'revision',
+
+                        'admin_note' =>
+                            trim(
+                                $validated['admin_note']
+                            ),
+
+                        'revision_requested_at' =>
+                            now(),
+
+                        'resubmitted_at' =>
+                            null,
+
+                        'approved_at' =>
+                            null,
+
+                        'rejected_at' =>
+                            null,
+
+                        'completed_at' =>
+                            null,
+                    ]);
+
+                    return $lockedOrder
+                        ->fresh([
+                            'user',
+                            'items.product.category',
+                        ]);
+                }
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengajuan merchandise dikembalikan kepada pemohon untuk direvisi.',
+                'data' => $order,
+            ]);
+        } catch (HttpResponseException $error) {
+            throw $error;
+        } catch (Throwable $error) {
+            report($error);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Permintaan revisi gagal diproses.',
+                'data' => null,
+            ], 500);
+        }
+    }
+
+    /**
+     * User memperbaiki dan mengirim ulang pengajuan revisi.
+     */
+    public function resubmit(
+        Request $request,
+        int $id
+    ): JsonResponse {
+        $user =
+            $request->user();
+
+        if (
+            !$user ||
+            !$this->userHasPermission(
+                $user,
+                'request.merchandise.create'
+            )
+        ) {
+            return $this->forbiddenResponse(
+                'Kamu tidak memiliki izin memperbarui pengajuan merchandise.'
+            );
+        }
+
+        $order = Order::query()
+            ->with('items')
+            ->findOrFail($id);
+
+        if (
+            (int) $order->user_id !==
+            (int) $user->id
+        ) {
+            return $this->forbiddenResponse(
+                'Kamu hanya dapat memperbaiki pengajuan milik sendiri.'
+            );
+        }
+
+        if (
+            $order->status !==
+            'revision'
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pengajuan hanya dapat diperbarui ketika berstatus revisi.',
+                'data' => null,
+            ], 422);
+        }
+
+        $validated =
+            $this->validateOrderRequest(
+                $request,
+                false
+            );
+
+        $newProofFilePath = null;
+        $oldProofFilePath =
+            $order->proof_file_path;
+
+        try {
+            $newProofFile =
+                $request->file(
+                    'proof_file'
+                );
+
+            if ($newProofFile) {
+                $newProofFilePath =
+                    $newProofFile->store(
+                        'merchandise-proofs',
+                        'public'
+                    );
+            }
+
+            $updatedOrder = DB::transaction(
+                function () use (
+                    $order,
+                    $validated,
+                    $newProofFile,
+                    $newProofFilePath
+                ): Order {
+                    $lockedOrder =
+                        Order::query()
+                            ->lockForUpdate()
+                            ->findOrFail(
+                                $order->id
+                            );
+
+                    if (
+                        $lockedOrder->status !==
+                        'revision'
+                    ) {
+                        $this->abortJson(
+                            'Status pengajuan sudah berubah dan tidak dapat dikirim ulang.',
+                            422
+                        );
+                    }
+
+                    $this->validateOrderItems(
+                        $validated['items']
+                    );
+
+                    $payload = [
+                        'event_name' =>
+                            trim(
+                                $validated['event_name']
+                            ),
+
+                        'institution_name' =>
+                            trim(
+                                $validated['institution_name']
+                            ),
+
+                        'guest_name' =>
+                            trim(
+                                $validated['guest_name']
+                            ),
+
+                        'guest_position' =>
+                            trim(
+                                $validated['guest_position']
+                            ),
+
+                        'activity_date' =>
+                            $validated['activity_date'],
+
+                        'user_note' =>
+                            trim(
+                                $validated['user_note']
+                            ),
+
+                        'status' =>
+                            'pending',
+
+                        /*
+                         * Catatan revisi lama dibersihkan setelah user
+                         * berhasil mengirim ulang.
+                         */
+                        'admin_note' =>
+                            null,
+
+                        'submitted_at' =>
+                            now(),
+
+                        'resubmitted_at' =>
+                            now(),
+
+                        'approved_at' =>
+                            null,
+
+                        'rejected_at' =>
+                            null,
+
+                        'completed_at' =>
+                            null,
+                    ];
+
+                    if (
+                        $newProofFile &&
+                        $newProofFilePath
+                    ) {
+                        $payload['proof_file_path'] =
+                            $newProofFilePath;
+
+                        $payload['proof_file_name'] =
+                            $newProofFile
+                                ->getClientOriginalName();
+
+                        $payload['proof_file_mime'] =
+                            $newProofFile
+                                ->getMimeType();
+                    }
+
+                    $lockedOrder->update(
+                        $payload
+                    );
+
+                    $this->replaceOrderItems(
+                        $lockedOrder,
+                        $validated['items']
+                    );
+
+                    return $lockedOrder
+                        ->fresh([
+                            'user',
+                            'items.product.category',
+                        ]);
+                }
+            );
+
+            if (
+                $newProofFilePath &&
+                $oldProofFilePath &&
+                $newProofFilePath !==
+                    $oldProofFilePath
+            ) {
+                $this->deleteFileIfExists(
+                    $oldProofFilePath
+                );
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Perbaikan pengajuan berhasil dikirim ulang.',
+                'data' => $updatedOrder,
+            ]);
+        } catch (HttpResponseException $error) {
+            $this->deleteFileIfExists(
+                $newProofFilePath
+            );
+
+            throw $error;
+        } catch (Throwable $error) {
+            $this->deleteFileIfExists(
+                $newProofFilePath
+            );
+
+            report($error);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Perbaikan pengajuan gagal dikirim ulang.',
+                'data' => null,
+            ], 500);
+        }
+    }
+
     public function approve(
         Request $request,
         int $id
@@ -383,17 +627,20 @@ class OrderController extends Controller
 
         try {
             $order = DB::transaction(
-                function () use ($id): Order {
-                    $lockedOrder = Order::query()
-                        ->lockForUpdate()
-                        ->findOrFail($id);
+                function () use (
+                    $id
+                ): Order {
+                    $lockedOrder =
+                        Order::query()
+                            ->lockForUpdate()
+                            ->findOrFail($id);
 
                     if (
                         $lockedOrder->status !==
                         'pending'
                     ) {
                         $this->abortJson(
-                            'Pengajuan hanya bisa disetujui saat status masih menunggu.',
+                            'Pengajuan hanya dapat disetujui saat status menunggu.',
                             422
                         );
                     }
@@ -403,7 +650,9 @@ class OrderController extends Controller
                     ]);
 
                     if (
-                        $lockedOrder->items->isEmpty()
+                        $lockedOrder
+                            ->items
+                            ->isEmpty()
                     ) {
                         $this->abortJson(
                             'Pengajuan tidak memiliki item merchandise.',
@@ -415,22 +664,16 @@ class OrderController extends Controller
                         $lockedOrder->items
                         as $item
                     ) {
-                        if (!$item->product_id) {
-                            $this->abortJson(
-                                'Salah satu produk pada pengajuan sudah tidak tersedia.',
-                                422
-                            );
-                        }
-
-                        $product = Product::query()
-                            ->lockForUpdate()
-                            ->find(
-                                $item->product_id
-                            );
+                        $product =
+                            Product::query()
+                                ->lockForUpdate()
+                                ->find(
+                                    $item->product_id
+                                );
 
                         if (!$product) {
                             $this->abortJson(
-                                'Salah satu produk pada pengajuan tidak ditemukan.',
+                                'Salah satu produk tidak ditemukan.',
                                 422
                             );
                         }
@@ -466,7 +709,7 @@ class OrderController extends Controller
                             (int) $item->quantity
                         ) {
                             $this->abortJson(
-                                "Stok {$product->name} tidak mencukupi. Stok tersedia {$product->stock}, sedangkan jumlah yang diajukan {$item->quantity}.",
+                                "Stok {$product->name} tidak mencukupi.",
                                 422
                             );
                         }
@@ -478,17 +721,27 @@ class OrderController extends Controller
                     }
 
                     $lockedOrder->update([
-                        'status' => 'approved',
-                        'admin_note' => null,
-                        'approved_at' => now(),
-                        'rejected_at' => null,
-                        'completed_at' => null,
+                        'status' =>
+                            'approved',
+
+                        'admin_note' =>
+                            null,
+
+                        'approved_at' =>
+                            now(),
+
+                        'rejected_at' =>
+                            null,
+
+                        'completed_at' =>
+                            null,
                     ]);
 
-                    return $lockedOrder->fresh([
-                        'user',
-                        'items.product.category',
-                    ]);
+                    return $lockedOrder
+                        ->fresh([
+                            'user',
+                            'items.product.category',
+                        ]);
                 }
             );
 
@@ -510,9 +763,6 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Menolak pengajuan merchandise.
-     */
     public function reject(
         Request $request,
         int $id
@@ -527,18 +777,15 @@ class OrderController extends Controller
             );
         }
 
-        $validated = $request->validate([
-            'admin_note' => [
-                'required',
-                'string',
-                'min:5',
-                'max:2000',
-            ],
-        ], [
-            'admin_note.required' => 'Alasan penolakan wajib diisi.',
-            'admin_note.min' => 'Alasan penolakan minimal lima karakter.',
-            'admin_note.max' => 'Alasan penolakan maksimal 2.000 karakter.',
-        ]);
+        $validated =
+            $request->validate([
+                'admin_note' => [
+                    'required',
+                    'string',
+                    'min:5',
+                    'max:2000',
+                ],
+            ]);
 
         try {
             $order = DB::transaction(
@@ -546,36 +793,45 @@ class OrderController extends Controller
                     $id,
                     $validated
                 ): Order {
-                    $lockedOrder = Order::query()
-                        ->lockForUpdate()
-                        ->findOrFail($id);
+                    $lockedOrder =
+                        Order::query()
+                            ->lockForUpdate()
+                            ->findOrFail($id);
 
                     if (
                         $lockedOrder->status !==
                         'pending'
                     ) {
                         $this->abortJson(
-                            'Pengajuan hanya bisa ditolak saat status masih menunggu.',
+                            'Pengajuan hanya dapat ditolak saat status menunggu.',
                             422
                         );
                     }
 
                     $lockedOrder->update([
-                        'status' => 'rejected',
+                        'status' =>
+                            'rejected',
 
-                        'admin_note' => trim(
-                            $validated['admin_note']
-                        ),
+                        'admin_note' =>
+                            trim(
+                                $validated['admin_note']
+                            ),
 
-                        'rejected_at' => now(),
-                        'approved_at' => null,
-                        'completed_at' => null,
+                        'rejected_at' =>
+                            now(),
+
+                        'approved_at' =>
+                            null,
+
+                        'completed_at' =>
+                            null,
                     ]);
 
-                    return $lockedOrder->fresh([
-                        'user',
-                        'items.product.category',
-                    ]);
+                    return $lockedOrder
+                        ->fresh([
+                            'user',
+                            'items.product.category',
+                        ]);
                 }
             );
 
@@ -591,15 +847,12 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Penolakan pengajuan merchandise gagal diproses.',
+                'message' => 'Penolakan pengajuan gagal diproses.',
                 'data' => null,
             ], 500);
         }
     }
 
-    /**
-     * Menandai layanan merchandise selesai.
-     */
     public function complete(
         Request $request,
         int $id
@@ -614,15 +867,14 @@ class OrderController extends Controller
             );
         }
 
-        $validated = $request->validate([
-            'admin_note' => [
-                'nullable',
-                'string',
-                'max:2000',
-            ],
-        ], [
-            'admin_note.max' => 'Catatan penyelesaian maksimal 2.000 karakter.',
-        ]);
+        $validated =
+            $request->validate([
+                'admin_note' => [
+                    'nullable',
+                    'string',
+                    'max:2000',
+                ],
+            ]);
 
         try {
             $order = DB::transaction(
@@ -630,42 +882,47 @@ class OrderController extends Controller
                     $id,
                     $validated
                 ): Order {
-                    $lockedOrder = Order::query()
-                        ->lockForUpdate()
-                        ->findOrFail($id);
+                    $lockedOrder =
+                        Order::query()
+                            ->lockForUpdate()
+                            ->findOrFail($id);
 
                     if (
                         $lockedOrder->status !==
                         'approved'
                     ) {
                         $this->abortJson(
-                            'Pengajuan hanya bisa diselesaikan setelah disetujui.',
+                            'Pengajuan hanya dapat diselesaikan setelah disetujui.',
                             422
                         );
                     }
 
                     $adminNote =
-                        array_key_exists(
-                            'admin_note',
-                            $validated
-                        ) &&
-                        $validated['admin_note'] !==
-                            null
+                        isset(
+                            $validated['admin_note']
+                        )
                             ? trim(
                                 $validated['admin_note']
                             )
-                            : $lockedOrder->admin_note;
+                            : $lockedOrder
+                                ->admin_note;
 
                     $lockedOrder->update([
-                        'status' => 'completed',
-                        'admin_note' => $adminNote,
-                        'completed_at' => now(),
+                        'status' =>
+                            'completed',
+
+                        'admin_note' =>
+                            $adminNote ?: null,
+
+                        'completed_at' =>
+                            now(),
                     ]);
 
-                    return $lockedOrder->fresh([
-                        'user',
-                        'items.product.category',
-                    ]);
+                    return $lockedOrder
+                        ->fresh([
+                            'user',
+                            'items.product.category',
+                        ]);
                 }
             );
 
@@ -681,29 +938,134 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Penyelesaian pengajuan merchandise gagal diproses.',
+                'message' => 'Penyelesaian pengajuan gagal diproses.',
                 'data' => null,
             ], 500);
         }
     }
 
-    /**
-     * Memeriksa akses detail pengajuan.
-     */
+    private function validateOrderRequest(
+        Request $request,
+        bool $proofFileRequired
+    ): array {
+        return $request->validate([
+            'event_name' => [
+                'required',
+                'string',
+                'min:3',
+                'max:255',
+            ],
+
+            'institution_name' => [
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
+
+            'guest_name' => [
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
+
+            'guest_position' => [
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
+
+            'activity_date' => [
+                'required',
+                'date',
+            ],
+
+            'user_note' => [
+                'required',
+                'string',
+                'min:5',
+                'max:5000',
+            ],
+
+            'proof_file' => [
+                $proofFileRequired
+                    ? 'required'
+                    : 'nullable',
+
+                'file',
+                'mimes:pdf,jpg,jpeg,png',
+                'max:5120',
+            ],
+
+            'items' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'items.*.product_id' => [
+                'required',
+                'integer',
+                'distinct',
+                'exists:products,id',
+            ],
+
+            'items.*.quantity' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+        ], [
+            'proof_file.required' =>
+                'Dokumen pendukung wajib diunggah.',
+
+            'proof_file.mimes' =>
+                'Lampiran harus berformat PDF, JPG, JPEG, atau PNG.',
+
+            'proof_file.max' =>
+                'Ukuran lampiran maksimal 5 MB.',
+
+            'items.required' =>
+                'Pilih minimal satu merchandise.',
+
+            'items.min' =>
+                'Pilih minimal satu merchandise.',
+        ]);
+    }
+
+    private function replaceOrderItems(
+        Order $order,
+        array $items
+    ): void {
+        $order->items()->delete();
+
+        foreach ($items as $item) {
+            OrderItem::query()->create([
+                'order_id' =>
+                    $order->id,
+
+                'product_id' =>
+                    $item['product_id'],
+
+                'quantity' =>
+                    $item['quantity'],
+            ]);
+        }
+    }
+
     private function canAccessOrder(
         Request $request,
         Order $order
     ): bool {
-        $user = $request->user();
+        $user =
+            $request->user();
 
         if (!$user) {
             return false;
         }
 
-        /*
-         * Superadmin atau pemilik permission approval
-         * dapat melihat seluruh pengajuan merchandise.
-         */
         if (
             $this->userHasPermission(
                 $user,
@@ -713,10 +1075,6 @@ class OrderController extends Controller
             return true;
         }
 
-        /*
-         * Pengguna dengan akses riwayat hanya boleh
-         * melihat data miliknya sendiri.
-         */
         if (
             !$this->userHasPermission(
                 $user,
@@ -732,13 +1090,11 @@ class OrderController extends Controller
         );
     }
 
-    /**
-     * Memeriksa permission proses approval merchandise.
-     */
     private function canProcessOrder(
         Request $request
     ): bool {
-        $user = $request->user();
+        $user =
+            $request->user();
 
         return (
             $user !== null &&
@@ -749,12 +1105,6 @@ class OrderController extends Controller
         );
     }
 
-    /**
-     * Memeriksa permission user.
-     *
-     * Method ini mendukung helper hasPermission() pada model User
-     * dan tetap mempunyai fallback ketika helper belum tersedia.
-     */
     private function userHasPermission(
         User $user,
         string $permission
@@ -778,7 +1128,9 @@ class OrderController extends Controller
         }
 
         $permissions =
-            is_array($user->permissions)
+            is_array(
+                $user->permissions
+            )
                 ? $user->permissions
                 : [];
 
@@ -789,17 +1141,15 @@ class OrderController extends Controller
         );
     }
 
-    /**
-     * Memeriksa produk ketika user membuat pengajuan.
-     */
     private function validateOrderItems(
         array $items
     ): void {
         foreach ($items as $item) {
-            $product = Product::query()
-                ->find(
-                    $item['product_id']
-                );
+            $product =
+                Product::query()
+                    ->find(
+                        $item['product_id']
+                    );
 
             if (!$product) {
                 $this->abortJson(
@@ -829,7 +1179,7 @@ class OrderController extends Controller
                 )
             ) {
                 $this->abortJson(
-                    "Produk {$product->name} tidak tersedia untuk pengajuan merchandise.",
+                    "Produk {$product->name} tidak tersedia untuk merchandise.",
                     422
                 );
             }
@@ -846,21 +1196,19 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Menghasilkan kode order unik.
-     */
     private function generateOrderCode(): string
     {
         do {
-            $orderCode = sprintf(
-                'MER-%s-%s',
-                now()->format(
-                    'YmdHis'
-                ),
-                strtoupper(
-                    Str::random(5)
-                )
-            );
+            $orderCode =
+                sprintf(
+                    'MER-%s-%s',
+                    now()->format(
+                        'YmdHis'
+                    ),
+                    strtoupper(
+                        Str::random(5)
+                    )
+                );
         } while (
             Order::query()
                 ->where(
@@ -873,9 +1221,6 @@ class OrderController extends Controller
         return $orderCode;
     }
 
-    /**
-     * Menghapus file ketika transaksi gagal.
-     */
     private function deleteFileIfExists(
         ?string $filePath
     ): void {
@@ -888,13 +1233,12 @@ class OrderController extends Controller
                 ->exists($filePath)
         ) {
             Storage::disk('public')
-                ->delete($filePath);
+                ->delete(
+                    $filePath
+                );
         }
     }
 
-    /**
-     * Response akses ditolak.
-     */
     private function forbiddenResponse(
         string $message
     ): JsonResponse {
@@ -905,9 +1249,6 @@ class OrderController extends Controller
         ], 403);
     }
 
-    /**
-     * Menghentikan proses dan mengembalikan JSON konsisten.
-     */
     private function abortJson(
         string $message,
         int $statusCode

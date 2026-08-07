@@ -1,4 +1,5 @@
 import {
+    useCallback,
     useEffect,
     useState,
 } from 'react';
@@ -11,6 +12,12 @@ import {
 import api from '../../api/axios';
 
 import {
+    getDefaultPath,
+    getStoredUser,
+    hasPermission,
+} from '../../components/ProtectedRoute';
+
+import {
     closeAlert,
     showErrorAlert,
     showLoadingAlert,
@@ -20,43 +27,152 @@ import {
 
 const USER_ROLE = 'user';
 
-const getDashboardPath = (role) => {
-    return role === USER_ROLE
-        ? '/user/dashboard'
-        : '/admin/dashboard';
-};
-
-const getStoredUser = () => {
-    try {
-        return JSON.parse(
-            localStorage.getItem(
-                'admin_user'
-            ) || '{}'
-        );
-    } catch {
-        return {};
-    }
-};
-
 const isRedirectAllowedForRole = (
     path,
     role
 ) => {
     if (
-        !path ||
-        typeof path !== 'string'
+        typeof path !== 'string' ||
+        path.trim() === ''
     ) {
         return false;
     }
 
     if (role === USER_ROLE) {
-        return path.startsWith(
-            '/user/'
+        return (
+            path === '/user' ||
+            path.startsWith('/user/')
         );
     }
 
-    return path.startsWith(
-        '/admin/'
+    return (
+        path === '/admin' ||
+        path.startsWith('/admin/')
+    );
+};
+
+const canAccessRequestedPath = (
+    path,
+    user
+) => {
+    if (
+        !isRedirectAllowedForRole(
+            path,
+            user?.role
+        )
+    ) {
+        return false;
+    }
+
+    const permissionRoutes = [
+        {
+            prefix: '/user/dashboard',
+            permission: 'dashboard.view',
+        },
+        {
+            prefix: '/admin/dashboard',
+            permission: 'dashboard.view',
+        },
+        {
+            prefix: '/user/request/merchandise',
+            permission:
+                'request.merchandise.create',
+        },
+        {
+            prefix: '/admin/request/merchandise',
+            permission:
+                'request.merchandise.create',
+        },
+        {
+            prefix: '/user/request/humas-service',
+            permission:
+                'request.humas.create',
+        },
+        {
+            prefix: '/admin/request/humas-service',
+            permission:
+                'request.humas.create',
+        },
+        {
+            prefix: '/user/request/sekpim-borrowing',
+            permission:
+                'request.borrowing.create',
+        },
+        {
+            prefix: '/admin/request/sekpim-borrowing',
+            permission:
+                'request.borrowing.create',
+        },
+        {
+            prefix: '/user/my-requests',
+            permission:
+                'request.history.view',
+        },
+        {
+            prefix: '/admin/my-requests',
+            permission:
+                'request.history.view',
+        },
+        {
+            prefix: '/admin/orders',
+            permission:
+                'approval.merchandise.view',
+        },
+        {
+            prefix: '/admin/humas-services',
+            permission:
+                'approval.humas.view',
+        },
+        {
+            prefix: '/admin/borrow-requests',
+            permission:
+                'approval.borrowing.view',
+        },
+        {
+            prefix: '/admin/categories',
+            permission:
+                'categories.view',
+        },
+        {
+            prefix: '/admin/products',
+            permission:
+                'products.view',
+        },
+        {
+            prefix: '/admin/users',
+            permission: [
+                'users.view',
+                'users.manage',
+            ],
+        },
+    ];
+
+    const matchedRoute =
+        permissionRoutes.find(
+            (route) =>
+                path === route.prefix ||
+                path.startsWith(
+                    `${route.prefix}/`
+                )
+        );
+
+    if (!matchedRoute) {
+        return false;
+    }
+
+    return hasPermission(
+        user,
+        matchedRoute.permission
+    );
+};
+
+const clearLocalSession = () => {
+    localStorage.removeItem(
+        'admin_token'
+    );
+
+    localStorage.removeItem(
+        'admin_user'
     );
 };
 
@@ -85,35 +201,111 @@ export default function LoginPage() {
         setLoading,
     ] = useState(false);
 
+    const getRedirectAfterLogin =
+        useCallback(
+            (user) => {
+                const requestedPath =
+                    location.state?.from;
+
+                if (
+                    canAccessRequestedPath(
+                        requestedPath,
+                        user
+                    )
+                ) {
+                    return requestedPath;
+                }
+
+                return getDefaultPath(
+                    user
+                );
+            },
+            [location.state]
+        );
+
     /*
     |--------------------------------------------------------------------------
-    | Redirect ketika sesi login masih aktif
+    | Sinkronisasi sesi yang masih tersimpan
     |--------------------------------------------------------------------------
+    |
+    | Jangan hanya percaya data localStorage.
+    | Ambil data akun terbaru dari endpoint /admin/me.
+    |
     */
 
     useEffect(() => {
-        const token =
-            localStorage.getItem(
-                'admin_token'
-            );
+        let isMounted = true;
 
-        const storedUser =
-            getStoredUser();
+        const synchronizeSession =
+            async () => {
+                const token =
+                    localStorage.getItem(
+                        'admin_token'
+                    );
 
-        if (
-            token &&
-            storedUser?.role
-        ) {
-            navigate(
-                getDashboardPath(
-                    storedUser.role
-                ),
-                {
-                    replace: true,
+                if (!token) {
+                    return;
                 }
-            );
-        }
-    }, [navigate]);
+
+                try {
+                    const response =
+                        await api.get(
+                            '/admin/me'
+                        );
+
+                    const authenticatedUser =
+                        response?.data?.data;
+
+                    if (
+                        !authenticatedUser?.role
+                    ) {
+                        throw new Error(
+                            'Data sesi tidak lengkap.'
+                        );
+                    }
+
+                    localStorage.setItem(
+                        'admin_user',
+                        JSON.stringify(
+                            authenticatedUser
+                        )
+                    );
+
+                    if (isMounted) {
+                        navigate(
+                            getRedirectAfterLogin(
+                                authenticatedUser
+                            ),
+                            {
+                                replace: true,
+                            }
+                        );
+                    }
+                } catch (error) {
+                    if (
+                        error?.response?.status !==
+                        401
+                    ) {
+                        console.error(
+                            'Session synchronization error:',
+                            error?.response?.data ||
+                                error
+                        );
+
+                        clearLocalSession();
+                    }
+                }
+            };
+
+        synchronizeSession();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [
+        getRedirectAfterLogin,
+        navigate,
+    ]);
 
     const handleChange = (
         event
@@ -155,29 +347,6 @@ export default function LoginPage() {
         return true;
     };
 
-    const getRedirectAfterLogin = (
-        user
-    ) => {
-        const defaultPath =
-            getDashboardPath(
-                user.role
-            );
-
-        const requestedPath =
-            location.state?.from;
-
-        if (
-            isRedirectAllowedForRole(
-                requestedPath,
-                user.role
-            )
-        ) {
-            return requestedPath;
-        }
-
-        return defaultPath;
-    };
-
     const handleSubmit = async (
         event
     ) => {
@@ -195,7 +364,7 @@ export default function LoginPage() {
                 'Memeriksa akun kamu...'
             );
 
-            const response =
+            const loginResponse =
                 await api.post(
                     '/admin/login',
                     {
@@ -207,27 +376,60 @@ export default function LoginPage() {
                     }
                 );
 
-            const data =
-                response?.data?.data;
+            const loginData =
+                loginResponse?.data?.data;
 
             if (
-                !data?.token ||
-                !data?.user?.role
+                !loginData?.token ||
+                !loginData?.user?.role
             ) {
                 throw new Error(
                     'Response login tidak lengkap.'
                 );
             }
 
+            /*
+             * Simpan token lebih dahulu agar endpoint /admin/me
+             * dapat menggunakan bearer token.
+             */
             localStorage.setItem(
                 'admin_token',
-                data.token
+                loginData.token
             );
+
+            /*
+             * Simpan sementara response login.
+             */
+            localStorage.setItem(
+                'admin_user',
+                JSON.stringify(
+                    loginData.user
+                )
+            );
+
+            /*
+             * Ambil data user terbaru dari backend.
+             */
+            const meResponse =
+                await api.get(
+                    '/admin/me'
+                );
+
+            const authenticatedUser =
+                meResponse?.data?.data;
+
+            if (
+                !authenticatedUser?.role
+            ) {
+                throw new Error(
+                    'Data akun terbaru tidak dapat diambil.'
+                );
+            }
 
             localStorage.setItem(
                 'admin_user',
                 JSON.stringify(
-                    data.user
+                    authenticatedUser
                 )
             );
 
@@ -235,12 +437,12 @@ export default function LoginPage() {
 
             await showSuccessAlert(
                 'Login Berhasil',
-                `Selamat datang, ${data.user.name}.`
+                `Selamat datang, ${authenticatedUser.name}.`
             );
 
             navigate(
                 getRedirectAfterLogin(
-                    data.user
+                    authenticatedUser
                 ),
                 {
                     replace: true,
@@ -253,12 +455,14 @@ export default function LoginPage() {
                     error
             );
 
+            clearLocalSession();
             closeAlert();
 
             await showErrorAlert(
                 'Login Gagal',
                 error?.response?.data
                     ?.message ||
+                    error?.message ||
                     'Username atau password tidak sesuai.'
             );
         } finally {
@@ -275,6 +479,9 @@ export default function LoginPage() {
                 'password123',
         });
     };
+
+    const storedUser =
+        getStoredUser();
 
     return (
         <main className="login-page">
@@ -306,22 +513,17 @@ export default function LoginPage() {
                                     </div>
 
                                     <div className="login-brand-subtitle">
-                                        Telkom
-                                        University
-                                        Surabaya
+                                        Telkom University Surabaya
                                     </div>
                                 </div>
                             </div>
 
                             <span className="badge rounded-pill text-bg-light text-danger px-3 py-2 mb-4">
-                                Sistem Pengajuan
-                                Internal
+                                Sistem Pengajuan Internal
                             </span>
 
                             <h1 className="display-4 fw-black mb-4">
-                                Kelola pengajuan
-                                HUMAS & SEKPiM
-                                dalam satu sistem.
+                                Kelola pengajuan HUMAS &amp; SEKPiM dalam satu sistem.
                             </h1>
 
                             <p
@@ -330,14 +532,10 @@ export default function LoginPage() {
                                     lineHeight: 1.8,
                                 }}
                             >
-                                Masuk untuk membuat
-                                pengajuan merchandise,
-                                request liputan Humas,
-                                peminjaman barang
-                                Sekretariat Pimpinan,
-                                serta memantau proses
-                                pelayanan berdasarkan
-                                akses akun.
+                                Masuk untuk membuat pengajuan merchandise,
+                                request liputan Humas, peminjaman barang
+                                Sekretariat Pimpinan, serta memantau proses
+                                pelayanan berdasarkan akses akun.
                             </p>
 
                             <div className="row g-3">
@@ -350,8 +548,7 @@ export default function LoginPage() {
                                         </div>
 
                                         <div className="small text-white-50">
-                                            Pengajuan
-                                            paket tamu.
+                                            Pengajuan paket tamu.
                                         </div>
                                     </div>
                                 </div>
@@ -365,9 +562,7 @@ export default function LoginPage() {
                                         </div>
 
                                         <div className="small text-white-50">
-                                            Request
-                                            liputan
-                                            kegiatan.
+                                            Request liputan kegiatan.
                                         </div>
                                     </div>
                                 </div>
@@ -381,8 +576,7 @@ export default function LoginPage() {
                                         </div>
 
                                         <div className="small text-white-50">
-                                            Peminjaman
-                                            perlengkapan.
+                                            Peminjaman perlengkapan.
                                         </div>
                                     </div>
                                 </div>
@@ -403,12 +597,16 @@ export default function LoginPage() {
                                     </h2>
 
                                     <p className="text-muted mb-0">
-                                        Masukkan
-                                        username dan
-                                        password untuk
-                                        melanjutkan.
+                                        Masukkan username dan password untuk melanjutkan.
                                     </p>
                                 </div>
+
+                                {storedUser?.role && (
+                                    <div className="alert alert-info border-0 rounded-4">
+                                        <i className="bi bi-arrow-clockwise me-2" />
+                                        Memeriksa sesi akun yang tersimpan.
+                                    </div>
+                                )}
 
                                 <form
                                     onSubmit={
@@ -416,7 +614,10 @@ export default function LoginPage() {
                                     }
                                 >
                                     <div className="mb-3">
-                                        <label className="form-label fw-bold">
+                                        <label
+                                            htmlFor="username"
+                                            className="form-label fw-bold"
+                                        >
                                             Username
                                         </label>
 
@@ -426,6 +627,7 @@ export default function LoginPage() {
                                             </span>
 
                                             <input
+                                                id="username"
                                                 type="text"
                                                 name="username"
                                                 className="form-control"
@@ -446,7 +648,10 @@ export default function LoginPage() {
                                     </div>
 
                                     <div className="mb-4">
-                                        <label className="form-label fw-bold">
+                                        <label
+                                            htmlFor="password"
+                                            className="form-label fw-bold"
+                                        >
                                             Password
                                         </label>
 
@@ -456,6 +661,7 @@ export default function LoginPage() {
                                             </span>
 
                                             <input
+                                                id="password"
                                                 type={
                                                     showPassword
                                                         ? 'text'
@@ -522,8 +728,7 @@ export default function LoginPage() {
                                         ) : (
                                             <>
                                                 <i className="bi bi-box-arrow-in-right me-2" />
-                                                Masuk
-                                                Sistem
+                                                Masuk Sistem
                                             </>
                                         )}
                                     </button>
@@ -583,7 +788,6 @@ export default function LoginPage() {
 
                                     <div className="small text-muted mt-2">
                                         Password default:{' '}
-
                                         <strong>
                                             password123
                                         </strong>
@@ -593,8 +797,7 @@ export default function LoginPage() {
                         </section>
 
                         <p className="text-center text-white-50 small mt-4 mb-0">
-                            © HUMAS Telkom
-                            University Surabaya
+                            © HUMAS Telkom University Surabaya
                         </p>
                     </div>
                 </div>

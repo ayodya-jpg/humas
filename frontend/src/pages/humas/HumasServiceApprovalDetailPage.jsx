@@ -26,7 +26,7 @@ import {
 const STATUS_CONFIG = {
     pending: {
         label: 'Menunggu',
-        className:
+        badgeClass:
             'bg-warning-subtle text-warning-emphasis',
         icon:
             'bi-hourglass-split',
@@ -34,7 +34,7 @@ const STATUS_CONFIG = {
 
     approved: {
         label: 'Disetujui',
-        className:
+        badgeClass:
             'bg-primary-subtle text-primary',
         icon:
             'bi-check-circle-fill',
@@ -42,7 +42,7 @@ const STATUS_CONFIG = {
 
     rejected: {
         label: 'Ditolak',
-        className:
+        badgeClass:
             'bg-danger-subtle text-danger',
         icon:
             'bi-x-circle-fill',
@@ -50,7 +50,7 @@ const STATUS_CONFIG = {
 
     completed: {
         label: 'Selesai',
-        className:
+        badgeClass:
             'bg-success-subtle text-success',
         icon:
             'bi-check2-all',
@@ -99,13 +99,19 @@ const getCurrentUser = () => {
 const normalizePermissions = (
     permissions
 ) => {
-    if (!Array.isArray(permissions)) {
+    if (
+        !Array.isArray(
+            permissions
+        )
+    ) {
         return [];
     }
 
     return [
         ...new Set(
-            permissions.filter(Boolean)
+            permissions.filter(
+                Boolean
+            )
         ),
     ];
 };
@@ -123,43 +129,103 @@ const hasPermission = (
 
     return normalizePermissions(
         currentUser?.permissions
-    ).includes(permission);
+    ).includes(
+        permission
+    );
 };
 
 const formatDate = (
-    dateValue,
-    includeTime = false
+    dateValue
 ) => {
     if (!dateValue) {
         return '-';
     }
 
+    if (
+        typeof dateValue ===
+            'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(
+            dateValue
+        )
+    ) {
+        const [
+            year,
+            month,
+            day,
+        ] = dateValue
+            .split('-')
+            .map(Number);
+
+        return new Date(
+            year,
+            month - 1,
+            day
+        ).toLocaleDateString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+            }
+        );
+    }
+
     const parsedDate =
-        new Date(dateValue);
+        new Date(
+            dateValue
+        );
 
     if (
         Number.isNaN(
             parsedDate.getTime()
         )
     ) {
-        return dateValue;
+        return '-';
     }
 
-    return new Intl.DateTimeFormat(
-        'id-ID',
-        {
-            day: '2-digit',
-            month: 'long',
-            year: 'numeric',
+    return parsedDate
+        .toLocaleDateString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+            }
+        );
+};
 
-            ...(includeTime
-                ? {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                  }
-                : {}),
-        }
-    ).format(parsedDate);
+const formatDateTime = (
+    dateValue
+) => {
+    if (!dateValue) {
+        return '-';
+    }
+
+    const parsedDate =
+        new Date(
+            dateValue
+        );
+
+    if (
+        Number.isNaN(
+            parsedDate.getTime()
+        )
+    ) {
+        return '-';
+    }
+
+    return parsedDate
+        .toLocaleString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            }
+        );
 };
 
 const normalizeExternalUrl = (
@@ -170,9 +236,13 @@ const normalizeExternalUrl = (
     }
 
     const normalizedValue =
-        String(value).trim();
+        String(
+            value
+        ).trim();
 
-    if (!normalizedValue) {
+    if (
+        !normalizedValue
+    ) {
         return null;
     }
 
@@ -193,13 +263,17 @@ const extractErrorMessage = (
     const responseData =
         error?.response?.data;
 
-    if (responseData?.errors) {
+    if (
+        responseData?.errors
+    ) {
         const firstError =
             Object.values(
                 responseData.errors
             )?.[0]?.[0];
 
-        if (firstError) {
+        if (
+            firstError
+        ) {
             return firstError;
         }
     }
@@ -213,39 +287,96 @@ const extractErrorMessage = (
 const DetailItem = ({
     label,
     value,
-    icon,
+    icon =
+        'bi-info-circle',
     children,
 }) => {
     return (
-        <div className="border-bottom pb-3 h-100">
-            <div className="small text-muted mb-1">
-                {icon && (
+        <div className="p-3 rounded-4 bg-light h-100">
+            <div className="d-flex align-items-start gap-3">
+                <div
+                    className="rounded-circle bg-white text-danger d-flex align-items-center justify-content-center flex-shrink-0"
+                    style={{
+                        width: 42,
+                        height: 42,
+                    }}
+                >
                     <i
-                        className={`bi ${icon} me-2`}
+                        className={`bi ${icon}`}
                     />
-                )}
+                </div>
 
-                {label}
+                <div className="min-w-0 flex-grow-1">
+                    <div className="small text-muted mb-1">
+                        {label}
+                    </div>
+
+                    {children || (
+                        <div className="fw-bold text-break">
+                            {value || '-'}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const TimelineItem = ({
+    label,
+    value,
+    icon,
+    active = false,
+    rejected = false,
+}) => {
+    let statusClass =
+        'done';
+
+    if (active) {
+        statusClass =
+            'active';
+    }
+
+    if (rejected) {
+        statusClass =
+            'rejected';
+    }
+
+    return (
+        <div
+            className={`request-timeline-item ${statusClass}`}
+        >
+            <div className="request-timeline-marker">
+                <i
+                    className={`bi ${icon}`}
+                />
             </div>
 
-            {children || (
-                <div className="fw-semibold text-break">
+            <div className="request-timeline-content">
+                <div className="fw-black mb-1">
+                    {label}
+                </div>
+
+                <div className="small text-muted">
                     {value || '-'}
                 </div>
-            )}
+            </div>
         </div>
     );
 };
 
 export default function HumasServiceApprovalDetailPage() {
-    const { id } = useParams();
+    const {
+        id,
+    } = useParams();
 
     const navigate =
         useNavigate();
 
     const currentUser =
         useMemo(
-            () => getCurrentUser(),
+            () =>
+                getCurrentUser(),
             []
         );
 
@@ -279,8 +410,13 @@ export default function HumasServiceApprovalDetailPage() {
         useCallback(
             async () => {
                 try {
-                    setLoading(true);
-                    setErrorMessage('');
+                    setLoading(
+                        true
+                    );
+
+                    setErrorMessage(
+                        ''
+                    );
 
                     const response =
                         await api.get(
@@ -288,13 +424,18 @@ export default function HumasServiceApprovalDetailPage() {
                         );
 
                     setRequestData(
-                        response?.data?.data ||
-                            null
+                        response
+                            ?.data
+                            ?.data ||
+                        null
                     );
-                } catch (error) {
+                } catch (
+                    error
+                ) {
                     console.error(
                         'Fetch Humas detail error:',
-                        error?.response
+                        error
+                            ?.response
                             ?.data ||
                             error
                     );
@@ -305,36 +446,44 @@ export default function HumasServiceApprovalDetailPage() {
                         )
                     );
                 } finally {
-                    setLoading(false);
+                    setLoading(
+                        false
+                    );
                 }
             },
-            [id]
+            [
+                id,
+            ]
         );
 
     useEffect(() => {
         loadDetail();
-    }, [loadDetail]);
+    }, [
+        loadDetail,
+    ]);
 
     const statusConfig =
         useMemo(() => {
             return (
                 STATUS_CONFIG[
-                    requestData?.status
+                    requestData
+                        ?.status
                 ] || {
                     label:
                         requestData
                             ?.status ||
-                        '-',
+                        'Tidak diketahui',
 
-                    className:
+                    badgeClass:
                         'bg-secondary-subtle text-secondary',
 
                     icon:
-                        'bi-circle-fill',
+                        'bi-info-circle-fill',
                 }
             );
         }, [
-            requestData?.status,
+            requestData
+                ?.status,
         ]);
 
     const coverageConfig =
@@ -354,45 +503,62 @@ export default function HumasServiceApprovalDetailPage() {
                 }
             );
         }, [
-            requestData?.coverage_type,
+            requestData
+                ?.coverage_type,
         ]);
 
     const resolvedUnitName =
         useMemo(() => {
-            if (!requestData) {
+            if (
+                !requestData
+            ) {
                 return '-';
             }
 
             if (
-                requestData.resolved_unit_name
+                requestData
+                    .resolved_unit_name
             ) {
-                return requestData.resolved_unit_name;
+                return requestData
+                    .resolved_unit_name;
             }
 
             if (
-                requestData.unit_name ===
+                requestData
+                    .unit_name ===
                 'Lainnya'
             ) {
                 return (
-                    requestData.other_unit_name ||
+                    requestData
+                        .other_unit_name ||
                     'Lainnya'
                 );
             }
 
             return (
-                requestData.unit_name ||
+                requestData
+                    .unit_name ||
+                requestData
+                    .requester_unit ||
+                requestData
+                    .user
+                    ?.unit_name ||
                 '-'
             );
-        }, [requestData]);
+        }, [
+            requestData,
+        ]);
 
     const referenceUrl =
         useMemo(
             () =>
                 normalizeExternalUrl(
-                    requestData?.reference_link
+                    requestData
+                        ?.reference_link
                 ),
             [
-                requestData?.reference_link,
+                requestData
+                    ?.reference_link,
             ]
         );
 
@@ -400,20 +566,24 @@ export default function HumasServiceApprovalDetailPage() {
         useMemo(
             () =>
                 normalizeExternalUrl(
-                    requestData?.result_link
+                    requestData
+                        ?.result_link
                 ),
             [
-                requestData?.result_link,
+                requestData
+                    ?.result_link,
             ]
         );
 
     const ensureProcessAccess =
-        () => {
-            if (canProcess) {
+        async () => {
+            if (
+                canProcess
+            ) {
                 return true;
             }
 
-            showErrorAlert(
+            await showErrorAlert(
                 'Akses Ditolak',
                 'Akun hanya memiliki izin melihat approval dan tidak dapat memproses request liputan.'
             );
@@ -428,13 +598,15 @@ export default function HumasServiceApprovalDetailPage() {
             successTitle
         ) => {
             if (
-                !ensureProcessAccess()
+                !(await ensureProcessAccess())
             ) {
                 return;
             }
 
             try {
-                setProcessing(true);
+                setProcessing(
+                    true
+                );
 
                 showLoadingAlert(
                     'Memproses Request',
@@ -451,24 +623,32 @@ export default function HumasServiceApprovalDetailPage() {
 
                 await showSuccessAlert(
                     successTitle,
-                    response?.data
+                    response
+                        ?.data
                         ?.message ||
                         'Request berhasil diproses.'
                 );
 
                 if (
-                    response?.data?.data
+                    response
+                        ?.data
+                        ?.data
                 ) {
                     setRequestData(
-                        response.data.data
+                        response
+                            .data
+                            .data
                     );
                 } else {
                     await loadDetail();
                 }
-            } catch (error) {
+            } catch (
+                error
+            ) {
                 console.error(
                     `Process Humas ${action} error:`,
-                    error?.response
+                    error
+                        ?.response
                         ?.data ||
                         error
                 );
@@ -482,22 +662,37 @@ export default function HumasServiceApprovalDetailPage() {
                     )
                 );
             } finally {
-                setProcessing(false);
+                setProcessing(
+                    false
+                );
             }
         };
 
     const handleApprove =
         async () => {
             if (
-                !ensureProcessAccess()
+                !(await ensureProcessAccess())
             ) {
+                return;
+            }
+
+            if (
+                requestData
+                    ?.status !==
+                'pending'
+            ) {
+                await showErrorAlert(
+                    'Status Tidak Sesuai',
+                    'Hanya request berstatus menunggu yang dapat disetujui.'
+                );
+
                 return;
             }
 
             const confirmation =
                 await showConfirmAlert({
                     title:
-                        'Setujui request liputan?',
+                        'Setujui Request Liputan?',
 
                     text:
                         'Request akan diteruskan kepada tim Humas untuk diproses.',
@@ -516,7 +711,8 @@ export default function HumasServiceApprovalDetailPage() {
                 });
 
             if (
-                !confirmation.isConfirmed
+                !confirmation
+                    .isConfirmed
             ) {
                 return;
             }
@@ -531,21 +727,34 @@ export default function HumasServiceApprovalDetailPage() {
     const handleReject =
         async () => {
             if (
-                !ensureProcessAccess()
+                !(await ensureProcessAccess())
             ) {
+                return;
+            }
+
+            if (
+                requestData
+                    ?.status !==
+                'pending'
+            ) {
+                await showErrorAlert(
+                    'Status Tidak Sesuai',
+                    'Hanya request berstatus menunggu yang dapat ditolak.'
+                );
+
                 return;
             }
 
             const result =
                 await showTextareaAlert({
                     title:
-                        'Tolak request liputan?',
+                        'Tolak Request Liputan?',
 
                     text:
                         'Masukkan alasan penolakan untuk ditampilkan kepada pemohon.',
 
                     inputLabel:
-                        'Alasan penolakan',
+                        'Alasan Penolakan',
 
                     inputPlaceholder:
                         'Tuliskan alasan penolakan...',
@@ -567,7 +776,8 @@ export default function HumasServiceApprovalDetailPage() {
                 });
 
             if (
-                !result.isConfirmed ||
+                !result
+                    .isConfirmed ||
                 !result.value
             ) {
                 return;
@@ -577,7 +787,9 @@ export default function HumasServiceApprovalDetailPage() {
                 'reject',
                 {
                     admin_note:
-                        result.value.trim(),
+                        result
+                            .value
+                            .trim(),
                 },
                 'Request Ditolak'
             );
@@ -586,18 +798,31 @@ export default function HumasServiceApprovalDetailPage() {
     const handleComplete =
         async () => {
             if (
-                !ensureProcessAccess()
+                !(await ensureProcessAccess())
             ) {
+                return;
+            }
+
+            if (
+                requestData
+                    ?.status !==
+                'approved'
+            ) {
+                await showErrorAlert(
+                    'Status Tidak Sesuai',
+                    'Request hanya dapat diselesaikan setelah disetujui.'
+                );
+
                 return;
             }
 
             const result =
                 await showCompletionAlert({
                     title:
-                        'Selesaikan request liputan?',
+                        'Selesaikan Request Liputan?',
 
                     text:
-                        'Masukkan link hasil pekerjaan yang nantinya dapat dibuka oleh pemohon.',
+                        'Masukkan link hasil pekerjaan yang dapat dibuka oleh pemohon.',
 
                     confirmButtonText:
                         'Simpan dan Selesaikan',
@@ -607,7 +832,8 @@ export default function HumasServiceApprovalDetailPage() {
                 });
 
             if (
-                !result.isConfirmed ||
+                !result
+                    .isConfirmed ||
                 !result.value
             ) {
                 return;
@@ -617,18 +843,22 @@ export default function HumasServiceApprovalDetailPage() {
                 'complete',
                 {
                     result_link:
-                        result.value
+                        result
+                            .value
                             .result_link,
 
                     result_note:
-                        result.value
+                        result
+                            .value
                             .result_note,
                 },
                 'Request Selesai'
             );
         };
 
-    if (loading) {
+    if (
+        loading
+    ) {
         return (
             <div className="card border-0 shadow-sm rounded-5">
                 <div className="card-body p-5 text-center">
@@ -663,11 +893,11 @@ export default function HumasServiceApprovalDetailPage() {
                         <i className="bi bi-exclamation-triangle-fill fs-1" />
                     </div>
 
-                    <h4 className="fw-bold mt-3">
+                    <h4 className="fw-black mb-2">
                         Detail gagal dimuat
                     </h4>
 
-                    <p className="text-muted">
+                    <p className="text-muted mb-4">
                         {errorMessage ||
                             'Data request tidak ditemukan.'}
                     </p>
@@ -696,7 +926,7 @@ export default function HumasServiceApprovalDetailPage() {
                         >
                             <i className="bi bi-arrow-left me-2" />
 
-                            Kembali
+                            Kembali ke Approval Humas
                         </button>
                     </div>
                 </div>
@@ -706,38 +936,59 @@ export default function HumasServiceApprovalDetailPage() {
 
     return (
         <div className="container-fluid px-0">
-            <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
-                <div>
+            <header className="approval-detail-header mb-4">
+                <div className="approval-detail-heading">
                     <Link
                         to="/admin/humas-services"
-                        className="text-decoration-none text-muted small"
+                        className="approval-detail-back-link"
                     >
-                        <i className="bi bi-arrow-left me-2" />
+                        <i className="bi bi-arrow-left" />
 
-                        Kembali ke Approval
-                        Liputan Humas
+                        <span>
+                            Kembali ke Approval Liputan Humas
+                        </span>
                     </Link>
 
-                    <h2 className="fw-bold mt-2 mb-1">
+                    <h2 className="approval-detail-title">
                         Detail Request Liputan
                     </h2>
 
-                    <p className="text-muted mb-0">
-                        {requestData.service_code ||
-                            `HMS-${requestData.id}`}
-                    </p>
+                    <div className="approval-detail-meta">
+                        <span className="fw-bold text-muted">
+                            {requestData
+                                .service_code ||
+                                `HMS-${requestData.id}`}
+                        </span>
+
+                        <span
+                            className={`badge rounded-pill px-3 py-2 ${statusConfig.badgeClass}`}
+                        >
+                            <i
+                                className={`bi ${statusConfig.icon} me-2`}
+                            />
+
+                            {
+                                statusConfig.label
+                            }
+                        </span>
+                    </div>
                 </div>
 
-                <span
-                    className={`badge rounded-pill px-3 py-2 ${statusConfig.className}`}
-                >
-                    <i
-                        className={`bi ${statusConfig.icon} me-2`}
-                    />
+                <div className="approval-detail-date">
+                    <span className="small text-muted">
+                        Dikirim
+                    </span>
 
-                    {statusConfig.label}
-                </span>
-            </div>
+                    <strong>
+                        {formatDateTime(
+                            requestData
+                                .submitted_at ||
+                            requestData
+                                .created_at
+                        )}
+                    </strong>
+                </div>
+            </header>
 
             {!canProcess && (
                 <div className="alert alert-info border-0 shadow-sm rounded-4 mb-4">
@@ -750,7 +1001,7 @@ export default function HumasServiceApprovalDetailPage() {
                             </div>
 
                             <div className="small">
-                                Akun dapat melihat detail request, tetapi tidak memiliki izin untuk menyetujui, menolak, atau menyelesaikannya.
+                                Akun dapat melihat detail request, tetapi tidak dapat menyetujui, menolak, atau menyelesaikannya.
                             </div>
                         </div>
                     </div>
@@ -761,16 +1012,33 @@ export default function HumasServiceApprovalDetailPage() {
                 <div className="col-xl-8">
                     <section className="card border-0 shadow-sm rounded-5 mb-4">
                         <div className="card-body p-4 p-lg-5">
-                            <h5 className="fw-bold mb-4">
-                                Informasi Pemohon
-                            </h5>
+                            <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
+                                <div>
+                                    <h4 className="fw-black mb-1">
+                                        Informasi Pemohon
+                                    </h4>
 
-                            <div className="row g-4">
+                                    <p className="text-muted mb-0">
+                                        Informasi akun, unit, dan kontak pemohon.
+                                    </p>
+                                </div>
+
+                                <div className="icon-box bg-danger-subtle text-danger">
+                                    <i className="bi bi-person-vcard-fill" />
+                                </div>
+                            </div>
+
+                            <div className="row g-3">
                                 <div className="col-md-6">
                                     <DetailItem
                                         label="Nama Lengkap"
                                         value={
-                                            requestData.applicant_name
+                                            requestData
+                                                .applicant_name ||
+                                            requestData
+                                                .user
+                                                ?.name ||
+                                            '-'
                                         }
                                         icon="bi-person-fill"
                                     />
@@ -791,10 +1059,12 @@ export default function HumasServiceApprovalDetailPage() {
                                         label="WhatsApp PIC Acara"
                                         icon="bi-whatsapp"
                                     >
-                                        {requestData.pic_whatsapp ? (
+                                        {requestData
+                                            .pic_whatsapp ? (
                                             <a
                                                 href={`https://wa.me/62${String(
-                                                    requestData.pic_whatsapp
+                                                    requestData
+                                                        .pic_whatsapp
                                                 )
                                                     .replace(
                                                         /\D/g,
@@ -806,16 +1076,17 @@ export default function HumasServiceApprovalDetailPage() {
                                                     )}`}
                                                 target="_blank"
                                                 rel="noreferrer"
-                                                className="fw-semibold text-success text-decoration-none"
+                                                className="fw-bold text-success text-decoration-none"
                                             >
                                                 {
-                                                    requestData.pic_whatsapp
+                                                    requestData
+                                                        .pic_whatsapp
                                                 }
 
                                                 <i className="bi bi-box-arrow-up-right ms-2" />
                                             </a>
                                         ) : (
-                                            <div className="fw-semibold">
+                                            <div className="fw-bold">
                                                 -
                                             </div>
                                         )}
@@ -826,7 +1097,8 @@ export default function HumasServiceApprovalDetailPage() {
                                     <DetailItem
                                         label="Email Akun"
                                         value={
-                                            requestData.user
+                                            requestData
+                                                .user
                                                 ?.email ||
                                             '-'
                                         }
@@ -839,19 +1111,35 @@ export default function HumasServiceApprovalDetailPage() {
 
                     <section className="card border-0 shadow-sm rounded-5 mb-4">
                         <div className="card-body p-4 p-lg-5">
-                            <h5 className="fw-bold mb-4">
-                                Detail Kegiatan
-                            </h5>
+                            <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
+                                <div>
+                                    <h4 className="fw-black mb-1">
+                                        Detail Kegiatan
+                                    </h4>
 
-                            <div className="row g-4">
+                                    <p className="text-muted mb-0">
+                                        Informasi jenis liputan, jadwal, lokasi, dan kebutuhan kegiatan.
+                                    </p>
+                                </div>
+
+                                <div className="icon-box bg-danger-subtle text-danger">
+                                    <i
+                                        className={`bi ${coverageConfig.icon}`}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="row g-3">
                                 <div className="col-md-6">
                                     <DetailItem
                                         label="Jenis Liputan"
                                         icon={
-                                            coverageConfig.icon
+                                            coverageConfig
+                                                .icon
                                         }
                                         value={
-                                            coverageConfig.label
+                                            coverageConfig
+                                                .label
                                         }
                                     />
                                 </div>
@@ -861,7 +1149,8 @@ export default function HumasServiceApprovalDetailPage() {
                                         label="Tanggal Pelaksanaan"
                                         icon="bi-calendar-event-fill"
                                         value={formatDate(
-                                            requestData.event_date
+                                            requestData
+                                                .event_date
                                         )}
                                     />
                                 </div>
@@ -871,58 +1160,64 @@ export default function HumasServiceApprovalDetailPage() {
                                         label="Lokasi Acara"
                                         icon="bi-geo-alt-fill"
                                         value={
-                                            requestData.event_location
+                                            requestData
+                                                .event_location ||
+                                            '-'
                                         }
                                     />
                                 </div>
 
                                 <div className="col-12">
-                                    <div className="small text-muted mb-2">
-                                        <i className="bi bi-card-text me-2" />
+                                    <div className="p-4 rounded-4 bg-light border">
+                                        <div className="small text-muted fw-bold mb-2">
+                                            <i className="bi bi-card-text me-2" />
 
-                                        Detail Kegiatan
-                                    </div>
+                                            Detail Kegiatan
+                                        </div>
 
-                                    <div
-                                        className="bg-light border rounded-4 p-4"
-                                        style={{
-                                            whiteSpace:
-                                                'pre-wrap',
+                                        <div
+                                            style={{
+                                                whiteSpace:
+                                                    'pre-wrap',
 
-                                            lineHeight:
-                                                1.8,
-                                        }}
-                                    >
-                                        {requestData.activity_detail ||
-                                            '-'}
+                                                lineHeight:
+                                                    1.8,
+                                            }}
+                                        >
+                                            {requestData
+                                                .activity_detail ||
+                                                '-'}
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div className="col-12">
-                                    <div className="small text-muted mb-2">
-                                        <i className="bi bi-link-45deg me-2" />
+                                    <div className="p-4 rounded-4 bg-light border">
+                                        <div className="small text-muted fw-bold mb-3">
+                                            <i className="bi bi-link-45deg me-2" />
 
-                                        Link Referensi
-                                    </div>
-
-                                    {referenceUrl ? (
-                                        <a
-                                            href={
-                                                referenceUrl
-                                            }
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="btn btn-outline-danger rounded-pill"
-                                        >
-                                            <i className="bi bi-box-arrow-up-right me-2" />
-
-                                            Buka Link Referensi
-                                        </a>
-                                    ) : (
-                                        <div className="p-3 rounded-4 bg-light border fw-semibold">
-                                            Tidak tersedia
+                                            Link Referensi
                                         </div>
-                                    )}
+
+                                        {referenceUrl ? (
+                                            <a
+                                                href={
+                                                    referenceUrl
+                                                }
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="btn btn-outline-danger rounded-pill"
+                                            >
+                                                <i className="bi bi-box-arrow-up-right me-2" />
+
+                                                Buka Link Referensi
+                                            </a>
+                                        ) : (
+                                            <div className="fw-bold text-muted">
+                                                Tidak tersedia
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -930,15 +1225,28 @@ export default function HumasServiceApprovalDetailPage() {
 
                     <section className="card border-0 shadow-sm rounded-5 mb-4">
                         <div className="card-body p-4 p-lg-5">
-                            <h5 className="fw-bold mb-4">
-                                Draft Artikel Kegiatan
-                            </h5>
+                            <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
+                                <div>
+                                    <h4 className="fw-black mb-1">
+                                        Draft Artikel Kegiatan
+                                    </h4>
 
-                            {requestData.article_draft_url ? (
+                                    <p className="text-muted mb-0">
+                                        Dokumen pendukung yang dikirim oleh pemohon.
+                                    </p>
+                                </div>
+
+                                <div className="icon-box bg-danger-subtle text-danger">
+                                    <i className="bi bi-file-earmark-richtext-fill" />
+                                </div>
+                            </div>
+
+                            {requestData
+                                .article_draft_url ? (
                                 <div className="border rounded-4 p-3 bg-light">
                                     <div className="d-flex align-items-center gap-3 flex-wrap">
                                         <div
-                                            className="rounded-4 bg-white text-danger d-flex align-items-center justify-content-center shadow-sm"
+                                            className="rounded-4 bg-white text-danger d-flex align-items-center justify-content-center shadow-sm flex-shrink-0"
                                             style={{
                                                 width: 54,
                                                 height: 54,
@@ -948,20 +1256,23 @@ export default function HumasServiceApprovalDetailPage() {
                                         </div>
 
                                         <div className="flex-grow-1 min-w-0">
-                                            <div className="fw-bold text-truncate">
-                                                {requestData.article_draft_name ||
+                                            <div className="fw-black text-truncate">
+                                                {requestData
+                                                    .article_draft_name ||
                                                     'Draft Artikel'}
                                             </div>
 
                                             <div className="small text-muted">
-                                                {requestData.article_draft_mime ||
+                                                {requestData
+                                                    .article_draft_mime ||
                                                     'Dokumen pendukung'}
                                             </div>
                                         </div>
 
                                         <a
                                             href={
-                                                requestData.article_draft_url
+                                                requestData
+                                                    .article_draft_url
                                             }
                                             target="_blank"
                                             rel="noreferrer"
@@ -981,29 +1292,24 @@ export default function HumasServiceApprovalDetailPage() {
                         </div>
                     </section>
 
-                    {requestData.status ===
+                    {requestData
+                        .status ===
                         'completed' && (
                         <section className="card border-0 shadow-sm rounded-5">
                             <div className="card-body p-4 p-lg-5">
-                                <div className="d-flex align-items-start gap-3 mb-4">
-                                    <div
-                                        className="rounded-4 bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0"
-                                        style={{
-                                            width: 52,
-                                            height: 52,
-                                        }}
-                                    >
-                                        <i className="bi bi-check2-circle fs-4" />
-                                    </div>
-
+                                <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
                                     <div>
-                                        <h5 className="fw-bold mb-1">
+                                        <h4 className="fw-black mb-1">
                                             Hasil Pekerjaan
-                                        </h5>
+                                        </h4>
 
                                         <p className="text-muted mb-0">
                                             Link hasil yang diberikan kepada pemohon.
                                         </p>
+                                    </div>
+
+                                    <div className="icon-box bg-success-subtle text-success">
+                                        <i className="bi bi-cloud-check-fill" />
                                     </div>
                                 </div>
 
@@ -1016,13 +1322,15 @@ export default function HumasServiceApprovalDetailPage() {
                                                 </div>
 
                                                 <div
-                                                    className="fw-semibold text-truncate"
+                                                    className="fw-bold text-truncate"
                                                     style={{
-                                                        maxWidth: 600,
+                                                        maxWidth:
+                                                            600,
                                                     }}
                                                 >
                                                     {
-                                                        requestData.result_link
+                                                        requestData
+                                                            .result_link
                                                     }
                                                 </div>
                                             </div>
@@ -1041,9 +1349,10 @@ export default function HumasServiceApprovalDetailPage() {
                                             </a>
                                         </div>
 
-                                        {requestData.result_note && (
+                                        {requestData
+                                            .result_note && (
                                             <div className="bg-white border rounded-4 p-3 mt-3">
-                                                <div className="small text-muted mb-1">
+                                                <div className="small text-muted fw-bold mb-1">
                                                     Catatan Hasil
                                                 </div>
 
@@ -1057,7 +1366,8 @@ export default function HumasServiceApprovalDetailPage() {
                                                     }}
                                                 >
                                                     {
-                                                        requestData.result_note
+                                                        requestData
+                                                            .result_note
                                                     }
                                                 </div>
                                             </div>
@@ -1082,60 +1392,103 @@ export default function HumasServiceApprovalDetailPage() {
                     >
                         <section className="card border-0 shadow-sm rounded-5 mb-4">
                             <div className="card-body p-4">
-                                <h5 className="fw-bold mb-4">
+                                <h4 className="fw-black mb-1">
                                     Informasi Status
-                                </h5>
+                                </h4>
 
-                                <div className="d-grid gap-3">
-                                    <DetailItem
+                                <p className="text-muted mb-4">
+                                    Perkembangan proses request liputan.
+                                </p>
+
+                                <div className="request-timeline">
+                                    <TimelineItem
                                         label="Dikirim"
-                                        value={formatDate(
-                                            requestData.submitted_at ||
-                                                requestData.created_at,
-                                            true
+                                        value={formatDateTime(
+                                            requestData
+                                                .submitted_at ||
+                                            requestData
+                                                .created_at
                                         )}
+                                        icon="bi-send-check-fill"
                                     />
 
-                                    <DetailItem
-                                        label="Disetujui"
-                                        value={formatDate(
-                                            requestData.approved_at,
-                                            true
-                                        )}
-                                    />
+                                    {requestData
+                                        .approved_at && (
+                                        <TimelineItem
+                                            label="Disetujui"
+                                            value={formatDateTime(
+                                                requestData
+                                                    .approved_at
+                                            )}
+                                            icon="bi-check-circle-fill"
+                                        />
+                                    )}
 
-                                    <DetailItem
-                                        label="Ditolak"
-                                        value={formatDate(
-                                            requestData.rejected_at,
-                                            true
-                                        )}
-                                    />
+                                    {requestData
+                                        .rejected_at && (
+                                        <TimelineItem
+                                            label="Ditolak"
+                                            value={formatDateTime(
+                                                requestData
+                                                    .rejected_at
+                                            )}
+                                            icon="bi-x-circle-fill"
+                                            rejected
+                                        />
+                                    )}
 
-                                    <DetailItem
-                                        label="Selesai"
-                                        value={formatDate(
-                                            requestData.completed_at,
-                                            true
-                                        )}
-                                    />
+                                    {requestData
+                                        .completed_at && (
+                                        <TimelineItem
+                                            label="Selesai"
+                                            value={formatDateTime(
+                                                requestData
+                                                    .completed_at
+                                            )}
+                                            icon="bi-check2-all"
+                                        />
+                                    )}
+
+                                    {requestData
+                                        .status ===
+                                        'pending' && (
+                                        <TimelineItem
+                                            label="Menunggu Pemeriksaan"
+                                            value="Admin sedang memeriksa request liputan."
+                                            icon="bi-hourglass-split"
+                                            active
+                                        />
+                                    )}
+
+                                    {requestData
+                                        .status ===
+                                        'approved' && (
+                                        <TimelineItem
+                                            label="Dalam Proses"
+                                            value="Request sedang dikerjakan oleh tim Humas."
+                                            icon="bi-camera-reels-fill"
+                                            active
+                                        />
+                                    )}
                                 </div>
 
-                                {requestData.admin_note && (
+                                {requestData
+                                    .admin_note && (
                                     <div className="alert alert-danger rounded-4 mt-4 mb-0">
-                                        <strong>
+                                        <div className="fw-black mb-2">
                                             Catatan Admin
-                                        </strong>
+                                        </div>
 
                                         <div
-                                            className="small mt-2"
+                                            className="small"
                                             style={{
                                                 whiteSpace:
                                                     'pre-wrap',
                                             }}
                                         >
                                             {
-                                                requestData.admin_note
+                                                requestData
+                                                    .admin_note
                                             }
                                         </div>
                                     </div>
@@ -1145,30 +1498,35 @@ export default function HumasServiceApprovalDetailPage() {
 
                         <section className="card border-0 shadow-sm rounded-5">
                             <div className="card-body p-4">
-                                <h5 className="fw-bold mb-3">
+                                <h4 className="fw-black mb-1">
                                     Tindakan Admin
-                                </h5>
+                                </h4>
+
+                                <p className="text-muted mb-4">
+                                    Proses request berdasarkan status saat ini.
+                                </p>
 
                                 {!canProcess ? (
                                     <div className="p-4 rounded-4 bg-light border text-center">
                                         <i className="bi bi-shield-lock-fill fs-2 text-secondary" />
 
                                         <h6 className="fw-black mt-3 mb-2">
-                                            Tidak memiliki akses proses
+                                            Mode hanya lihat
                                         </h6>
 
                                         <p className="small text-muted mb-0">
-                                            Hubungi superadmin untuk mendapatkan permission proses approval liputan Humas.
+                                            Akun tidak memiliki permission proses approval Liputan Humas.
                                         </p>
                                     </div>
                                 ) : (
                                     <>
-                                        {requestData.status ===
+                                        {requestData
+                                            .status ===
                                             'pending' && (
                                             <div className="d-grid gap-2">
                                                 <button
                                                     type="button"
-                                                    className="btn btn-primary btn-lg rounded-pill"
+                                                    className="btn btn-primary rounded-pill"
                                                     onClick={
                                                         handleApprove
                                                     }
@@ -1198,32 +1556,54 @@ export default function HumasServiceApprovalDetailPage() {
                                             </div>
                                         )}
 
-                                        {requestData.status ===
+                                        {requestData
+                                            .status ===
                                             'approved' && (
-                                            <button
-                                                type="button"
-                                                className="btn btn-success btn-lg rounded-pill w-100"
-                                                onClick={
-                                                    handleComplete
-                                                }
-                                                disabled={
-                                                    processing
-                                                }
-                                            >
-                                                <i className="bi bi-check2-all me-2" />
+                                            <>
+                                                <div className="p-3 rounded-4 bg-primary-subtle mb-3">
+                                                    <div className="fw-black text-primary mb-1">
+                                                        Request Disetujui
+                                                    </div>
 
-                                                Tandai Selesai
-                                            </button>
+                                                    <div className="small text-muted">
+                                                        Tandai selesai setelah hasil pekerjaan tersedia.
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-success rounded-pill w-100"
+                                                    onClick={
+                                                        handleComplete
+                                                    }
+                                                    disabled={
+                                                        processing
+                                                    }
+                                                >
+                                                    <i className="bi bi-check2-all me-2" />
+
+                                                    Tandai Selesai
+                                                </button>
+                                            </>
                                         )}
 
                                         {[
                                             'rejected',
                                             'completed',
                                         ].includes(
-                                            requestData.status
+                                            requestData
+                                                .status
                                         ) && (
                                             <div className="alert alert-light border rounded-4 mb-0">
-                                                Request ini sudah tidak memiliki tindakan lanjutan.
+                                                Request berstatus{' '}
+
+                                                <strong>
+                                                    {
+                                                        statusConfig.label
+                                                    }
+                                                </strong>{' '}
+
+                                                dan tidak memiliki tindakan lanjutan.
                                             </div>
                                         )}
                                     </>

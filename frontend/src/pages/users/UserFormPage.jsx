@@ -21,8 +21,8 @@ import {
     showWarningAlert,
 } from '../../utils/sweetAlert';
 
-const ROLE_OPTIONS = [
-    {
+const ROLE_CONFIG = {
+    superadmin: {
         value: 'superadmin',
         label: 'Super Admin',
         description:
@@ -30,7 +30,8 @@ const ROLE_OPTIONS = [
         icon: 'bi-shield-lock-fill',
         color: 'danger',
     },
-    {
+
+    admin: {
         value: 'admin',
         label: 'Admin',
         description:
@@ -38,15 +39,17 @@ const ROLE_OPTIONS = [
         icon: 'bi-person-badge-fill',
         color: 'primary',
     },
-    {
+
+    admin_humas: {
         value: 'admin_humas',
         label: 'Admin Humas',
         description:
-            'Admin utama untuk merchandise, liputan Humas, dan pengelolaan produk.',
+            'Admin utama untuk merchandise, layanan Humas, dan master data terkait.',
         icon: 'bi-megaphone-fill',
         color: 'danger',
     },
-    {
+
+    admin_sekpim: {
         value: 'admin_sekpim',
         label: 'Admin SEKPiM',
         description:
@@ -54,7 +57,8 @@ const ROLE_OPTIONS = [
         icon: 'bi-briefcase-fill',
         color: 'success',
     },
-    {
+
+    user: {
         value: 'user',
         label: 'User',
         description:
@@ -62,7 +66,7 @@ const ROLE_OPTIONS = [
         icon: 'bi-person-fill',
         color: 'secondary',
     },
-];
+};
 
 const PERMISSION_GROUPS = [
     {
@@ -71,6 +75,7 @@ const PERMISSION_GROUPS = [
         description:
             'Hak akses dasar untuk membuka halaman utama sistem.',
         icon: 'bi-grid-fill',
+
         permissions: [
             {
                 value: 'dashboard.view',
@@ -80,176 +85,242 @@ const PERMISSION_GROUPS = [
             },
         ],
     },
+
     {
         key: 'request',
         label: 'Pengajuan',
         description:
-            'Mengatur layanan apa saja yang dapat diajukan oleh akun.',
+            'Mengatur layanan yang dapat diajukan oleh akun.',
         icon: 'bi-send-fill',
+
         permissions: [
             {
-                value: 'request.merchandise.create',
-                label: 'Ajukan Merchandise',
+                value:
+                    'request.merchandise.create',
+                label:
+                    'Ajukan Merchandise',
                 description:
                     'Dapat membuat pengajuan merchandise.',
             },
+
             {
-                value: 'request.humas.create',
-                label: 'Request Liputan Humas',
+                value:
+                    'request.humas.create',
+                label:
+                    'Request Liputan Humas',
                 description:
                     'Dapat membuat request liputan dan publikasi Humas.',
             },
+
             {
-                value: 'request.borrowing.create',
-                label: 'Ajukan Peminjaman SEKPiM',
+                value:
+                    'request.borrowing.create',
+                label:
+                    'Ajukan Peminjaman SEKPiM',
                 description:
                     'Dapat membuat pengajuan peminjaman perlengkapan.',
             },
+
             {
-                value: 'request.history.view',
-                label: 'Lihat Riwayat Pengajuan',
+                value:
+                    'request.history.view',
+                label:
+                    'Lihat Riwayat Pengajuan',
                 description:
                     'Dapat melihat pengajuan pribadi dan detail statusnya.',
             },
         ],
     },
+
     {
         key: 'merchandise',
         label: 'Approval Merchandise',
         description:
-            'Hak akses untuk memeriksa dan memproses merchandise.',
+            'Hak akses untuk memeriksa dan memproses pengajuan merchandise.',
         icon: 'bi-gift-fill',
+
         permissions: [
             {
-                value: 'approval.merchandise.view',
-                label: 'Lihat Approval Merchandise',
+                value:
+                    'approval.merchandise.view',
+                label:
+                    'Lihat Approval Merchandise',
                 description:
                     'Dapat membuka daftar dan detail pengajuan merchandise.',
             },
+
             {
-                value: 'approval.merchandise.process',
-                label: 'Proses Approval Merchandise',
+                value:
+                    'approval.merchandise.process',
+                label:
+                    'Proses Approval Merchandise',
                 description:
-                    'Dapat menyetujui, menolak, dan menyelesaikan pengajuan merchandise.',
+                    'Dapat menyetujui, menolak, dan menyelesaikan merchandise.',
             },
         ],
     },
+
     {
         key: 'humas',
         label: 'Approval Liputan Humas',
         description:
-            'Hak akses untuk memeriksa dan memproses request liputan.',
+            'Hak akses untuk memeriksa dan memproses request Humas.',
         icon: 'bi-camera-reels-fill',
+
         permissions: [
             {
-                value: 'approval.humas.view',
-                label: 'Lihat Approval Liputan',
+                value:
+                    'approval.humas.view',
+                label:
+                    'Lihat Approval Liputan',
                 description:
-                    'Dapat membuka daftar dan detail request liputan Humas.',
+                    'Dapat membuka daftar dan detail request Humas.',
             },
+
             {
-                value: 'approval.humas.process',
-                label: 'Proses Approval Liputan',
+                value:
+                    'approval.humas.process',
+                label:
+                    'Proses Approval Liputan',
                 description:
-                    'Dapat menyetujui, menolak, dan menyelesaikan request liputan.',
+                    'Dapat menyetujui, menolak, dan menyelesaikan request Humas.',
             },
         ],
     },
+
     {
         key: 'borrowing',
         label: 'Approval Peminjaman SEKPiM',
         description:
             'Hak akses untuk memeriksa dan memproses peminjaman.',
         icon: 'bi-box-seam-fill',
+
         permissions: [
             {
-                value: 'approval.borrowing.view',
-                label: 'Lihat Approval Peminjaman',
+                value:
+                    'approval.borrowing.view',
+                label:
+                    'Lihat Approval Peminjaman',
                 description:
                     'Dapat membuka daftar dan detail pengajuan peminjaman.',
             },
+
             {
-                value: 'approval.borrowing.process',
-                label: 'Proses Approval Peminjaman',
+                value:
+                    'approval.borrowing.process',
+                label:
+                    'Proses Approval Peminjaman',
                 description:
                     'Dapat menyetujui, menolak, menyerahkan, dan menerima pengembalian barang.',
             },
         ],
     },
+
     {
         key: 'category',
         label: 'Master Kategori',
         description:
             'Hak akses untuk melihat dan mengelola kategori.',
         icon: 'bi-tags-fill',
+
         permissions: [
             {
-                value: 'categories.view',
-                label: 'Lihat Data Kategori',
+                value:
+                    'categories.view',
+                label:
+                    'Lihat Data Kategori',
                 description:
                     'Dapat membuka daftar kategori.',
             },
+
             {
-                value: 'categories.manage',
-                label: 'Kelola Data Kategori',
+                value:
+                    'categories.manage',
+                label:
+                    'Kelola Data Kategori',
                 description:
                     'Dapat menambah, mengubah, dan menghapus kategori.',
             },
         ],
     },
+
     {
         key: 'product',
         label: 'Master Produk',
         description:
             'Hak akses untuk melihat dan mengelola produk.',
         icon: 'bi-boxes',
+
         permissions: [
             {
-                value: 'products.view',
-                label: 'Lihat Data Produk',
+                value:
+                    'products.view',
+                label:
+                    'Lihat Data Produk',
                 description:
                     'Dapat membuka daftar produk dan stok.',
             },
+
             {
-                value: 'products.manage',
-                label: 'Kelola Data Produk',
+                value:
+                    'products.manage',
+                label:
+                    'Kelola Data Produk',
                 description:
                     'Dapat menambah, mengubah, dan menghapus produk.',
             },
         ],
     },
+
     {
         key: 'user',
         label: 'Manajemen User',
         description:
-            'Hak akses sensitif untuk mengelola akun sistem.',
+            'Hak akses untuk melihat atau mengelola akun.',
         icon: 'bi-people-fill',
+
         permissions: [
             {
-                value: 'users.view',
-                label: 'Lihat Data User',
+                value:
+                    'users.view',
+                label:
+                    'Lihat Data User',
                 description:
-                    'Dapat membuka daftar dan detail akun.',
+                    'Dapat membuka daftar dan rincian akun.',
             },
+
             {
-                value: 'users.manage',
-                label: 'Kelola User dan Hak Akses',
+                value:
+                    'users.manage',
+                label:
+                    'Kelola User',
                 description:
-                    'Dapat menambah, mengubah, menghapus, dan mengatur permission akun.',
+                    'Permission pengelolaan user pada sistem.',
             },
         ],
     },
 ];
 
-const ALL_PERMISSIONS = PERMISSION_GROUPS.flatMap(
-    (group) =>
-        group.permissions.map(
-            (permission) => permission.value
-        )
-);
+const LOCAL_AVAILABLE_PERMISSIONS =
+    PERMISSION_GROUPS.flatMap(
+        (group) =>
+            group.permissions.map(
+                (permission) =>
+                    permission.value
+            )
+    );
 
-const DEFAULT_PERMISSIONS = {
-    superadmin: ALL_PERMISSIONS,
+const LOCAL_AVAILABLE_ROLES = [
+    'superadmin',
+    'admin',
+    'admin_humas',
+    'admin_sekpim',
+    'user',
+];
+
+const LOCAL_DEFAULT_PERMISSIONS = {
+    superadmin:
+        LOCAL_AVAILABLE_PERMISSIONS,
 
     admin: [
         'dashboard.view',
@@ -276,6 +347,8 @@ const DEFAULT_PERMISSIONS = {
         'approval.merchandise.process',
         'approval.humas.view',
         'approval.humas.process',
+        'categories.view',
+        'categories.manage',
         'products.view',
         'products.manage',
     ],
@@ -288,6 +361,8 @@ const DEFAULT_PERMISSIONS = {
         'request.history.view',
         'approval.borrowing.view',
         'approval.borrowing.process',
+        'categories.view',
+        'categories.manage',
         'products.view',
         'products.manage',
     ],
@@ -301,6 +376,32 @@ const DEFAULT_PERMISSIONS = {
     ],
 };
 
+const LOCAL_IMPLIED_PERMISSIONS = {
+    'approval.merchandise.process': [
+        'approval.merchandise.view',
+    ],
+
+    'approval.humas.process': [
+        'approval.humas.view',
+    ],
+
+    'approval.borrowing.process': [
+        'approval.borrowing.view',
+    ],
+
+    'categories.manage': [
+        'categories.view',
+    ],
+
+    'products.manage': [
+        'products.view',
+    ],
+
+    'users.manage': [
+        'users.view',
+    ],
+};
+
 const INITIAL_FORM = {
     name: '',
     username: '',
@@ -308,13 +409,15 @@ const INITIAL_FORM = {
     password: '',
     password_confirmation: '',
     role: 'user',
-    permissions: DEFAULT_PERMISSIONS.user,
+    permissions: [],
 };
 
 const getCurrentUser = () => {
     try {
         return JSON.parse(
-            localStorage.getItem('admin_user') || '{}'
+            localStorage.getItem(
+                'admin_user'
+            ) || '{}'
         );
     } catch {
         return {};
@@ -322,33 +425,113 @@ const getCurrentUser = () => {
 };
 
 const createUsername = (value) => {
-    return value
+    return String(value || '')
         .toLowerCase()
         .trim()
-        .replace(/[^a-z0-9\s._-]/g, '')
+        .replace(
+            /[^a-z0-9\s._-]/g,
+            ''
+        )
         .replace(/\s+/g, '.')
         .replace(/\.+/g, '.')
         .replace(/^\.+|\.+$/g, '');
 };
 
-const normalizePermissions = (permissions) => {
+const normalizePermissions = (
+    permissions,
+    availablePermissions =
+        LOCAL_AVAILABLE_PERMISSIONS
+) => {
     if (!Array.isArray(permissions)) {
         return [];
     }
+
+    const allowedPermissions =
+        Array.isArray(
+            availablePermissions
+        )
+            ? availablePermissions
+            : LOCAL_AVAILABLE_PERMISSIONS;
 
     return [
         ...new Set(
             permissions.filter(
                 (permission) =>
-                    ALL_PERMISSIONS.includes(permission)
+                    typeof permission ===
+                        'string' &&
+                    allowedPermissions.includes(
+                        permission
+                    )
             )
         ),
     ];
 };
 
+const expandImpliedPermissions = (
+    permissions,
+    impliedPermissions,
+    availablePermissions
+) => {
+    let expandedPermissions =
+        normalizePermissions(
+            permissions,
+            availablePermissions
+        );
+
+    let changed = true;
+
+    while (changed) {
+        const beforeCount =
+            expandedPermissions.length;
+
+        Object.entries(
+            impliedPermissions || {}
+        ).forEach(
+            ([
+                parentPermission,
+                childPermissions,
+            ]) => {
+                if (
+                    !expandedPermissions.includes(
+                        parentPermission
+                    )
+                ) {
+                    return;
+                }
+
+                if (
+                    !Array.isArray(
+                        childPermissions
+                    )
+                ) {
+                    return;
+                }
+
+                expandedPermissions = [
+                    ...expandedPermissions,
+                    ...childPermissions,
+                ];
+            }
+        );
+
+        expandedPermissions =
+            normalizePermissions(
+                expandedPermissions,
+                availablePermissions
+            );
+
+        changed =
+            expandedPermissions.length >
+            beforeCount;
+    }
+
+    return expandedPermissions;
+};
+
 const getBackendErrorMessage = (
     error,
-    fallbackMessage = 'Proses gagal dilakukan.'
+    fallbackMessage =
+        'Proses gagal dilakukan.'
 ) => {
     const responseData =
         error?.response?.data;
@@ -371,163 +554,399 @@ const getBackendErrorMessage = (
     return fallbackMessage;
 };
 
+const getRoleConfig = (role) => {
+    return (
+        ROLE_CONFIG[role] || {
+            value: role,
+            label:
+                role ||
+                'Tidak diketahui',
+            description:
+                'Role akun sistem.',
+            icon: 'bi-person-fill',
+            color: 'secondary',
+        }
+    );
+};
+
 export default function UserFormPage() {
-    const { id } = useParams();
-    const navigate = useNavigate();
+    const { id } =
+        useParams();
 
-    const isEdit = Boolean(id);
+    const navigate =
+        useNavigate();
 
-    const currentUser = useMemo(
-        () => getCurrentUser(),
-        []
+    const isEdit =
+        Boolean(id);
+
+    const currentUser =
+        useMemo(
+            () => getCurrentUser(),
+            []
+        );
+
+    const canManage =
+        currentUser?.role ===
+        'superadmin';
+
+    const [
+        form,
+        setForm,
+    ] = useState(INITIAL_FORM);
+
+    const [
+        availableRoles,
+        setAvailableRoles,
+    ] = useState(
+        LOCAL_AVAILABLE_ROLES
     );
 
-    const [form, setForm] =
-        useState(INITIAL_FORM);
+    const [
+        availablePermissions,
+        setAvailablePermissions,
+    ] = useState(
+        LOCAL_AVAILABLE_PERMISSIONS
+    );
 
-    const [loading, setLoading] =
-        useState(isEdit);
+    const [
+        defaultPermissions,
+        setDefaultPermissions,
+    ] = useState(
+        LOCAL_DEFAULT_PERMISSIONS
+    );
 
-    const [submitting, setSubmitting] =
-        useState(false);
+    const [
+        impliedPermissions,
+        setImpliedPermissions,
+    ] = useState(
+        LOCAL_IMPLIED_PERMISSIONS
+    );
 
-    const [showPassword, setShowPassword] =
-        useState(false);
+    const [
+        loading,
+        setLoading,
+    ] = useState(true);
+
+    const [
+        submitting,
+        setSubmitting,
+    ] = useState(false);
+
+    const [
+        loadError,
+        setLoadError,
+    ] = useState('');
+
+    const [
+        showPassword,
+        setShowPassword,
+    ] = useState(false);
 
     const [
         showPasswordConfirmation,
         setShowPasswordConfirmation,
     ] = useState(false);
 
-    const selectedRole = useMemo(() => {
-        return (
-            ROLE_OPTIONS.find(
-                (role) =>
-                    role.value === form.role
-            ) || ROLE_OPTIONS[4]
-        );
-    }, [form.role]);
+    const [
+        originalUser,
+        setOriginalUser,
+    ] = useState(null);
 
-    const selectedPermissionCount =
-        form.permissions.length;
+    const fetchFormData =
+        useCallback(
+            async () => {
+                if (!canManage) {
+                    setLoading(false);
 
-    const isSuperadminRole =
-        form.role === 'superadmin';
-
-    const isCurrentAccount =
-        currentUser.id === Number(id);
-
-    const fetchUser = useCallback(
-        async () => {
-            if (!isEdit) {
-                setForm(INITIAL_FORM);
-                setLoading(false);
-                return;
-            }
-
-            try {
-                setLoading(true);
-
-                const response =
-                    await api.get(
-                        `/admin/users/${id}`
+                    setLoadError(
+                        'Hanya superadmin yang dapat mengakses form manajemen user.'
                     );
 
-                const user =
-                    response?.data?.data;
-
-                if (!user) {
-                    throw new Error(
-                        'Data user tidak ditemukan.'
-                    );
+                    return;
                 }
 
-                const userRole =
-                    user.role || 'user';
+                try {
+                    setLoading(true);
+                    setLoadError('');
 
-                const permissions =
-                    userRole === 'superadmin'
-                        ? ALL_PERMISSIONS
-                        : normalizePermissions(
-                              user.permissions
-                          );
+                    const requests = [
+                        api.get(
+                            '/admin/users/permissions'
+                        ),
+                    ];
 
-                setForm({
-                    name: user.name || '',
-                    username:
-                        user.username || '',
-                    email: user.email || '',
-                    password: '',
-                    password_confirmation: '',
-                    role: userRole,
-                    permissions,
-                });
-            } catch (error) {
-                console.error(
-                    'Fetch user form error:',
-                    error?.response?.data ||
-                        error
-                );
+                    if (isEdit) {
+                        requests.push(
+                            api.get(
+                                `/admin/users/${id}`
+                            )
+                        );
+                    }
 
-                await showErrorAlert(
-                    'Gagal Memuat Form',
-                    getBackendErrorMessage(
-                        error,
-                        'Data user gagal dimuat.'
-                    )
-                );
+                    const responses =
+                        await Promise.all(
+                            requests
+                        );
 
-                navigate('/admin/users', {
-                    replace: true,
-                });
-            } finally {
-                setLoading(false);
-            }
-        },
-        [
-            id,
-            isEdit,
-            navigate,
-        ]
-    );
+                    const configuration =
+                        responses[0]
+                            ?.data?.data ||
+                        {};
+
+                    const backendRoles =
+                        Array.isArray(
+                            configuration.available_roles
+                        )
+                            ? configuration.available_roles
+                            : LOCAL_AVAILABLE_ROLES;
+
+                    const backendPermissions =
+                        Array.isArray(
+                            configuration.available_permissions
+                        )
+                            ? configuration.available_permissions
+                            : LOCAL_AVAILABLE_PERMISSIONS;
+
+                    const backendDefaults =
+                        configuration.default_permissions &&
+                        typeof configuration.default_permissions ===
+                            'object'
+                            ? configuration.default_permissions
+                            : LOCAL_DEFAULT_PERMISSIONS;
+
+                    const backendImplied =
+                        configuration.implied_permissions &&
+                        typeof configuration.implied_permissions ===
+                            'object'
+                            ? configuration.implied_permissions
+                            : LOCAL_IMPLIED_PERMISSIONS;
+
+                    setAvailableRoles(
+                        backendRoles
+                    );
+
+                    setAvailablePermissions(
+                        backendPermissions
+                    );
+
+                    setDefaultPermissions(
+                        backendDefaults
+                    );
+
+                    setImpliedPermissions(
+                        backendImplied
+                    );
+
+                    if (!isEdit) {
+                        const initialPermissions =
+                            normalizePermissions(
+                                backendDefaults.user ||
+                                    [],
+                                backendPermissions
+                            );
+
+                        setForm({
+                            ...INITIAL_FORM,
+                            role: 'user',
+                            permissions:
+                                initialPermissions,
+                        });
+
+                        setOriginalUser(null);
+
+                        return;
+                    }
+
+                    const user =
+                        responses[1]
+                            ?.data?.data;
+
+                    if (!user) {
+                        throw new Error(
+                            'Data user tidak ditemukan.'
+                        );
+                    }
+
+                    const userRole =
+                        user.role ||
+                        'user';
+
+                    /*
+                     * Checkbox menggunakan stored_permissions.
+                     *
+                     * Fallback ke permissions hanya untuk mendukung
+                     * response backend versi lama.
+                     */
+                    const storedPermissions =
+                        userRole ===
+                        'superadmin'
+                            ? backendPermissions
+                            : normalizePermissions(
+                                Array.isArray(
+                                    user.stored_permissions
+                                )
+                                    ? user.stored_permissions
+                                    : user.permissions,
+                                backendPermissions
+                            );
+
+                    setOriginalUser(user);
+
+                    setForm({
+                        name:
+                            user.name ||
+                            '',
+
+                        username:
+                            user.username ||
+                            '',
+
+                        email:
+                            user.email ||
+                            '',
+
+                        password:
+                            '',
+
+                        password_confirmation:
+                            '',
+
+                        role:
+                            userRole,
+
+                        permissions:
+                            storedPermissions,
+                    });
+                } catch (error) {
+                    console.error(
+                        'Fetch user form error:',
+                        error?.response?.data ||
+                            error
+                    );
+
+                    const message =
+                        getBackendErrorMessage(
+                            error,
+                            error?.message ||
+                                'Data form user gagal dimuat.'
+                        );
+
+                    setLoadError(
+                        message
+                    );
+
+                    await showErrorAlert(
+                        'Gagal Memuat Form',
+                        message
+                    );
+                } finally {
+                    setLoading(false);
+                }
+            },
+            [
+                canManage,
+                id,
+                isEdit,
+            ]
+        );
 
     useEffect(() => {
-        fetchUser();
-    }, [fetchUser]);
+        fetchFormData();
+    }, [fetchFormData]);
 
-    const handleChange = (event) => {
+    const roleOptions =
+        useMemo(() => {
+            return availableRoles.map(
+                (role) =>
+                    getRoleConfig(role)
+            );
+        }, [availableRoles]);
+
+    const selectedRole =
+        useMemo(
+            () =>
+                getRoleConfig(
+                    form.role
+                ),
+            [form.role]
+        );
+
+    const effectivePermissions =
+        useMemo(
+            () =>
+                form.role ===
+                'superadmin'
+                    ? availablePermissions
+                    : expandImpliedPermissions(
+                        form.permissions,
+                        impliedPermissions,
+                        availablePermissions
+                    ),
+            [
+                form.permissions,
+                form.role,
+                impliedPermissions,
+                availablePermissions,
+            ]
+        );
+
+    const storedPermissionCount =
+        form.permissions.length;
+
+    const effectivePermissionCount =
+        effectivePermissions.length;
+
+    const isSuperadminRole =
+        form.role ===
+        'superadmin';
+
+    const isCurrentAccount =
+        isEdit &&
+        Number(currentUser?.id) ===
+            Number(id);
+
+    const handleChange = (
+        event
+    ) => {
         const {
             name,
             value,
         } = event.target;
 
-        setForm((previousForm) => {
-            const nextForm = {
-                ...previousForm,
-                [name]: value,
-            };
+        setForm(
+            (previousForm) => {
+                const nextForm = {
+                    ...previousForm,
+                    [name]: value,
+                };
 
-            if (
-                name === 'name' &&
-                !isEdit
-            ) {
-                nextForm.username =
-                    createUsername(value);
+                if (
+                    name === 'name' &&
+                    !isEdit &&
+                    !previousForm.username
+                ) {
+                    nextForm.username =
+                        createUsername(
+                            value
+                        );
+                }
+
+                return nextForm;
             }
-
-            return nextForm;
-        });
+        );
     };
 
-    const handleRoleChange = (
+    const handleRoleChange = async (
         roleValue
     ) => {
         if (
             isCurrentAccount &&
-            form.role === 'superadmin' &&
-            roleValue !== 'superadmin'
+            originalUser?.role ===
+                'superadmin' &&
+            roleValue !==
+                'superadmin'
         ) {
-            showWarningAlert(
+            await showWarningAlert(
                 'Role Tidak Dapat Diubah',
                 'Role akun superadmin yang sedang digunakan tidak dapat diturunkan.'
             );
@@ -535,148 +954,289 @@ export default function UserFormPage() {
             return;
         }
 
-        setForm((previousForm) => ({
-            ...previousForm,
-            role: roleValue,
-            permissions:
-                roleValue === 'superadmin'
-                    ? ALL_PERMISSIONS
-                    : [
-                          ...(
-                              DEFAULT_PERMISSIONS[
-                                  roleValue
-                              ] || []
-                          ),
-                      ],
-        }));
+        const rolePermissions =
+            roleValue ===
+            'superadmin'
+                ? availablePermissions
+                : normalizePermissions(
+                    defaultPermissions[
+                        roleValue
+                    ] || [],
+                    availablePermissions
+                );
+
+        setForm(
+            (previousForm) => ({
+                ...previousForm,
+                role:
+                    roleValue,
+                permissions:
+                    rolePermissions,
+            })
+        );
     };
 
-    const handlePermissionToggle = (
+    const getDependentParents = (
         permissionValue
     ) => {
-        if (isSuperadminRole) {
-            return;
-        }
+        return Object.entries(
+            impliedPermissions || {}
+        )
+            .filter(
+                ([
+                    parentPermission,
+                    childPermissions,
+                ]) =>
+                    Array.isArray(
+                        childPermissions
+                    ) &&
+                    childPermissions.includes(
+                        permissionValue
+                    ) &&
+                    form.permissions.includes(
+                        parentPermission
+                    )
+            )
+            .map(
+                ([
+                    parentPermission,
+                ]) =>
+                    parentPermission
+            );
+    };
 
-        setForm((previousForm) => {
+    const handlePermissionToggle =
+        async (
+            permissionValue
+        ) => {
+            if (
+                isSuperadminRole
+            ) {
+                return;
+            }
+
             const isChecked =
-                previousForm.permissions.includes(
+                form.permissions.includes(
                     permissionValue
                 );
 
-            const nextPermissions = isChecked
-                ? previousForm.permissions.filter(
-                      (permission) =>
-                          permission !==
-                          permissionValue
-                  )
-                : [
-                      ...previousForm.permissions,
-                      permissionValue,
-                  ];
+            /*
+             * Permission view tidak dapat dilepas selama permission
+             * process/manage yang membutuhkannya masih aktif.
+             */
+            if (isChecked) {
+                const dependentParents =
+                    getDependentParents(
+                        permissionValue
+                    );
 
-            return {
-                ...previousForm,
-                permissions:
-                    normalizePermissions(
-                        nextPermissions
-                    ),
-            };
-        });
-    };
+                if (
+                    dependentParents.length >
+                    0
+                ) {
+                    await showWarningAlert(
+                        'Permission Masih Dibutuhkan',
+                        `Permission ini masih dibutuhkan oleh: ${dependentParents.join(', ')}. Nonaktifkan permission process/manage tersebut terlebih dahulu.`
+                    );
 
-    const handleGroupToggle = (
-        group
-    ) => {
-        if (isSuperadminRole) {
-            return;
-        }
+                    return;
+                }
+            }
 
-        const groupPermissions =
-            group.permissions.map(
-                (permission) =>
-                    permission.value
+            setForm(
+                (previousForm) => {
+                    let nextPermissions =
+                        previousForm.permissions;
+
+                    if (isChecked) {
+                        nextPermissions =
+                            previousForm.permissions.filter(
+                                (permission) =>
+                                    permission !==
+                                    permissionValue
+                            );
+                    } else {
+                        nextPermissions = [
+                            ...previousForm.permissions,
+                            permissionValue,
+                        ];
+
+                        const impliedChildren =
+                            impliedPermissions[
+                                permissionValue
+                            ];
+
+                        if (
+                            Array.isArray(
+                                impliedChildren
+                            )
+                        ) {
+                            nextPermissions = [
+                                ...nextPermissions,
+                                ...impliedChildren,
+                            ];
+                        }
+                    }
+
+                    return {
+                        ...previousForm,
+
+                        permissions:
+                            normalizePermissions(
+                                nextPermissions,
+                                availablePermissions
+                            ),
+                    };
+                }
             );
+        };
 
-        const isGroupFullySelected =
-            groupPermissions.every(
-                (permission) =>
-                    form.permissions.includes(
-                        permission
+    const handleGroupToggle =
+        async (group) => {
+            if (
+                isSuperadminRole
+            ) {
+                return;
+            }
+
+            const groupPermissions =
+                group.permissions
+                    .map(
+                        (permission) =>
+                            permission.value
                     )
-            );
+                    .filter(
+                        (permission) =>
+                            availablePermissions.includes(
+                                permission
+                            )
+                    );
 
-        setForm((previousForm) => {
-            let nextPermissions;
+            const isGroupFullySelected =
+                groupPermissions.every(
+                    (permission) =>
+                        form.permissions.includes(
+                            permission
+                        )
+                );
 
-            if (isGroupFullySelected) {
-                nextPermissions =
-                    previousForm.permissions.filter(
+            if (
+                isGroupFullySelected
+            ) {
+                const remainingPermissions =
+                    form.permissions.filter(
                         (permission) =>
                             !groupPermissions.includes(
                                 permission
                             )
                     );
-            } else {
-                nextPermissions = [
-                    ...previousForm.permissions,
-                    ...groupPermissions,
-                ];
+
+                /*
+                 * Setelah grup dilepas, perluasan ulang hanya dilakukan
+                 * pada permission yang masih tersisa.
+                 */
+                setForm(
+                    (previousForm) => ({
+                        ...previousForm,
+
+                        permissions:
+                            expandImpliedPermissions(
+                                remainingPermissions,
+                                impliedPermissions,
+                                availablePermissions
+                            ),
+                    })
+                );
+
+                return;
             }
 
-            return {
-                ...previousForm,
-                permissions:
-                    normalizePermissions(
-                        nextPermissions
-                    ),
-            };
-        });
-    };
+            const expandedGroup =
+                expandImpliedPermissions(
+                    [
+                        ...form.permissions,
+                        ...groupPermissions,
+                    ],
+                    impliedPermissions,
+                    availablePermissions
+                );
+
+            setForm(
+                (previousForm) => ({
+                    ...previousForm,
+
+                    permissions:
+                        expandedGroup,
+                })
+            );
+        };
 
     const applyDefaultPermissions = () => {
-        setForm((previousForm) => ({
-            ...previousForm,
-            permissions:
-                previousForm.role ===
-                'superadmin'
-                    ? ALL_PERMISSIONS
-                    : [
-                          ...(
-                              DEFAULT_PERMISSIONS[
-                                  previousForm.role
-                              ] || []
-                          ),
-                      ],
-        }));
+        const permissions =
+            form.role ===
+            'superadmin'
+                ? availablePermissions
+                : normalizePermissions(
+                    defaultPermissions[
+                        form.role
+                    ] || [],
+                    availablePermissions
+                );
+
+        setForm(
+            (previousForm) => ({
+                ...previousForm,
+                permissions,
+            })
+        );
     };
 
     const selectAllPermissions = () => {
-        if (isSuperadminRole) {
+        if (
+            isSuperadminRole
+        ) {
             return;
         }
 
-        setForm((previousForm) => ({
-            ...previousForm,
-            permissions: [
-                ...ALL_PERMISSIONS,
-            ],
-        }));
+        setForm(
+            (previousForm) => ({
+                ...previousForm,
+
+                permissions: [
+                    ...availablePermissions,
+                ],
+            })
+        );
     };
 
     const clearAllPermissions = () => {
-        if (isSuperadminRole) {
+        if (
+            isSuperadminRole
+        ) {
             return;
         }
 
-        setForm((previousForm) => ({
-            ...previousForm,
-            permissions: [],
-        }));
+        setForm(
+            (previousForm) => ({
+                ...previousForm,
+                permissions: [],
+            })
+        );
     };
 
     const validateForm = () => {
-        if (!form.name.trim()) {
+        if (!canManage) {
+            showErrorAlert(
+                'Akses Ditolak',
+                'Hanya superadmin yang dapat menyimpan data user.'
+            );
+
+            return false;
+        }
+
+        if (
+            !form.name.trim()
+        ) {
             showWarningAlert(
                 'Nama Wajib Diisi',
                 'Isi nama user terlebih dahulu.'
@@ -685,7 +1245,21 @@ export default function UserFormPage() {
             return false;
         }
 
-        if (!form.username.trim()) {
+        if (
+            form.name.trim().length <
+            3
+        ) {
+            showWarningAlert(
+                'Nama Terlalu Pendek',
+                'Nama user minimal tiga karakter.'
+            );
+
+            return false;
+        }
+
+        if (
+            !form.username.trim()
+        ) {
             showWarningAlert(
                 'Username Wajib Diisi',
                 'Isi username user terlebih dahulu.'
@@ -694,10 +1268,63 @@ export default function UserFormPage() {
             return false;
         }
 
-        if (!form.email.trim()) {
+        if (
+            !/^[a-zA-Z0-9._-]+$/.test(
+                form.username.trim()
+            )
+        ) {
+            showWarningAlert(
+                'Username Tidak Valid',
+                'Username hanya boleh berisi huruf, angka, titik, garis bawah, dan tanda hubung.'
+            );
+
+            return false;
+        }
+
+        if (
+            form.username.trim().length <
+            3
+        ) {
+            showWarningAlert(
+                'Username Terlalu Pendek',
+                'Username minimal tiga karakter.'
+            );
+
+            return false;
+        }
+
+        if (
+            !form.email.trim()
+        ) {
             showWarningAlert(
                 'Email Wajib Diisi',
                 'Isi email user terlebih dahulu.'
+            );
+
+            return false;
+        }
+
+        if (
+            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+                form.email.trim()
+            )
+        ) {
+            showWarningAlert(
+                'Email Tidak Valid',
+                'Masukkan alamat email yang valid.'
+            );
+
+            return false;
+        }
+
+        if (
+            !availableRoles.includes(
+                form.role
+            )
+        ) {
+            showWarningAlert(
+                'Role Tidak Valid',
+                'Pilih role yang tersedia.'
             );
 
             return false;
@@ -717,11 +1344,12 @@ export default function UserFormPage() {
 
         if (
             form.password &&
-            form.password.length < 6
+            form.password.length <
+                6
         ) {
             showWarningAlert(
                 'Password Terlalu Pendek',
-                'Password minimal 6 karakter.'
+                'Password minimal enam karakter.'
             );
 
             return false;
@@ -740,113 +1368,10 @@ export default function UserFormPage() {
             return false;
         }
 
-        if (
-            form.role !== 'superadmin' &&
-            form.permissions.length === 0
-        ) {
-            showWarningAlert(
-                'Hak Akses Belum Dipilih',
-                'Pilih minimal satu hak akses untuk akun ini.'
-            );
-
-            return false;
-        }
-
-        if (
-            form.permissions.includes(
-                'approval.merchandise.process'
-            ) &&
-            !form.permissions.includes(
-                'approval.merchandise.view'
-            )
-        ) {
-            showWarningAlert(
-                'Akses Merchandise Belum Lengkap',
-                'Permission proses merchandise membutuhkan permission lihat approval merchandise.'
-            );
-
-            return false;
-        }
-
-        if (
-            form.permissions.includes(
-                'approval.humas.process'
-            ) &&
-            !form.permissions.includes(
-                'approval.humas.view'
-            )
-        ) {
-            showWarningAlert(
-                'Akses Humas Belum Lengkap',
-                'Permission proses liputan membutuhkan permission lihat approval liputan.'
-            );
-
-            return false;
-        }
-
-        if (
-            form.permissions.includes(
-                'approval.borrowing.process'
-            ) &&
-            !form.permissions.includes(
-                'approval.borrowing.view'
-            )
-        ) {
-            showWarningAlert(
-                'Akses Peminjaman Belum Lengkap',
-                'Permission proses peminjaman membutuhkan permission lihat approval peminjaman.'
-            );
-
-            return false;
-        }
-
-        if (
-            form.permissions.includes(
-                'categories.manage'
-            ) &&
-            !form.permissions.includes(
-                'categories.view'
-            )
-        ) {
-            showWarningAlert(
-                'Akses Kategori Belum Lengkap',
-                'Permission kelola kategori membutuhkan permission lihat kategori.'
-            );
-
-            return false;
-        }
-
-        if (
-            form.permissions.includes(
-                'products.manage'
-            ) &&
-            !form.permissions.includes(
-                'products.view'
-            )
-        ) {
-            showWarningAlert(
-                'Akses Produk Belum Lengkap',
-                'Permission kelola produk membutuhkan permission lihat produk.'
-            );
-
-            return false;
-        }
-
-        if (
-            form.permissions.includes(
-                'users.manage'
-            ) &&
-            !form.permissions.includes(
-                'users.view'
-            )
-        ) {
-            showWarningAlert(
-                'Akses User Belum Lengkap',
-                'Permission kelola user membutuhkan permission lihat data user.'
-            );
-
-            return false;
-        }
+        /*
+         * Array permission kosong diperbolehkan.
+         * Ini sesuai backend dan pilihan superadmin.
+         */
 
         return true;
     };
@@ -871,21 +1396,39 @@ export default function UserFormPage() {
             );
 
             const payload = {
-                name: form.name.trim(),
+                name:
+                    form.name.trim(),
+
                 username:
                     form.username.trim(),
-                email: form.email.trim(),
-                role: form.role,
+
+                email:
+                    form.email
+                        .trim()
+                        .toLowerCase(),
+
+                role:
+                    form.role,
+
+                /*
+                 * Selalu kirim permissions, termasuk [].
+                 * Dengan demikian array kosong tidak diganti default role.
+                 */
                 permissions:
                     form.role ===
                     'superadmin'
-                        ? ALL_PERMISSIONS
+                        ? [
+                            ...availablePermissions,
+                        ]
                         : normalizePermissions(
-                              form.permissions
-                          ),
+                            form.permissions,
+                            availablePermissions
+                        ),
             };
 
-            if (form.password) {
+            if (
+                form.password
+            ) {
                 payload.password =
                     form.password;
 
@@ -901,20 +1444,6 @@ export default function UserFormPage() {
                         `/admin/users/${id}`,
                         payload
                     );
-
-                if (isCurrentAccount) {
-                    const updatedUser =
-                        response?.data?.data;
-
-                    if (updatedUser) {
-                        localStorage.setItem(
-                            'admin_user',
-                            JSON.stringify(
-                                updatedUser
-                            )
-                        );
-                    }
-                }
             } else {
                 response =
                     await api.post(
@@ -929,14 +1458,38 @@ export default function UserFormPage() {
                 isEdit
                     ? 'User Diperbarui'
                     : 'User Ditambahkan',
-                isEdit
-                    ? 'Data dan hak akses user berhasil diperbarui.'
-                    : 'User baru beserta hak aksesnya berhasil ditambahkan.'
+
+                response?.data?.message ||
+                    (
+                        isEdit
+                            ? 'Data dan hak akses user berhasil diperbarui.'
+                            : 'User baru berhasil ditambahkan.'
+                    )
             );
 
-            navigate('/admin/users', {
-                replace: true,
-            });
+            /*
+             * Apabila akun aktif sendiri diperbarui,
+             * sinkronkan informasi terbaru ke localStorage.
+             */
+            if (
+                isEdit &&
+                isCurrentAccount &&
+                response?.data?.data
+            ) {
+                localStorage.setItem(
+                    'admin_user',
+                    JSON.stringify(
+                        response.data.data
+                    )
+                );
+            }
+
+            navigate(
+                '/admin/users',
+                {
+                    replace: true,
+                }
+            );
         } catch (error) {
             console.error(
                 'Save user error:',
@@ -950,6 +1503,7 @@ export default function UserFormPage() {
                 isEdit
                     ? 'Update Gagal'
                     : 'Tambah Gagal',
+
                 getBackendErrorMessage(
                     error,
                     'Data user gagal disimpan.'
@@ -973,6 +1527,90 @@ export default function UserFormPage() {
                     <p className="text-muted mb-0">
                         Mohon tunggu sebentar.
                     </p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!canManage) {
+        return (
+            <div className="card border-0 shadow-sm rounded-5">
+                <div className="card-body p-5 text-center">
+                    <div
+                        className="mx-auto rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center mb-4"
+                        style={{
+                            width: 88,
+                            height: 88,
+                        }}
+                    >
+                        <i className="bi bi-shield-lock-fill fs-1" />
+                    </div>
+
+                    <h3 className="fw-black mb-2">
+                        Akses Ditolak
+                    </h3>
+
+                    <p className="text-muted mx-auto mb-4">
+                        Hanya superadmin yang dapat menambah atau mengubah akun dan hak akses.
+                    </p>
+
+                    <Link
+                        to="/admin/users"
+                        className="btn btn-danger rounded-pill px-4"
+                    >
+                        <i className="bi bi-arrow-left me-2" />
+
+                        Kembali ke Data User
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="card border-0 shadow-sm rounded-5">
+                <div className="card-body p-5 text-center">
+                    <div
+                        className="mx-auto rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center mb-4"
+                        style={{
+                            width: 88,
+                            height: 88,
+                        }}
+                    >
+                        <i className="bi bi-exclamation-triangle-fill fs-1" />
+                    </div>
+
+                    <h3 className="fw-black mb-2">
+                        Form Gagal Dimuat
+                    </h3>
+
+                    <p className="text-muted mx-auto mb-4">
+                        {loadError}
+                    </p>
+
+                    <div className="d-flex flex-wrap justify-content-center gap-2">
+                        <button
+                            type="button"
+                            className="btn btn-outline-danger rounded-pill"
+                            onClick={
+                                fetchFormData
+                            }
+                        >
+                            <i className="bi bi-arrow-clockwise me-2" />
+
+                            Coba Lagi
+                        </button>
+
+                        <Link
+                            to="/admin/users"
+                            className="btn btn-danger rounded-pill"
+                        >
+                            <i className="bi bi-arrow-left me-2" />
+
+                            Kembali
+                        </Link>
+                    </div>
                 </div>
             </div>
         );
@@ -1009,9 +1647,7 @@ export default function UserFormPage() {
                                     lineHeight: 1.8,
                                 }}
                             >
-                                Superadmin dapat mengatur identitas,
-                                role, serta menentukan menu dan fitur
-                                yang dapat digunakan oleh setiap akun.
+                                Atur identitas, role, serta menu dan fitur yang dapat digunakan oleh akun.
                             </p>
                         </div>
 
@@ -1020,6 +1656,7 @@ export default function UserFormPage() {
                             className="btn btn-light rounded-pill px-4"
                         >
                             <i className="bi bi-arrow-left me-2" />
+
                             Kembali
                         </Link>
                     </div>
@@ -1033,19 +1670,22 @@ export default function UserFormPage() {
 
                         <div>
                             <div className="fw-black">
-                                Ini adalah akun yang sedang digunakan
+                                Ini akun yang sedang digunakan
                             </div>
 
                             <div className="small">
-                                Role superadmin pada akun aktif tidak dapat diturunkan
-                                untuk mencegah kehilangan akses sistem.
+                                Role superadmin pada akun aktif tidak dapat diturunkan.
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            <form onSubmit={handleSubmit}>
+            <form
+                onSubmit={
+                    handleSubmit
+                }
+            >
                 <div className="row g-4">
                     <div className="col-xl-8">
                         <section className="card border-0 shadow-sm rounded-5 mb-4">
@@ -1068,58 +1708,98 @@ export default function UserFormPage() {
 
                                 <div className="row g-3">
                                     <div className="col-md-6">
-                                        <label className="form-label fw-bold">
+                                        <label
+                                            htmlFor="name"
+                                            className="form-label fw-bold"
+                                        >
                                             Nama Lengkap
                                         </label>
 
                                         <input
+                                            id="name"
                                             type="text"
                                             name="name"
                                             className="form-control rounded-pill"
                                             placeholder="Contoh: Ayodya Ganas Wasesa"
-                                            value={form.name}
-                                            onChange={handleChange}
-                                            disabled={submitting}
+                                            value={
+                                                form.name
+                                            }
+                                            onChange={
+                                                handleChange
+                                            }
+                                            disabled={
+                                                submitting
+                                            }
+                                            maxLength="255"
                                             required
                                         />
                                     </div>
 
                                     <div className="col-md-6">
-                                        <label className="form-label fw-bold">
+                                        <label
+                                            htmlFor="username"
+                                            className="form-label fw-bold"
+                                        >
                                             Username
                                         </label>
 
                                         <input
+                                            id="username"
                                             type="text"
                                             name="username"
                                             className="form-control rounded-pill"
                                             placeholder="contoh: ayodya"
-                                            value={form.username}
-                                            onChange={handleChange}
-                                            disabled={submitting}
+                                            value={
+                                                form.username
+                                            }
+                                            onChange={
+                                                handleChange
+                                            }
+                                            disabled={
+                                                submitting
+                                            }
+                                            maxLength="100"
                                             required
                                         />
+
+                                        <div className="form-text">
+                                            Gunakan huruf, angka, titik, garis bawah, atau tanda hubung.
+                                        </div>
                                     </div>
 
                                     <div className="col-12">
-                                        <label className="form-label fw-bold">
+                                        <label
+                                            htmlFor="email"
+                                            className="form-label fw-bold"
+                                        >
                                             Email
                                         </label>
 
                                         <input
+                                            id="email"
                                             type="email"
                                             name="email"
                                             className="form-control rounded-pill"
                                             placeholder="nama@email.com"
-                                            value={form.email}
-                                            onChange={handleChange}
-                                            disabled={submitting}
+                                            value={
+                                                form.email
+                                            }
+                                            onChange={
+                                                handleChange
+                                            }
+                                            disabled={
+                                                submitting
+                                            }
+                                            maxLength="255"
                                             required
                                         />
                                     </div>
 
                                     <div className="col-md-6">
-                                        <label className="form-label fw-bold">
+                                        <label
+                                            htmlFor="password"
+                                            className="form-label fw-bold"
+                                        >
                                             {isEdit
                                                 ? 'Password Baru'
                                                 : 'Password'}
@@ -1127,6 +1807,7 @@ export default function UserFormPage() {
 
                                         <div className="input-group">
                                             <input
+                                                id="password"
                                                 type={
                                                     showPassword
                                                         ? 'text'
@@ -1139,10 +1820,19 @@ export default function UserFormPage() {
                                                         ? 'Kosongkan jika tidak diganti'
                                                         : 'Minimal 6 karakter'
                                                 }
-                                                value={form.password}
-                                                onChange={handleChange}
-                                                disabled={submitting}
-                                                required={!isEdit}
+                                                value={
+                                                    form.password
+                                                }
+                                                onChange={
+                                                    handleChange
+                                                }
+                                                disabled={
+                                                    submitting
+                                                }
+                                                maxLength="255"
+                                                required={
+                                                    !isEdit
+                                                }
                                             />
 
                                             <button
@@ -1150,11 +1840,16 @@ export default function UserFormPage() {
                                                 className="btn btn-outline-secondary rounded-end-pill"
                                                 onClick={() =>
                                                     setShowPassword(
-                                                        (previousValue) =>
+                                                        (
+                                                            previousValue
+                                                        ) =>
                                                             !previousValue
                                                     )
                                                 }
-                                                disabled={submitting}
+                                                disabled={
+                                                    submitting
+                                                }
+                                                aria-label="Tampilkan atau sembunyikan password"
                                             >
                                                 <i
                                                     className={`bi ${
@@ -1168,18 +1863,22 @@ export default function UserFormPage() {
 
                                         {isEdit && (
                                             <div className="form-text">
-                                                Kosongkan jika password tidak ingin diganti.
+                                                Kosongkan apabila password tidak ingin diganti.
                                             </div>
                                         )}
                                     </div>
 
                                     <div className="col-md-6">
-                                        <label className="form-label fw-bold">
+                                        <label
+                                            htmlFor="password_confirmation"
+                                            className="form-label fw-bold"
+                                        >
                                             Konfirmasi Password
                                         </label>
 
                                         <div className="input-group">
                                             <input
+                                                id="password_confirmation"
                                                 type={
                                                     showPasswordConfirmation
                                                         ? 'text'
@@ -1191,8 +1890,13 @@ export default function UserFormPage() {
                                                 value={
                                                     form.password_confirmation
                                                 }
-                                                onChange={handleChange}
-                                                disabled={submitting}
+                                                onChange={
+                                                    handleChange
+                                                }
+                                                disabled={
+                                                    submitting
+                                                }
+                                                maxLength="255"
                                                 required={
                                                     !isEdit ||
                                                     Boolean(
@@ -1212,7 +1916,10 @@ export default function UserFormPage() {
                                                             !previousValue
                                                     )
                                                 }
-                                                disabled={submitting}
+                                                disabled={
+                                                    submitting
+                                                }
+                                                aria-label="Tampilkan atau sembunyikan konfirmasi password"
                                             >
                                                 <i
                                                     className={`bi ${
@@ -1237,15 +1944,25 @@ export default function UserFormPage() {
                                         </h4>
 
                                         <p className="text-muted mb-0">
-                                            Menu yang tidak dicentang tidak akan
-                                            ditampilkan pada akun tersebut.
+                                            Permission kosong diperbolehkan. Akun tersebut tidak akan memiliki akses fitur.
                                         </p>
                                     </div>
 
-                                    <span className="badge rounded-pill text-bg-danger px-3 py-2">
-                                        {selectedPermissionCount} dari{' '}
-                                        {ALL_PERMISSIONS.length} akses
-                                    </span>
+                                    <div className="d-flex flex-wrap gap-2">
+                                        <span className="badge rounded-pill text-bg-light border text-dark px-3 py-2">
+                                            {
+                                                storedPermissionCount
+                                            }{' '}
+                                            tersimpan
+                                        </span>
+
+                                        <span className="badge rounded-pill text-bg-danger px-3 py-2">
+                                            {
+                                                effectivePermissionCount
+                                            }{' '}
+                                            efektif
+                                        </span>
+                                    </div>
                                 </div>
 
                                 {isSuperadminRole && (
@@ -1259,8 +1976,7 @@ export default function UserFormPage() {
                                                 </div>
 
                                                 <div className="small">
-                                                    Seluruh permission otomatis aktif dan
-                                                    tidak dapat dinonaktifkan.
+                                                    Seluruh permission otomatis aktif dan tidak dapat dinonaktifkan.
                                                 </div>
                                             </div>
                                         </div>
@@ -1271,36 +1987,47 @@ export default function UserFormPage() {
                                     <button
                                         type="button"
                                         className="btn btn-sm btn-outline-danger rounded-pill"
-                                        onClick={applyDefaultPermissions}
-                                        disabled={submitting}
+                                        onClick={
+                                            applyDefaultPermissions
+                                        }
+                                        disabled={
+                                            submitting
+                                        }
                                     >
                                         <i className="bi bi-arrow-counterclockwise me-2" />
+
                                         Default Role
                                     </button>
 
                                     <button
                                         type="button"
                                         className="btn btn-sm btn-outline-primary rounded-pill"
-                                        onClick={selectAllPermissions}
+                                        onClick={
+                                            selectAllPermissions
+                                        }
                                         disabled={
                                             submitting ||
                                             isSuperadminRole
                                         }
                                     >
                                         <i className="bi bi-check2-all me-2" />
+
                                         Pilih Semua
                                     </button>
 
                                     <button
                                         type="button"
                                         className="btn btn-sm btn-outline-secondary rounded-pill"
-                                        onClick={clearAllPermissions}
+                                        onClick={
+                                            clearAllPermissions
+                                        }
                                         disabled={
                                             submitting ||
                                             isSuperadminRole
                                         }
                                     >
                                         <i className="bi bi-x-lg me-2" />
+
                                         Kosongkan
                                     </button>
                                 </div>
@@ -1308,15 +2035,36 @@ export default function UserFormPage() {
                                 <div className="row g-4">
                                     {PERMISSION_GROUPS.map(
                                         (group) => {
+                                            const visiblePermissions =
+                                                group.permissions.filter(
+                                                    (
+                                                        permission
+                                                    ) =>
+                                                        availablePermissions.includes(
+                                                            permission.value
+                                                        )
+                                                );
+
+                                            if (
+                                                visiblePermissions.length ===
+                                                0
+                                            ) {
+                                                return null;
+                                            }
+
                                             const groupPermissionValues =
-                                                group.permissions.map(
-                                                    (permission) =>
+                                                visiblePermissions.map(
+                                                    (
+                                                        permission
+                                                    ) =>
                                                         permission.value
                                                 );
 
                                             const selectedInGroup =
                                                 groupPermissionValues.filter(
-                                                    (permission) =>
+                                                    (
+                                                        permission
+                                                    ) =>
                                                         form.permissions.includes(
                                                             permission
                                                         )
@@ -1329,7 +2077,9 @@ export default function UserFormPage() {
                                             return (
                                                 <div
                                                     className="col-12 col-lg-6"
-                                                    key={group.key}
+                                                    key={
+                                                        group.key
+                                                    }
                                                 >
                                                     <div className="border rounded-4 h-100 overflow-hidden">
                                                         <div className="p-3 bg-light border-bottom">
@@ -1343,7 +2093,9 @@ export default function UserFormPage() {
 
                                                                     <div>
                                                                         <div className="fw-black">
-                                                                            {group.label}
+                                                                            {
+                                                                                group.label
+                                                                            }
                                                                         </div>
 
                                                                         <div className="small text-muted">
@@ -1363,7 +2115,12 @@ export default function UserFormPage() {
                                                                     }`}
                                                                     onClick={() =>
                                                                         handleGroupToggle(
-                                                                            group
+                                                                            {
+                                                                                ...group,
+
+                                                                                permissions:
+                                                                                    visiblePermissions,
+                                                                            }
                                                                         )
                                                                     }
                                                                     disabled={
@@ -1371,7 +2128,10 @@ export default function UserFormPage() {
                                                                         isSuperadminRole
                                                                     }
                                                                 >
-                                                                    {selectedInGroup}/
+                                                                    {
+                                                                        selectedInGroup
+                                                                    }
+                                                                    /
                                                                     {
                                                                         groupPermissionValues.length
                                                                     }
@@ -1381,14 +2141,45 @@ export default function UserFormPage() {
 
                                                         <div className="p-3">
                                                             <div className="d-flex flex-column gap-3">
-                                                                {group.permissions.map(
+                                                                {visiblePermissions.map(
                                                                     (
                                                                         permission
                                                                     ) => {
-                                                                        const isChecked =
+                                                                        const isStored =
                                                                             form.permissions.includes(
                                                                                 permission.value
                                                                             );
+
+                                                                        const isEffective =
+                                                                            effectivePermissions.includes(
+                                                                                permission.value
+                                                                            );
+
+                                                                        const impliedBy =
+                                                                            Object.entries(
+                                                                                impliedPermissions
+                                                                            )
+                                                                                .filter(
+                                                                                    ([
+                                                                                        parentPermission,
+                                                                                        childPermissions,
+                                                                                    ]) =>
+                                                                                        Array.isArray(
+                                                                                            childPermissions
+                                                                                        ) &&
+                                                                                        childPermissions.includes(
+                                                                                            permission.value
+                                                                                        ) &&
+                                                                                        form.permissions.includes(
+                                                                                            parentPermission
+                                                                                        )
+                                                                                )
+                                                                                .map(
+                                                                                    ([
+                                                                                        parentPermission,
+                                                                                    ]) =>
+                                                                                        parentPermission
+                                                                                );
 
                                                                         return (
                                                                             <label
@@ -1396,7 +2187,7 @@ export default function UserFormPage() {
                                                                                     permission.value
                                                                                 }
                                                                                 className={`p-3 rounded-4 border ${
-                                                                                    isChecked
+                                                                                    isEffective
                                                                                         ? 'border-danger bg-danger-subtle'
                                                                                         : 'bg-white'
                                                                                 }`}
@@ -1412,7 +2203,7 @@ export default function UserFormPage() {
                                                                                         type="checkbox"
                                                                                         className="form-check-input mt-1"
                                                                                         checked={
-                                                                                            isChecked
+                                                                                            isEffective
                                                                                         }
                                                                                         onChange={() =>
                                                                                             handlePermissionToggle(
@@ -1425,11 +2216,20 @@ export default function UserFormPage() {
                                                                                         }
                                                                                     />
 
-                                                                                    <div>
-                                                                                        <div className="fw-bold">
-                                                                                            {
-                                                                                                permission.label
-                                                                                            }
+                                                                                    <div className="flex-grow-1">
+                                                                                        <div className="d-flex flex-wrap align-items-center gap-2">
+                                                                                            <div className="fw-bold">
+                                                                                                {
+                                                                                                    permission.label
+                                                                                                }
+                                                                                            </div>
+
+                                                                                            {!isStored &&
+                                                                                                isEffective && (
+                                                                                                    <span className="badge rounded-pill text-bg-info">
+                                                                                                        Turunan
+                                                                                                    </span>
+                                                                                                )}
                                                                                         </div>
 
                                                                                         <div className="small text-muted">
@@ -1437,6 +2237,20 @@ export default function UserFormPage() {
                                                                                                 permission.description
                                                                                             }
                                                                                         </div>
+
+                                                                                        {impliedBy.length >
+                                                                                            0 && (
+                                                                                            <div className="small text-info-emphasis mt-2">
+                                                                                                Otomatis aktif karena
+                                                                                                {' '}
+                                                                                                <strong>
+                                                                                                    {impliedBy.join(
+                                                                                                        ', '
+                                                                                                    )}
+                                                                                                </strong>
+                                                                                                .
+                                                                                            </div>
+                                                                                        )}
                                                                                     </div>
                                                                                 </div>
                                                                             </label>
@@ -1463,12 +2277,14 @@ export default function UserFormPage() {
                                 </h4>
 
                                 <p className="text-muted mb-4">
-                                    Role menentukan jenis akun dan route utama setelah login.
+                                    Mengganti role akan menerapkan permission default role tersebut.
                                 </p>
 
                                 <div className="d-flex flex-column gap-3">
-                                    {ROLE_OPTIONS.map(
-                                        (roleOption) => {
+                                    {roleOptions.map(
+                                        (
+                                            roleOption
+                                        ) => {
                                             const selected =
                                                 form.role ===
                                                 roleOption.value;
@@ -1477,7 +2293,7 @@ export default function UserFormPage() {
                                                 submitting ||
                                                 (
                                                     isCurrentAccount &&
-                                                    form.role ===
+                                                    originalUser?.role ===
                                                         'superadmin' &&
                                                     roleOption.value !==
                                                         'superadmin'
@@ -1494,12 +2310,15 @@ export default function UserFormPage() {
                                                             : 'bg-white'
                                                     }`}
                                                     style={{
-                                                        cursor: disabled
-                                                            ? 'not-allowed'
-                                                            : 'pointer',
-                                                        opacity: disabled
-                                                            ? 0.65
-                                                            : 1,
+                                                        cursor:
+                                                            disabled
+                                                                ? 'not-allowed'
+                                                                : 'pointer',
+
+                                                        opacity:
+                                                            disabled
+                                                                ? 0.65
+                                                                : 1,
                                                     }}
                                                 >
                                                     <div className="d-flex align-items-start gap-3">
@@ -1509,13 +2328,17 @@ export default function UserFormPage() {
                                                             value={
                                                                 roleOption.value
                                                             }
-                                                            checked={selected}
+                                                            checked={
+                                                                selected
+                                                            }
                                                             onChange={() =>
                                                                 handleRoleChange(
                                                                     roleOption.value
                                                                 )
                                                             }
-                                                            disabled={disabled}
+                                                            disabled={
+                                                                disabled
+                                                            }
                                                             className="form-check-input mt-1"
                                                         />
 
@@ -1554,8 +2377,13 @@ export default function UserFormPage() {
                                 <div className="p-3 rounded-4 bg-light">
                                     <div className="d-flex align-items-center gap-3">
                                         <div className="profile-avatar bg-danger text-white">
-                                            {(form.name || 'U')
-                                                .charAt(0)
+                                            {(
+                                                form.name ||
+                                                'U'
+                                            )
+                                                .charAt(
+                                                    0
+                                                )
                                                 .toUpperCase()}
                                         </div>
 
@@ -1575,7 +2403,7 @@ export default function UserFormPage() {
 
                                     <hr />
 
-                                    <div className="d-flex align-items-center justify-content-between gap-3 mb-3">
+                                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                                         <span
                                             className={`badge rounded-pill bg-${selectedRole.color}-subtle text-${selectedRole.color} px-3 py-2`}
                                         >
@@ -1590,7 +2418,7 @@ export default function UserFormPage() {
 
                                         <span className="badge rounded-pill text-bg-dark">
                                             {
-                                                selectedPermissionCount
+                                                effectivePermissionCount
                                             }{' '}
                                             akses
                                         </span>
@@ -1610,11 +2438,14 @@ export default function UserFormPage() {
                                     <button
                                         type="submit"
                                         className="btn btn-danger rounded-pill"
-                                        disabled={submitting}
+                                        disabled={
+                                            submitting
+                                        }
                                     >
                                         {submitting ? (
                                             <>
                                                 <span className="spinner-border spinner-border-sm me-2" />
+
                                                 Menyimpan...
                                             </>
                                         ) : (

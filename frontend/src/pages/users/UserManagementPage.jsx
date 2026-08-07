@@ -209,13 +209,48 @@ const getCurrentUser = () => {
     }
 };
 
+const normalizePermissions = (permissions) => {
+    if (!Array.isArray(permissions)) {
+        return [];
+    }
+
+    return [
+        ...new Set(
+            permissions.filter(
+                (permission) =>
+                    typeof permission === 'string' &&
+                    permission.trim() !== ''
+            )
+        ),
+    ];
+};
+
+const hasPermission = (
+    currentUser,
+    permission
+) => {
+    if (
+        currentUser?.role ===
+        'superadmin'
+    ) {
+        return true;
+    }
+
+    return normalizePermissions(
+        currentUser?.permissions
+    ).includes(permission);
+};
+
 const getRoleConfig = (role) => {
     return (
         ROLE_OPTIONS.find(
-            (option) => option.value === role
+            (option) =>
+                option.value === role
         ) || {
             value: role,
-            label: role || 'Tidak diketahui',
+            label:
+                role ||
+                'Tidak diketahui',
             icon: 'bi-person-fill',
             color: 'secondary',
         }
@@ -252,7 +287,8 @@ const formatDateTime = (date) => {
         return '-';
     }
 
-    const parsedDate = new Date(date);
+    const parsedDate =
+        new Date(date);
 
     if (
         Number.isNaN(
@@ -274,18 +310,22 @@ const formatDateTime = (date) => {
     );
 };
 
-const normalizePermissions = (
-    permissions
-) => {
-    if (!Array.isArray(permissions)) {
-        return [];
+const extractArray = (response) => {
+    const payload =
+        response?.data?.data;
+
+    if (Array.isArray(payload)) {
+        return payload;
     }
 
-    return [
-        ...new Set(
-            permissions.filter(Boolean)
-        ),
-    ];
+    if (
+        payload &&
+        Array.isArray(payload.data)
+    ) {
+        return payload.data;
+    }
+
+    return [];
 };
 
 const getPermissionGroupSummary = (
@@ -320,10 +360,26 @@ const getPermissionGroupSummary = (
 };
 
 export default function UserManagementPage() {
-    const currentUser = useMemo(
-        () => getCurrentUser(),
-        []
-    );
+    const currentUser =
+        useMemo(
+            () => getCurrentUser(),
+            []
+        );
+
+    /*
+     * Backend menetapkan create, update, delete,
+     * dan pengaturan permission hanya untuk superadmin.
+     */
+    const canManage =
+        currentUser?.role ===
+        'superadmin';
+
+    const canView =
+        canManage ||
+        hasPermission(
+            currentUser,
+            'users.view'
+        );
 
     const [
         users,
@@ -351,57 +407,67 @@ export default function UserManagementPage() {
     ] = useState(false);
 
     const [
+        deletingId,
+        setDeletingId,
+    ] = useState(null);
+
+    const [
         expandedUsers,
         setExpandedUsers,
     ] = useState([]);
 
-    const fetchUsers = useCallback(
-        async (isRefresh = false) => {
-            try {
-                if (isRefresh) {
-                    setRefreshing(true);
-                } else {
-                    setLoading(true);
+    const fetchUsers =
+        useCallback(
+            async (
+                isRefresh = false
+            ) => {
+                if (!canView) {
+                    setLoading(false);
+                    setUsers([]);
+
+                    return;
                 }
 
-                const response =
-                    await api.get(
-                        '/admin/users'
+                try {
+                    if (isRefresh) {
+                        setRefreshing(true);
+                    } else {
+                        setLoading(true);
+                    }
+
+                    const response =
+                        await api.get(
+                            '/admin/users'
+                        );
+
+                    setUsers(
+                        extractArray(
+                            response
+                        )
+                    );
+                } catch (error) {
+                    console.error(
+                        'Fetch users error:',
+                        error?.response?.data ||
+                            error
                     );
 
-                const responseData =
-                    response?.data?.data;
+                    await showErrorAlert(
+                        'Gagal Memuat Data',
+                        getBackendErrorMessage(
+                            error,
+                            'Data user gagal dimuat dari server.'
+                        )
+                    );
 
-                setUsers(
-                    Array.isArray(
-                        responseData
-                    )
-                        ? responseData
-                        : []
-                );
-            } catch (error) {
-                console.error(
-                    'Fetch users error:',
-                    error?.response?.data ||
-                        error
-                );
-
-                await showErrorAlert(
-                    'Gagal Memuat Data',
-                    getBackendErrorMessage(
-                        error,
-                        'Data user gagal dimuat dari server.'
-                    )
-                );
-
-                setUsers([]);
-            } finally {
-                setLoading(false);
-                setRefreshing(false);
-            }
-        },
-        []
-    );
+                    setUsers([]);
+                } finally {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
+            },
+            [canView]
+        );
 
     useEffect(() => {
         fetchUsers();
@@ -421,13 +487,13 @@ export default function UserManagementPage() {
                             user.role
                         );
 
-                    const permissions =
+                    const effectivePermissions =
                         normalizePermissions(
                             user.permissions
                         );
 
                     const permissionText =
-                        permissions
+                        effectivePermissions
                             .map(
                                 (permission) =>
                                     PERMISSION_LABELS[
@@ -487,46 +553,48 @@ export default function UserManagementPage() {
             selectedRole,
         ]);
 
-    const summary = useMemo(() => {
-        return {
-            total: users.length,
+    const summary =
+        useMemo(() => {
+            return {
+                total:
+                    users.length,
 
-            superadmin:
-                users.filter(
-                    (user) =>
-                        user.role ===
-                        'superadmin'
-                ).length,
+                superadmin:
+                    users.filter(
+                        (user) =>
+                            user.role ===
+                            'superadmin'
+                    ).length,
 
-            admin:
-                users.filter(
-                    (user) =>
-                        user.role ===
-                        'admin'
-                ).length,
+                admin:
+                    users.filter(
+                        (user) =>
+                            user.role ===
+                            'admin'
+                    ).length,
 
-            admin_humas:
-                users.filter(
-                    (user) =>
-                        user.role ===
-                        'admin_humas'
-                ).length,
+                admin_humas:
+                    users.filter(
+                        (user) =>
+                            user.role ===
+                            'admin_humas'
+                    ).length,
 
-            admin_sekpim:
-                users.filter(
-                    (user) =>
-                        user.role ===
-                        'admin_sekpim'
-                ).length,
+                admin_sekpim:
+                    users.filter(
+                        (user) =>
+                            user.role ===
+                            'admin_sekpim'
+                    ).length,
 
-            user:
-                users.filter(
-                    (user) =>
-                        user.role ===
-                        'user'
-                ).length,
-        };
-    }, [users]);
+                user:
+                    users.filter(
+                        (user) =>
+                            user.role ===
+                            'user'
+                    ).length,
+            };
+        }, [users]);
 
     const toggleExpandedUser = (
         userId
@@ -552,16 +620,35 @@ export default function UserManagementPage() {
         );
     };
 
+    const ensureManageAccess = async () => {
+        if (canManage) {
+            return true;
+        }
+
+        await showErrorAlert(
+            'Akses Ditolak',
+            'Hanya superadmin yang dapat menambah, mengubah, atau menghapus akun.'
+        );
+
+        return false;
+    };
+
     const handleDelete = async (
         user
     ) => {
+        if (
+            !(await ensureManageAccess())
+        ) {
+            return;
+        }
+
         if (
             Number(currentUser.id) ===
             Number(user.id)
         ) {
             await showErrorAlert(
                 'Tidak Bisa Dihapus',
-                'Akun yang sedang digunakan tidak bisa dihapus dari halaman ini.'
+                'Akun yang sedang digunakan tidak dapat dihapus.'
             );
 
             return;
@@ -569,11 +656,18 @@ export default function UserManagementPage() {
 
         const confirmation =
             await showConfirmAlert({
-                title: 'Hapus User?',
-                text: `Akun "${user.name}" akan dihapus permanen dari sistem.`,
+                title:
+                    'Hapus User?',
+
+                text:
+                    `Akun "${user.name}" akan dihapus dari sistem.`,
+
                 confirmButtonText:
                     'Ya, hapus',
-                icon: 'warning',
+
+                icon:
+                    'warning',
+
                 confirmButtonColor:
                     '#dc2626',
             });
@@ -585,20 +679,34 @@ export default function UserManagementPage() {
         }
 
         try {
+            setDeletingId(
+                user.id
+            );
+
             showLoadingAlert(
                 'Menghapus User',
                 'Mohon tunggu sebentar.'
             );
 
-            await api.delete(
-                `/admin/users/${user.id}`
-            );
+            const response =
+                await api.delete(
+                    `/admin/users/${user.id}`
+                );
 
             closeAlert();
 
             await showSuccessAlert(
                 'User Dihapus',
-                'Data user berhasil dihapus.'
+                response?.data?.message ||
+                    'Data user berhasil dihapus.'
+            );
+
+            setExpandedUsers(
+                (previousUsers) =>
+                    previousUsers.filter(
+                        (id) =>
+                            id !== user.id
+                    )
             );
 
             await fetchUsers(true);
@@ -618,6 +726,8 @@ export default function UserManagementPage() {
                     'User gagal dihapus.'
                 )
             );
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -625,6 +735,38 @@ export default function UserManagementPage() {
         setSearch('');
         setSelectedRole('all');
     };
+
+    if (!canView) {
+        return (
+            <div className="card border-0 shadow-sm rounded-5">
+                <div className="card-body p-5 text-center">
+                    <div
+                        className="mx-auto rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center mb-4"
+                        style={{
+                            width: 88,
+                            height: 88,
+                        }}
+                    >
+                        <i className="bi bi-shield-lock-fill fs-1" />
+                    </div>
+
+                    <h3 className="fw-black mb-2">
+                        Akses Ditolak
+                    </h3>
+
+                    <p className="text-muted mb-0">
+                        Akun tidak memiliki permission
+                        {' '}
+                        <strong>
+                            users.view
+                        </strong>
+                        {' '}
+                        untuk melihat data pengguna.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="container-fluid px-0">
@@ -643,7 +785,9 @@ export default function UserManagementPage() {
                             </span>
 
                             <h1 className="display-6 fw-black mb-3">
-                                Kelola akun dan hak akses.
+                                {canManage
+                                    ? 'Kelola akun dan hak akses.'
+                                    : 'Daftar akun dan hak akses.'}
                             </h1>
 
                             <p
@@ -653,10 +797,9 @@ export default function UserManagementPage() {
                                     lineHeight: 1.8,
                                 }}
                             >
-                                Superadmin dapat menambahkan akun,
-                                mengubah role, serta menentukan menu dan
-                                fitur yang dapat digunakan oleh setiap
-                                pengguna.
+                                {canManage
+                                    ? 'Superadmin dapat menambahkan akun, mengubah role, serta menentukan menu dan fitur yang dapat digunakan oleh setiap pengguna.'
+                                    : 'Akun ini hanya dapat melihat daftar pengguna beserta hak akses efektifnya. Perubahan akun hanya dapat dilakukan oleh superadmin.'}
                             </p>
                         </div>
 
@@ -665,7 +808,9 @@ export default function UserManagementPage() {
                                 <div className="col-6 col-md-4">
                                     <div className="bg-white bg-opacity-10 rounded-4 p-3 h-100">
                                         <div className="fs-3 fw-black">
-                                            {summary.total}
+                                            {
+                                                summary.total
+                                            }
                                         </div>
 
                                         <div className="small text-white-50">
@@ -677,7 +822,9 @@ export default function UserManagementPage() {
                                 <div className="col-6 col-md-4">
                                     <div className="bg-white bg-opacity-10 rounded-4 p-3 h-100">
                                         <div className="fs-3 fw-black">
-                                            {summary.superadmin}
+                                            {
+                                                summary.superadmin
+                                            }
                                         </div>
 
                                         <div className="small text-white-50">
@@ -689,7 +836,9 @@ export default function UserManagementPage() {
                                 <div className="col-6 col-md-4">
                                     <div className="bg-white bg-opacity-10 rounded-4 p-3 h-100">
                                         <div className="fs-3 fw-black">
-                                            {summary.admin}
+                                            {
+                                                summary.admin
+                                            }
                                         </div>
 
                                         <div className="small text-white-50">
@@ -701,7 +850,9 @@ export default function UserManagementPage() {
                                 <div className="col-6 col-md-4">
                                     <div className="bg-white bg-opacity-10 rounded-4 p-3 h-100">
                                         <div className="fs-3 fw-black">
-                                            {summary.admin_humas}
+                                            {
+                                                summary.admin_humas
+                                            }
                                         </div>
 
                                         <div className="small text-white-50">
@@ -713,7 +864,9 @@ export default function UserManagementPage() {
                                 <div className="col-6 col-md-4">
                                     <div className="bg-white bg-opacity-10 rounded-4 p-3 h-100">
                                         <div className="fs-3 fw-black">
-                                            {summary.admin_sekpim}
+                                            {
+                                                summary.admin_sekpim
+                                            }
                                         </div>
 
                                         <div className="small text-white-50">
@@ -725,7 +878,9 @@ export default function UserManagementPage() {
                                 <div className="col-6 col-md-4">
                                     <div className="bg-white bg-opacity-10 rounded-4 p-3 h-100">
                                         <div className="fs-3 fw-black">
-                                            {summary.user}
+                                            {
+                                                summary.user
+                                            }
                                         </div>
 
                                         <div className="small text-white-50">
@@ -738,6 +893,24 @@ export default function UserManagementPage() {
                     </div>
                 </div>
             </section>
+
+            {!canManage && (
+                <div className="alert alert-info border-0 shadow-sm rounded-4 mb-4">
+                    <div className="d-flex align-items-start gap-3">
+                        <i className="bi bi-eye-fill fs-4" />
+
+                        <div>
+                            <div className="fw-black">
+                                Mode hanya lihat
+                            </div>
+
+                            <div className="small">
+                                Akun dapat melihat daftar dan rincian hak akses, tetapi tidak dapat menambah, mengedit, atau menghapus user.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <section className="card border-0 shadow-sm rounded-5 mb-4">
                 <div className="card-body p-4">
@@ -756,7 +929,9 @@ export default function UserManagementPage() {
                                     type="search"
                                     className="form-control"
                                     placeholder="Nama, username, email, role, atau akses..."
-                                    value={search}
+                                    value={
+                                        search
+                                    }
                                     onChange={(
                                         event
                                     ) =>
@@ -823,6 +998,7 @@ export default function UserManagementPage() {
                                     }
                                 >
                                     <i className="bi bi-arrow-counterclockwise me-2" />
+
                                     Reset
                                 </button>
 
@@ -841,23 +1017,28 @@ export default function UserManagementPage() {
                                     {refreshing ? (
                                         <>
                                             <span className="spinner-border spinner-border-sm me-2" />
+
                                             Memuat...
                                         </>
                                     ) : (
                                         <>
                                             <i className="bi bi-arrow-clockwise me-2" />
+
                                             Refresh
                                         </>
                                     )}
                                 </button>
 
-                                <Link
-                                    to="/admin/users/create"
-                                    className="btn btn-danger rounded-pill"
-                                >
-                                    <i className="bi bi-person-plus-fill me-2" />
-                                    Tambah User
-                                </Link>
+                                {canManage && (
+                                    <Link
+                                        to="/admin/users/create"
+                                        className="btn btn-danger rounded-pill"
+                                    >
+                                        <i className="bi bi-person-plus-fill me-2" />
+
+                                        Tambah User
+                                    </Link>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -878,8 +1059,7 @@ export default function UserManagementPage() {
                         </p>
                     </div>
                 </div>
-            ) : filteredUsers.length ===
-              0 ? (
+            ) : filteredUsers.length === 0 ? (
                 <div className="card border-0 shadow-sm rounded-5">
                     <div className="card-body p-5 text-center">
                         <div
@@ -920,14 +1100,23 @@ export default function UserManagementPage() {
                                     user.role
                                 );
 
-                            const permissions =
+                            /*
+                             * permissions = akses efektif.
+                             * stored_permissions = centang yang tersimpan.
+                             */
+                            const effectivePermissions =
                                 normalizePermissions(
                                     user.permissions
                                 );
 
+                            const storedPermissions =
+                                normalizePermissions(
+                                    user.stored_permissions
+                                );
+
                             const permissionGroups =
                                 getPermissionGroupSummary(
-                                    permissions
+                                    effectivePermissions
                                 );
 
                             const isCurrentAccount =
@@ -959,7 +1148,13 @@ export default function UserManagementPage() {
                                     <article className="card border-0 shadow-sm rounded-5 overflow-hidden">
                                         <div className="card-body p-4">
                                             <div className="row g-4 align-items-center">
-                                                <div className="col-xl-4">
+                                                <div
+                                                    className={
+                                                        canManage
+                                                            ? 'col-xl-4'
+                                                            : 'col-xl-5'
+                                                    }
+                                                >
                                                     <div className="d-flex align-items-start gap-3">
                                                         <div className="profile-avatar bg-danger text-white flex-shrink-0">
                                                             {(
@@ -988,21 +1183,18 @@ export default function UserManagementPage() {
 
                                                                 {isCurrentAccount && (
                                                                     <span className="badge rounded-pill text-bg-warning px-3 py-2">
-                                                                        Akun
-                                                                        Saat
-                                                                        Ini
+                                                                        Akun Saat Ini
                                                                     </span>
                                                                 )}
 
                                                                 {isSuperadmin && (
                                                                     <span className="badge rounded-pill text-bg-dark px-3 py-2">
-                                                                        Akses
-                                                                        Penuh
+                                                                        Akses Penuh
                                                                     </span>
                                                                 )}
                                                             </div>
 
-                                                            <h5 className="fw-black mb-1 text-truncate">
+                                                            <h5 className="fw-black mb-1 text-break">
                                                                 {
                                                                     user.name
                                                                 }
@@ -1026,14 +1218,13 @@ export default function UserManagementPage() {
 
                                                 <div className="col-md-6 col-xl-2">
                                                     <div className="small text-muted fw-bold mb-1">
-                                                        Hak
-                                                        Akses
+                                                        Hak Akses Efektif
                                                     </div>
 
                                                     <div className="d-flex align-items-center gap-2">
                                                         <div className="fs-4 fw-black text-danger">
                                                             {
-                                                                permissions.length
+                                                                effectivePermissions.length
                                                             }
                                                         </div>
 
@@ -1041,9 +1232,18 @@ export default function UserManagementPage() {
                                                             permission
                                                         </div>
                                                     </div>
+
+                                                    {!isSuperadmin && (
+                                                        <div className="small text-muted mt-1">
+                                                            {
+                                                                storedPermissions.length
+                                                            }{' '}
+                                                            tersimpan
+                                                        </div>
+                                                    )}
                                                 </div>
 
-                                                <div className="col-md-6 col-xl-3">
+                                                <div className="col-md-6 col-xl-2">
                                                     <div className="small text-muted fw-bold mb-1">
                                                         Dibuat
                                                     </div>
@@ -1055,7 +1255,13 @@ export default function UserManagementPage() {
                                                     </div>
                                                 </div>
 
-                                                <div className="col-xl-3">
+                                                <div
+                                                    className={
+                                                        canManage
+                                                            ? 'col-xl-4'
+                                                            : 'col-xl-3'
+                                                    }
+                                                >
                                                     <div className="d-flex flex-wrap justify-content-xl-end gap-2">
                                                         <button
                                                             type="button"
@@ -1079,103 +1285,105 @@ export default function UserManagementPage() {
                                                                 : 'Lihat Akses'}
                                                         </button>
 
-                                                        <Link
-                                                            to={`/admin/users/${user.id}/edit`}
-                                                            className="btn btn-outline-primary rounded-pill"
-                                                        >
-                                                            <i className="bi bi-pencil-square me-2" />
-                                                            Edit
-                                                        </Link>
+                                                        {canManage && (
+                                                            <>
+                                                                <Link
+                                                                    to={`/admin/users/${user.id}/edit`}
+                                                                    className="btn btn-outline-primary rounded-pill"
+                                                                >
+                                                                    <i className="bi bi-pencil-square me-2" />
 
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-outline-danger rounded-pill"
-                                                            onClick={() =>
-                                                                handleDelete(
-                                                                    user
-                                                                )
-                                                            }
-                                                            disabled={
-                                                                isCurrentAccount
-                                                            }
-                                                        >
-                                                            <i className="bi bi-trash me-2" />
-                                                            Hapus
-                                                        </button>
+                                                                    Edit
+                                                                </Link>
+
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-outline-danger rounded-pill"
+                                                                    onClick={() =>
+                                                                        handleDelete(
+                                                                            user
+                                                                        )
+                                                                    }
+                                                                    disabled={
+                                                                        isCurrentAccount ||
+                                                                        deletingId ===
+                                                                            user.id
+                                                                    }
+                                                                >
+                                                                    {deletingId ===
+                                                                    user.id ? (
+                                                                        <span className="spinner-border spinner-border-sm" />
+                                                                    ) : (
+                                                                        <>
+                                                                            <i className="bi bi-trash me-2" />
+
+                                                                            Hapus
+                                                                        </>
+                                                                    )}
+                                                                </button>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            {isCurrentAccount && (
-                                                <div className="mt-4 p-3 rounded-4 bg-warning-subtle border border-warning-subtle">
-                                                    <div className="d-flex align-items-start gap-3">
-                                                        <i className="bi bi-exclamation-triangle-fill text-warning-emphasis fs-5" />
+                                            {isCurrentAccount &&
+                                                canManage && (
+                                                    <div className="mt-4 p-3 rounded-4 bg-warning-subtle border border-warning-subtle">
+                                                        <div className="d-flex align-items-start gap-3">
+                                                            <i className="bi bi-exclamation-triangle-fill text-warning-emphasis fs-5" />
 
-                                                        <div>
-                                                            <div className="fw-bold text-warning-emphasis">
-                                                                Ini
-                                                                akun
-                                                                yang
-                                                                sedang
-                                                                digunakan
-                                                            </div>
+                                                            <div>
+                                                                <div className="fw-bold text-warning-emphasis">
+                                                                    Ini akun yang sedang digunakan
+                                                                </div>
 
-                                                            <div className="small text-muted">
-                                                                Tombol
-                                                                hapus
-                                                                dinonaktifkan
-                                                                untuk
-                                                                mencegah
-                                                                akun
-                                                                aktif
-                                                                terhapus.
+                                                                <div className="small text-muted">
+                                                                    Tombol hapus dinonaktifkan untuk mencegah akun aktif terhapus.
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            )}
+                                                )}
 
                                             {isExpanded && (
                                                 <div className="mt-4 pt-4 border-top">
                                                     <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
                                                         <div>
                                                             <h5 className="fw-black mb-1">
-                                                                Rincian
-                                                                Hak
-                                                                Akses
+                                                                Rincian Hak Akses Efektif
                                                             </h5>
 
                                                             <p className="text-muted mb-0">
-                                                                Menu
-                                                                dan
-                                                                fitur
-                                                                yang
-                                                                dapat
-                                                                digunakan
-                                                                oleh
-                                                                akun
-                                                                ini.
+                                                                Termasuk permission turunan otomatis dari akses process atau manage.
                                                             </p>
                                                         </div>
 
-                                                        <span className="badge rounded-pill text-bg-danger px-3 py-2">
-                                                            {
-                                                                permissions.length
-                                                            }{' '}
-                                                            akses
-                                                            aktif
-                                                        </span>
+                                                        <div className="d-flex flex-wrap gap-2">
+                                                            <span className="badge rounded-pill text-bg-danger px-3 py-2">
+                                                                {
+                                                                    effectivePermissions.length
+                                                                }{' '}
+                                                                akses efektif
+                                                            </span>
+
+                                                            {!isSuperadmin && (
+                                                                <span className="badge rounded-pill text-bg-light border text-dark px-3 py-2">
+                                                                    {
+                                                                        storedPermissions.length
+                                                                    }{' '}
+                                                                    tersimpan
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
 
                                                     {permissionGroups.length ===
                                                     0 ? (
                                                         <div className="alert alert-warning border-0 rounded-4 mb-0">
                                                             <i className="bi bi-exclamation-triangle-fill me-2" />
-                                                            Akun
-                                                            ini
-                                                            belum
-                                                            memiliki
-                                                            permission.
+
+                                                            Akun ini belum memiliki permission.
                                                         </div>
                                                     ) : (
                                                         <div className="row g-3">
@@ -1226,20 +1434,41 @@ export default function UserManagementPage() {
                                                                                                 icon: 'bi-check-circle-fill',
                                                                                             };
 
+                                                                                        const isStored =
+                                                                                            storedPermissions.includes(
+                                                                                                permission
+                                                                                            );
+
                                                                                         return (
                                                                                             <div
-                                                                                                className="d-flex align-items-start gap-2 small"
+                                                                                                className="d-flex align-items-start justify-content-between gap-2 small"
                                                                                                 key={
                                                                                                     permission
                                                                                                 }
                                                                                             >
-                                                                                                <i className="bi bi-check-circle-fill text-success mt-1" />
+                                                                                                <div className="d-flex align-items-start gap-2">
+                                                                                                    <i className="bi bi-check-circle-fill text-success mt-1" />
 
-                                                                                                <span>
-                                                                                                    {
-                                                                                                        permissionConfig.label
-                                                                                                    }
-                                                                                                </span>
+                                                                                                    <span>
+                                                                                                        {
+                                                                                                            permissionConfig.label
+                                                                                                        }
+                                                                                                    </span>
+                                                                                                </div>
+
+                                                                                                {!isSuperadmin && (
+                                                                                                    <span
+                                                                                                        className={`badge rounded-pill ${
+                                                                                                            isStored
+                                                                                                                ? 'text-bg-light border text-dark'
+                                                                                                                : 'text-bg-info'
+                                                                                                        }`}
+                                                                                                    >
+                                                                                                        {isStored
+                                                                                                            ? 'Tersimpan'
+                                                                                                            : 'Turunan'}
+                                                                                                    </span>
+                                                                                                )}
                                                                                             </div>
                                                                                         );
                                                                                     }

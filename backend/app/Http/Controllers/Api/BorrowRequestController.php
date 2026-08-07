@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BorrowRequest;
 use App\Models\BorrowRequestItem;
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,15 +17,34 @@ use Throwable;
 class BorrowRequestController extends Controller
 {
     /**
-     * Menampilkan seluruh pengajuan peminjaman untuk admin SEKPiM.
+     * Menampilkan seluruh pengajuan peminjaman.
+     *
+     * Endpoint ini hanya dapat diakses oleh akun yang memiliki
+     * permission approval.borrowing.view.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $borrowRequests = BorrowRequest::with([
-            'user',
-            'items.product.category',
-        ])
-            ->latest()
+        $user = $request->user();
+
+        if (
+            !$user ||
+            !$this->userHasPermission(
+                $user,
+                'approval.borrowing.view'
+            )
+        ) {
+            return $this->forbiddenResponse(
+                'Kamu tidak memiliki izin melihat seluruh pengajuan peminjaman.'
+            );
+        }
+
+        $borrowRequests = BorrowRequest::query()
+            ->with([
+                'user',
+                'items.product.category',
+            ])
+            ->latest('submitted_at')
+            ->latest('created_at')
             ->get();
 
         return response()->json([
@@ -37,13 +57,34 @@ class BorrowRequestController extends Controller
     /**
      * Menampilkan riwayat peminjaman milik user yang sedang login.
      */
-    public function myBorrowRequests(Request $request): JsonResponse
-    {
-        $borrowRequests = BorrowRequest::with([
-            'items.product.category',
-        ])
-            ->where('user_id', $request->user()->id)
-            ->latest()
+    public function myBorrowRequests(
+        Request $request
+    ): JsonResponse {
+        $user = $request->user();
+
+        if (
+            !$user ||
+            !$this->userHasPermission(
+                $user,
+                'request.history.view'
+            )
+        ) {
+            return $this->forbiddenResponse(
+                'Kamu tidak memiliki izin melihat riwayat pengajuan peminjaman.'
+            );
+        }
+
+        $borrowRequests = BorrowRequest::query()
+            ->with([
+                'user',
+                'items.product.category',
+            ])
+            ->where(
+                'user_id',
+                $user->id
+            )
+            ->latest('submitted_at')
+            ->latest('created_at')
             ->get();
 
         return response()->json([
@@ -55,20 +96,33 @@ class BorrowRequestController extends Controller
 
     /**
      * Menampilkan detail pengajuan peminjaman.
+     *
+     * Aturan akses:
+     * - superadmin dapat melihat seluruh pengajuan;
+     * - approval.borrowing.view dapat melihat seluruh pengajuan;
+     * - request.history.view hanya dapat melihat pengajuan miliknya;
+     * - akun lain mendapatkan response 403.
      */
-    public function show(Request $request, int $id): JsonResponse
-    {
-        $borrowRequest = BorrowRequest::with([
-            'user',
-            'items.product.category',
-        ])->findOrFail($id);
+    public function show(
+        Request $request,
+        int $id
+    ): JsonResponse {
+        $borrowRequest = BorrowRequest::query()
+            ->with([
+                'user',
+                'items.product.category',
+            ])
+            ->findOrFail($id);
 
-        if (!$this->canAccessBorrowRequest($request, $borrowRequest)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Akses ditolak. Kamu tidak memiliki izin melihat pengajuan peminjaman ini.',
-                'data' => null,
-            ], 403);
+        if (
+            !$this->canAccessBorrowRequest(
+                $request,
+                $borrowRequest
+            )
+        ) {
+            return $this->forbiddenResponse(
+                'Akses ditolak. Kamu tidak memiliki izin melihat pengajuan peminjaman ini.'
+            );
         }
 
         return response()->json([
@@ -82,10 +136,24 @@ class BorrowRequestController extends Controller
      * Menyimpan pengajuan peminjaman baru.
      *
      * Stok belum dikurangi ketika user mengirim pengajuan.
-     * Stok baru dikurangi saat barang benar-benar diserahkan.
+     * Stok baru dikurangi ketika barang benar-benar diserahkan.
      */
     public function store(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        if (
+            !$user ||
+            !$this->userHasPermission(
+                $user,
+                'request.borrowing.create'
+            )
+        ) {
+            return $this->forbiddenResponse(
+                'Kamu tidak memiliki izin membuat pengajuan peminjaman.'
+            );
+        }
+
         $validated = $request->validate([
             'purpose' => [
                 'required',
@@ -149,46 +217,53 @@ class BorrowRequestController extends Controller
         ]);
 
         try {
-            $borrowRequest = DB::transaction(function () use ($request, $validated) {
-                /*
-                 * Memastikan produk aktif, bertipe peminjaman,
-                 * dan stok tersedia ketika pengajuan dibuat.
-                 *
-                 * Stok akan diperiksa kembali ketika barang diserahkan.
-                 */
-                $this->validateBorrowItems($validated['items']);
+            $borrowRequest = DB::transaction(
+                function () use (
+                    $user,
+                    $validated
+                ): BorrowRequest {
+                    $this->validateBorrowItems(
+                        $validated['items']
+                    );
 
-                $borrowRequest = BorrowRequest::create([
-                    'user_id' => $request->user()->id,
-                    'borrow_code' => $this->generateBorrowCode(),
+                    $borrowRequest = BorrowRequest::query()->create([
+                        'user_id' => $user->id,
+                        'borrow_code' => $this->generateBorrowCode(),
 
-                    'purpose' => $validated['purpose'],
-                    'borrow_date' => $validated['borrow_date'],
-                    'return_date' => $validated['return_date'],
+                        'purpose' => trim(
+                            $validated['purpose']
+                        ),
 
-                    'status' => 'pending',
-                    'admin_note' => null,
+                        'borrow_date' => $validated['borrow_date'],
+                        'return_date' => $validated['return_date'],
 
-                    'submitted_at' => now(),
-                    'approved_at' => null,
-                    'rejected_at' => null,
-                    'borrowed_at' => null,
-                    'returned_at' => null,
-                ]);
+                        'status' => 'pending',
+                        'admin_note' => null,
 
-                foreach ($validated['items'] as $item) {
-                    BorrowRequestItem::create([
-                        'borrow_request_id' => $borrowRequest->id,
-                        'product_id' => $item['product_id'],
-                        'quantity' => $item['quantity'],
+                        'submitted_at' => now(),
+                        'approved_at' => null,
+                        'rejected_at' => null,
+                        'borrowed_at' => null,
+                        'returned_at' => null,
+                    ]);
+
+                    foreach (
+                        $validated['items']
+                        as $item
+                    ) {
+                        BorrowRequestItem::query()->create([
+                            'borrow_request_id' => $borrowRequest->id,
+                            'product_id' => $item['product_id'],
+                            'quantity' => $item['quantity'],
+                        ]);
+                    }
+
+                    return $borrowRequest->load([
+                        'user',
+                        'items.product.category',
                     ]);
                 }
-
-                return $borrowRequest->load([
-                    'user',
-                    'items.product.category',
-                ]);
-            });
+            );
 
             return response()->json([
                 'success' => true,
@@ -214,91 +289,126 @@ class BorrowRequestController extends Controller
      * Approval belum mengurangi stok.
      * Stok baru dikurangi ketika barang diserahkan.
      */
-    public function approve(int $id): JsonResponse
-    {
+    public function approve(
+        Request $request,
+        int $id
+    ): JsonResponse {
+        if (
+            !$this->canProcessBorrowRequest(
+                $request
+            )
+        ) {
+            return $this->forbiddenResponse(
+                'Kamu tidak memiliki izin menyetujui pengajuan peminjaman.'
+            );
+        }
+
         try {
-            $borrowRequest = DB::transaction(function () use ($id) {
-                $lockedBorrowRequest = BorrowRequest::query()
-                    ->lockForUpdate()
-                    ->findOrFail($id);
+            $borrowRequest = DB::transaction(
+                function () use ($id): BorrowRequest {
+                    $lockedBorrowRequest = BorrowRequest::query()
+                        ->lockForUpdate()
+                        ->findOrFail($id);
 
-                if ($lockedBorrowRequest->status !== 'pending') {
-                    $this->abortJson(
-                        'Pengajuan hanya bisa disetujui saat status masih menunggu.',
-                        422
-                    );
+                    if (
+                        $lockedBorrowRequest->status !==
+                        'pending'
+                    ) {
+                        $this->abortJson(
+                            'Pengajuan hanya bisa disetujui saat status masih menunggu.',
+                            422
+                        );
+                    }
+
+                    $lockedBorrowRequest->load([
+                        'items.product',
+                    ]);
+
+                    if (
+                        $lockedBorrowRequest->items->isEmpty()
+                    ) {
+                        $this->abortJson(
+                            'Pengajuan tidak memiliki item perlengkapan.',
+                            422
+                        );
+                    }
+
+                    foreach (
+                        $lockedBorrowRequest->items
+                        as $item
+                    ) {
+                        if (!$item->product_id) {
+                            $this->abortJson(
+                                'Salah satu perlengkapan pada pengajuan sudah tidak tersedia.',
+                                422
+                            );
+                        }
+
+                        $product = Product::query()
+                            ->find(
+                                $item->product_id
+                            );
+
+                        if (!$product) {
+                            $this->abortJson(
+                                'Salah satu perlengkapan pada pengajuan tidak ditemukan.',
+                                422
+                            );
+                        }
+
+                        if (
+                            $product->status !==
+                            'active'
+                        ) {
+                            $this->abortJson(
+                                "Perlengkapan {$product->name} sedang tidak aktif.",
+                                422
+                            );
+                        }
+
+                        if (
+                            !in_array(
+                                $product->type,
+                                [
+                                    'borrow',
+                                    'both',
+                                ],
+                                true
+                            )
+                        ) {
+                            $this->abortJson(
+                                "Produk {$product->name} tidak tersedia untuk peminjaman.",
+                                422
+                            );
+                        }
+
+                        if (
+                            (int) $product->stock <
+                            (int) $item->quantity
+                        ) {
+                            $this->abortJson(
+                                "Stok {$product->name} tidak mencukupi. Stok tersedia {$product->stock}, sedangkan jumlah yang diajukan {$item->quantity}.",
+                                422
+                            );
+                        }
+                    }
+
+                    $lockedBorrowRequest->update([
+                        'status' => 'approved',
+                        'admin_note' => null,
+
+                        'approved_at' => now(),
+                        'rejected_at' => null,
+                        'borrowed_at' => null,
+                        'returned_at' => null,
+                    ]);
+
+                    return $lockedBorrowRequest->fresh([
+                        'user',
+                        'items.product.category',
+                    ]);
                 }
-
-                $lockedBorrowRequest->load([
-                    'items.product',
-                ]);
-
-                if ($lockedBorrowRequest->items->isEmpty()) {
-                    $this->abortJson(
-                        'Pengajuan tidak memiliki item perlengkapan.',
-                        422
-                    );
-                }
-
-                /*
-                 * Approval tetap memeriksa produk dan stok saat ini.
-                 * Pemeriksaan final dilakukan lagi saat barang diserahkan.
-                 */
-                foreach ($lockedBorrowRequest->items as $item) {
-                    if (!$item->product_id) {
-                        $this->abortJson(
-                            'Salah satu perlengkapan pada pengajuan sudah tidak tersedia.',
-                            422
-                        );
-                    }
-
-                    $product = Product::query()
-                        ->find($item->product_id);
-
-                    if (!$product) {
-                        $this->abortJson(
-                            'Salah satu perlengkapan pada pengajuan tidak ditemukan.',
-                            422
-                        );
-                    }
-
-                    if ($product->status !== 'active') {
-                        $this->abortJson(
-                            "Perlengkapan {$product->name} sedang tidak aktif.",
-                            422
-                        );
-                    }
-
-                    if (!in_array($product->type, ['borrow', 'both'], true)) {
-                        $this->abortJson(
-                            "Produk {$product->name} tidak tersedia untuk peminjaman.",
-                            422
-                        );
-                    }
-
-                    if ((int) $product->stock < (int) $item->quantity) {
-                        $this->abortJson(
-                            "Stok {$product->name} tidak mencukupi. Stok tersedia {$product->stock}, sedangkan jumlah yang diajukan {$item->quantity}.",
-                            422
-                        );
-                    }
-                }
-
-                $lockedBorrowRequest->update([
-                    'status' => 'approved',
-                    'admin_note' => null,
-
-                    'approved_at' => now(),
-                    'rejected_at' => null,
-                    'borrowed_at' => null,
-                    'returned_at' => null,
-                ]);
-
-                return $lockedBorrowRequest->fresh([
-                    'user',
-                    'items.product.category',
-                ]);
-            });
+            );
 
             return response()->json([
                 'success' => true,
@@ -320,11 +430,21 @@ class BorrowRequestController extends Controller
 
     /**
      * Menolak pengajuan peminjaman.
-     *
-     * Penolakan hanya dapat dilakukan saat status pending.
      */
-    public function reject(Request $request, int $id): JsonResponse
-    {
+    public function reject(
+        Request $request,
+        int $id
+    ): JsonResponse {
+        if (
+            !$this->canProcessBorrowRequest(
+                $request
+            )
+        ) {
+            return $this->forbiddenResponse(
+                'Kamu tidak memiliki izin menolak pengajuan peminjaman.'
+            );
+        }
+
         $validated = $request->validate([
             'admin_note' => [
                 'required',
@@ -339,33 +459,44 @@ class BorrowRequestController extends Controller
         ]);
 
         try {
-            $borrowRequest = DB::transaction(function () use ($id, $validated) {
-                $lockedBorrowRequest = BorrowRequest::query()
-                    ->lockForUpdate()
-                    ->findOrFail($id);
+            $borrowRequest = DB::transaction(
+                function () use (
+                    $id,
+                    $validated
+                ): BorrowRequest {
+                    $lockedBorrowRequest = BorrowRequest::query()
+                        ->lockForUpdate()
+                        ->findOrFail($id);
 
-                if ($lockedBorrowRequest->status !== 'pending') {
-                    $this->abortJson(
-                        'Pengajuan hanya bisa ditolak saat status masih menunggu.',
-                        422
-                    );
+                    if (
+                        $lockedBorrowRequest->status !==
+                        'pending'
+                    ) {
+                        $this->abortJson(
+                            'Pengajuan hanya bisa ditolak saat status masih menunggu.',
+                            422
+                        );
+                    }
+
+                    $lockedBorrowRequest->update([
+                        'status' => 'rejected',
+
+                        'admin_note' => trim(
+                            $validated['admin_note']
+                        ),
+
+                        'rejected_at' => now(),
+                        'approved_at' => null,
+                        'borrowed_at' => null,
+                        'returned_at' => null,
+                    ]);
+
+                    return $lockedBorrowRequest->fresh([
+                        'user',
+                        'items.product.category',
+                    ]);
                 }
-
-                $lockedBorrowRequest->update([
-                    'status' => 'rejected',
-                    'admin_note' => $validated['admin_note'],
-
-                    'rejected_at' => now(),
-                    'approved_at' => null,
-                    'borrowed_at' => null,
-                    'returned_at' => null,
-                ]);
-
-                return $lockedBorrowRequest->fresh([
-                    'user',
-                    'items.product.category',
-                ]);
-            });
+            );
 
             return response()->json([
                 'success' => true,
@@ -391,93 +522,128 @@ class BorrowRequestController extends Controller
      * Stok dikurangi tepat satu kali ketika status berubah
      * dari approved menjadi borrowed.
      */
-    public function borrowed(int $id): JsonResponse
-    {
+    public function borrowed(
+        Request $request,
+        int $id
+    ): JsonResponse {
+        if (
+            !$this->canProcessBorrowRequest(
+                $request
+            )
+        ) {
+            return $this->forbiddenResponse(
+                'Kamu tidak memiliki izin memproses penyerahan barang.'
+            );
+        }
+
         try {
-            $borrowRequest = DB::transaction(function () use ($id) {
-                $lockedBorrowRequest = BorrowRequest::query()
-                    ->lockForUpdate()
-                    ->findOrFail($id);
-
-                if ($lockedBorrowRequest->status !== 'approved') {
-                    $this->abortJson(
-                        'Barang hanya bisa diserahkan setelah pengajuan disetujui.',
-                        422
-                    );
-                }
-
-                $lockedBorrowRequest->load([
-                    'items.product',
-                ]);
-
-                if ($lockedBorrowRequest->items->isEmpty()) {
-                    $this->abortJson(
-                        'Pengajuan tidak memiliki item perlengkapan.',
-                        422
-                    );
-                }
-
-                foreach ($lockedBorrowRequest->items as $item) {
-                    if (!$item->product_id) {
-                        $this->abortJson(
-                            'Salah satu perlengkapan pada pengajuan sudah tidak tersedia.',
-                            422
-                        );
-                    }
-
-                    /*
-                     * Mengunci produk agar dua proses penyerahan barang
-                     * tidak memotong stok pada waktu yang sama.
-                     */
-                    $product = Product::query()
+            $borrowRequest = DB::transaction(
+                function () use ($id): BorrowRequest {
+                    $lockedBorrowRequest = BorrowRequest::query()
                         ->lockForUpdate()
-                        ->find($item->product_id);
+                        ->findOrFail($id);
 
-                    if (!$product) {
+                    if (
+                        $lockedBorrowRequest->status !==
+                        'approved'
+                    ) {
                         $this->abortJson(
-                            'Salah satu perlengkapan pada pengajuan tidak ditemukan.',
+                            'Barang hanya bisa diserahkan setelah pengajuan disetujui.',
                             422
                         );
                     }
 
-                    if ($product->status !== 'active') {
+                    $lockedBorrowRequest->load([
+                        'items.product',
+                    ]);
+
+                    if (
+                        $lockedBorrowRequest->items->isEmpty()
+                    ) {
                         $this->abortJson(
-                            "Perlengkapan {$product->name} sedang tidak aktif.",
+                            'Pengajuan tidak memiliki item perlengkapan.',
                             422
                         );
                     }
 
-                    if (!in_array($product->type, ['borrow', 'both'], true)) {
-                        $this->abortJson(
-                            "Produk {$product->name} tidak tersedia untuk peminjaman.",
-                            422
+                    foreach (
+                        $lockedBorrowRequest->items
+                        as $item
+                    ) {
+                        if (!$item->product_id) {
+                            $this->abortJson(
+                                'Salah satu perlengkapan pada pengajuan sudah tidak tersedia.',
+                                422
+                            );
+                        }
+
+                        $product = Product::query()
+                            ->lockForUpdate()
+                            ->find(
+                                $item->product_id
+                            );
+
+                        if (!$product) {
+                            $this->abortJson(
+                                'Salah satu perlengkapan pada pengajuan tidak ditemukan.',
+                                422
+                            );
+                        }
+
+                        if (
+                            $product->status !==
+                            'active'
+                        ) {
+                            $this->abortJson(
+                                "Perlengkapan {$product->name} sedang tidak aktif.",
+                                422
+                            );
+                        }
+
+                        if (
+                            !in_array(
+                                $product->type,
+                                [
+                                    'borrow',
+                                    'both',
+                                ],
+                                true
+                            )
+                        ) {
+                            $this->abortJson(
+                                "Produk {$product->name} tidak tersedia untuk peminjaman.",
+                                422
+                            );
+                        }
+
+                        if (
+                            (int) $product->stock <
+                            (int) $item->quantity
+                        ) {
+                            $this->abortJson(
+                                "Stok {$product->name} tidak mencukupi. Stok tersedia {$product->stock}, sedangkan jumlah yang akan diserahkan {$item->quantity}.",
+                                422
+                            );
+                        }
+
+                        $product->decrement(
+                            'stock',
+                            (int) $item->quantity
                         );
                     }
 
-                    if ((int) $product->stock < (int) $item->quantity) {
-                        $this->abortJson(
-                            "Stok {$product->name} tidak mencukupi. Stok tersedia {$product->stock}, sedangkan jumlah yang akan diserahkan {$item->quantity}.",
-                            422
-                        );
-                    }
+                    $lockedBorrowRequest->update([
+                        'status' => 'borrowed',
+                        'borrowed_at' => now(),
+                        'returned_at' => null,
+                    ]);
 
-                    $product->decrement(
-                        'stock',
-                        (int) $item->quantity
-                    );
+                    return $lockedBorrowRequest->fresh([
+                        'user',
+                        'items.product.category',
+                    ]);
                 }
-
-                $lockedBorrowRequest->update([
-                    'status' => 'borrowed',
-                    'borrowed_at' => now(),
-                    'returned_at' => null,
-                ]);
-
-                return $lockedBorrowRequest->fresh([
-                    'user',
-                    'items.product.category',
-                ]);
-            });
+            );
 
             return response()->json([
                 'success' => true,
@@ -503,67 +669,91 @@ class BorrowRequestController extends Controller
      * Stok dikembalikan tepat satu kali ketika status berubah
      * dari borrowed menjadi returned.
      */
-    public function returned(int $id): JsonResponse
-    {
+    public function returned(
+        Request $request,
+        int $id
+    ): JsonResponse {
+        if (
+            !$this->canProcessBorrowRequest(
+                $request
+            )
+        ) {
+            return $this->forbiddenResponse(
+                'Kamu tidak memiliki izin memproses pengembalian barang.'
+            );
+        }
+
         try {
-            $borrowRequest = DB::transaction(function () use ($id) {
-                $lockedBorrowRequest = BorrowRequest::query()
-                    ->lockForUpdate()
-                    ->findOrFail($id);
-
-                if ($lockedBorrowRequest->status !== 'borrowed') {
-                    $this->abortJson(
-                        'Barang hanya bisa dikembalikan saat status sedang dipinjam.',
-                        422
-                    );
-                }
-
-                $lockedBorrowRequest->load([
-                    'items.product',
-                ]);
-
-                if ($lockedBorrowRequest->items->isEmpty()) {
-                    $this->abortJson(
-                        'Pengajuan tidak memiliki item perlengkapan.',
-                        422
-                    );
-                }
-
-                foreach ($lockedBorrowRequest->items as $item) {
-                    if (!$item->product_id) {
-                        $this->abortJson(
-                            'Salah satu perlengkapan pada pengajuan sudah tidak tersedia.',
-                            422
-                        );
-                    }
-
-                    $product = Product::query()
+            $borrowRequest = DB::transaction(
+                function () use ($id): BorrowRequest {
+                    $lockedBorrowRequest = BorrowRequest::query()
                         ->lockForUpdate()
-                        ->find($item->product_id);
+                        ->findOrFail($id);
 
-                    if (!$product) {
+                    if (
+                        $lockedBorrowRequest->status !==
+                        'borrowed'
+                    ) {
                         $this->abortJson(
-                            'Salah satu perlengkapan pada pengajuan tidak ditemukan.',
+                            'Barang hanya bisa dikembalikan saat status sedang dipinjam.',
                             422
                         );
                     }
 
-                    $product->increment(
-                        'stock',
-                        (int) $item->quantity
-                    );
+                    $lockedBorrowRequest->load([
+                        'items.product',
+                    ]);
+
+                    if (
+                        $lockedBorrowRequest->items->isEmpty()
+                    ) {
+                        $this->abortJson(
+                            'Pengajuan tidak memiliki item perlengkapan.',
+                            422
+                        );
+                    }
+
+                    foreach (
+                        $lockedBorrowRequest->items
+                        as $item
+                    ) {
+                        if (!$item->product_id) {
+                            $this->abortJson(
+                                'Salah satu perlengkapan pada pengajuan sudah tidak tersedia.',
+                                422
+                            );
+                        }
+
+                        $product = Product::query()
+                            ->lockForUpdate()
+                            ->find(
+                                $item->product_id
+                            );
+
+                        if (!$product) {
+                            $this->abortJson(
+                                'Salah satu perlengkapan pada pengajuan tidak ditemukan.',
+                                422
+                            );
+                        }
+
+                        $product->increment(
+                            'stock',
+                            (int) $item->quantity
+                        );
+                    }
+
+                    $lockedBorrowRequest->update([
+                        'status' => 'returned',
+                        'returned_at' => now(),
+                    ]);
+
+                    return $lockedBorrowRequest->fresh([
+                        'user',
+                        'items.product.category',
+                    ]);
                 }
-
-                $lockedBorrowRequest->update([
-                    'status' => 'returned',
-                    'returned_at' => now(),
-                ]);
-
-                return $lockedBorrowRequest->fresh([
-                    'user',
-                    'items.product.category',
-                ]);
-            });
+            );
 
             return response()->json([
                 'success' => true,
@@ -597,52 +787,143 @@ class BorrowRequestController extends Controller
         }
 
         /*
-         * Admin Humas tidak mendapatkan akses ke peminjaman SEKPiM.
+         * Superadmin atau pemilik permission approval
+         * dapat melihat seluruh pengajuan peminjaman.
          */
         if (
-            in_array(
-                $user->role,
-                [
-                    'admin',
-                    'admin_sekpim',
-                    'superadmin',
-                ],
-                true
+            $this->userHasPermission(
+                $user,
+                'approval.borrowing.view'
             )
         ) {
             return true;
         }
 
-        return (int) $borrowRequest->user_id === (int) $user->id;
+        /*
+         * Pengguna yang hanya memiliki akses riwayat
+         * hanya boleh melihat pengajuannya sendiri.
+         */
+        if (
+            !$this->userHasPermission(
+                $user,
+                'request.history.view'
+            )
+        ) {
+            return false;
+        }
+
+        return (
+            (int) $borrowRequest->user_id ===
+            (int) $user->id
+        );
+    }
+
+    /**
+     * Memeriksa permission proses approval peminjaman.
+     */
+    private function canProcessBorrowRequest(
+        Request $request
+    ): bool {
+        $user = $request->user();
+
+        return (
+            $user !== null &&
+            $this->userHasPermission(
+                $user,
+                'approval.borrowing.process'
+            )
+        );
+    }
+
+    /**
+     * Memeriksa permission user.
+     */
+    private function userHasPermission(
+        User $user,
+        string $permission
+    ): bool {
+        if (
+            $user->role ===
+            'superadmin'
+        ) {
+            return true;
+        }
+
+        if (
+            method_exists(
+                $user,
+                'hasPermission'
+            )
+        ) {
+            return $user->hasPermission(
+                $permission
+            );
+        }
+
+        $permissions =
+            is_array($user->permissions)
+                ? $user->permissions
+                : [];
+
+        return in_array(
+            $permission,
+            $permissions,
+            true
+        );
     }
 
     /**
      * Memvalidasi perlengkapan ketika user membuat pengajuan.
      *
-     * Stok akan diperiksa kembali saat barang diserahkan karena
-     * stok dapat berubah setelah pengajuan dibuat.
+     * Stok diperiksa lagi saat barang diserahkan karena stok
+     * dapat berubah setelah pengajuan dibuat.
      */
-    private function validateBorrowItems(array $items): void
-    {
+    private function validateBorrowItems(
+        array $items
+    ): void {
         foreach ($items as $item) {
             $product = Product::query()
-                ->findOrFail($item['product_id']);
+                ->find(
+                    $item['product_id']
+                );
 
-            if ($product->status !== 'active') {
+            if (!$product) {
+                $this->abortJson(
+                    'Salah satu perlengkapan tidak ditemukan.',
+                    422
+                );
+            }
+
+            if (
+                $product->status !==
+                'active'
+            ) {
                 $this->abortJson(
                     "Perlengkapan {$product->name} sedang tidak aktif.",
                     422
                 );
             }
 
-            if (!in_array($product->type, ['borrow', 'both'], true)) {
+            if (
+                !in_array(
+                    $product->type,
+                    [
+                        'borrow',
+                        'both',
+                    ],
+                    true
+                )
+            ) {
                 $this->abortJson(
                     "Produk {$product->name} tidak tersedia untuk peminjaman.",
                     422
                 );
             }
 
-            if ((int) $product->stock < (int) $item['quantity']) {
+            if (
+                (int) $product->stock <
+                (int) $item['quantity']
+            ) {
                 $this->abortJson(
                     "Stok {$product->name} tidak mencukupi. Stok tersedia {$product->stock}.",
                     422
@@ -659,12 +940,19 @@ class BorrowRequestController extends Controller
         do {
             $borrowCode = sprintf(
                 'BRW-%s-%s',
-                now()->format('YmdHis'),
-                strtoupper(Str::random(5))
+                now()->format(
+                    'YmdHis'
+                ),
+                strtoupper(
+                    Str::random(5)
+                )
             );
         } while (
             BorrowRequest::query()
-                ->where('borrow_code', $borrowCode)
+                ->where(
+                    'borrow_code',
+                    $borrowCode
+                )
                 ->exists()
         );
 
@@ -672,10 +960,25 @@ class BorrowRequestController extends Controller
     }
 
     /**
+     * Response akses ditolak.
+     */
+    private function forbiddenResponse(
+        string $message
+    ): JsonResponse {
+        return response()->json([
+            'success' => false,
+            'message' => $message,
+            'data' => null,
+        ], 403);
+    }
+
+    /**
      * Menghentikan proses dengan response JSON konsisten.
      */
-    private function abortJson(string $message, int $statusCode): never
-    {
+    private function abortJson(
+        string $message,
+        int $statusCode
+    ): never {
         throw new HttpResponseException(
             response()->json([
                 'success' => false,

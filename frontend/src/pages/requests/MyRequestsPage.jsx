@@ -5,7 +5,9 @@ import {
     useState,
 } from 'react';
 
-import { Link } from 'react-router-dom';
+import {
+    Link,
+} from 'react-router-dom';
 
 import api from '../../api/axios';
 
@@ -42,6 +44,10 @@ const STATUS_OPTIONS = [
         label: 'Menunggu',
     },
     {
+        value: 'revision',
+        label: 'Perlu Revisi',
+    },
+    {
         value: 'approved',
         label: 'Disetujui',
     },
@@ -68,6 +74,12 @@ const STATUS_CONFIG = {
         label: 'Menunggu',
         badgeClass: 'text-bg-warning',
         icon: 'bi-hourglass-split',
+    },
+
+    revision: {
+        label: 'Perlu Revisi',
+        badgeClass: 'text-bg-info',
+        icon: 'bi-pencil-square',
     },
 
     approved: {
@@ -131,47 +143,93 @@ const COVERAGE_TYPE_CONFIG = {
 const getCurrentUser = () => {
     try {
         return JSON.parse(
-            localStorage.getItem('admin_user') || '{}'
+            localStorage.getItem(
+                'admin_user'
+            ) || '{}'
         );
     } catch {
         return {};
     }
 };
 
-const extractArray = (response) => {
-    const payload = response?.data?.data;
+const extractArray = (
+    response
+) => {
+    const payload =
+        response?.data?.data;
 
-    if (Array.isArray(payload)) {
+    if (
+        Array.isArray(
+            payload
+        )
+    ) {
         return payload;
     }
 
-    if (Array.isArray(payload?.data)) {
+    if (
+        Array.isArray(
+            payload?.data
+        )
+    ) {
         return payload.data;
     }
 
     return [];
 };
 
-const formatDate = (date) => {
+const formatDate = (
+    date
+) => {
     if (!date) {
         return '-';
     }
 
     if (
-        typeof date === 'string' &&
-        /^\d{4}-\d{2}-\d{2}$/.test(date)
+        typeof date ===
+            'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(
+            date
+        )
     ) {
-        const [year, month, day] = date
+        const [
+            year,
+            month,
+            day,
+        ] = date
             .split('-')
             .map(Number);
 
-        const parsedDate = new Date(
-            year,
-            month - 1,
-            day
-        );
+        const parsedDate =
+            new Date(
+                year,
+                month - 1,
+                day
+            );
 
-        return parsedDate.toLocaleDateString(
+        return parsedDate
+            .toLocaleDateString(
+                'id-ID',
+                {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                }
+            );
+    }
+
+    const parsedDate =
+        new Date(date);
+
+    if (
+        Number.isNaN(
+            parsedDate.getTime()
+        )
+    ) {
+        return '-';
+    }
+
+    return parsedDate
+        .toLocaleDateString(
             'id-ID',
             {
                 day: '2-digit',
@@ -179,71 +237,78 @@ const formatDate = (date) => {
                 year: 'numeric',
             }
         );
-    }
-
-    const parsedDate = new Date(date);
-
-    if (Number.isNaN(parsedDate.getTime())) {
-        return '-';
-    }
-
-    return parsedDate.toLocaleDateString(
-        'id-ID',
-        {
-            day: '2-digit',
-            month: 'long',
-            year: 'numeric',
-        }
-    );
 };
 
-const formatDateTime = (date) => {
+const formatDateTime = (
+    date
+) => {
     if (!date) {
         return '-';
     }
 
-    const parsedDate = new Date(date);
+    const parsedDate =
+        new Date(date);
 
-    if (Number.isNaN(parsedDate.getTime())) {
+    if (
+        Number.isNaN(
+            parsedDate.getTime()
+        )
+    ) {
         return '-';
     }
 
-    return parsedDate.toLocaleString(
-        'id-ID',
-        {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        }
-    );
+    return parsedDate
+        .toLocaleString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            }
+        );
 };
 
-const normalizeExternalUrl = (value) => {
+const normalizeExternalUrl = (
+    value
+) => {
     if (!value) {
         return null;
     }
 
-    const normalizedValue = String(value).trim();
+    const normalizedValue =
+        String(value).trim();
 
     if (!normalizedValue) {
         return null;
     }
 
-    if (/^https?:\/\//i.test(normalizedValue)) {
+    if (
+        /^https?:\/\//i.test(
+            normalizedValue
+        )
+    ) {
         return normalizedValue;
     }
 
     return `https://${normalizedValue}`;
 };
 
-const getResolvedUnitName = (item) => {
-    if (item?.resolved_unit_name) {
+const getResolvedUnitName = (
+    item
+) => {
+    if (
+        item?.resolved_unit_name
+    ) {
         return item.resolved_unit_name;
     }
 
-    if (item?.unit_name === 'Lainnya') {
+    if (
+        item?.unit_name ===
+        'Lainnya'
+    ) {
         return (
             item.other_unit_name ||
             'Lainnya'
@@ -258,15 +323,23 @@ const getResolvedUnitName = (item) => {
     );
 };
 
-const normalizeMerchandise = (item) => ({
+const normalizeMerchandise = (
+    item
+) => ({
     ...item,
 
-    requestType: 'merchandise',
+    requestType:
+        'merchandise',
 
     requestCode:
         item.order_code ||
         item.code ||
-        `MER-${String(item.id).padStart(4, '0')}`,
+        `MER-${String(
+            item.id
+        ).padStart(
+            4,
+            '0'
+        )}`,
 
     requestTitle:
         item.event_name ||
@@ -283,7 +356,9 @@ const normalizeMerchandise = (item) => ({
 
     requestMeta:
         item.activity_date
-            ? `Kegiatan: ${formatDate(item.activity_date)}`
+            ? `Kegiatan: ${formatDate(
+                item.activity_date
+            )}`
             : null,
 
     requestDate:
@@ -293,29 +368,43 @@ const normalizeMerchandise = (item) => ({
 
     updatedDate:
         item.updated_at ||
+        item.resubmitted_at ||
         item.submitted_at ||
         item.created_at,
 });
 
-const normalizeHumas = (item) => {
+const normalizeHumas = (
+    item
+) => {
     const coverageConfig =
-        COVERAGE_TYPE_CONFIG[item.coverage_type];
+        COVERAGE_TYPE_CONFIG[
+            item.coverage_type
+        ];
 
     const resolvedUnitName =
-        getResolvedUnitName(item);
+        getResolvedUnitName(
+            item
+        );
 
     return {
         ...item,
 
-        requestType: 'humas',
+        requestType:
+            'humas',
 
         requestCode:
             item.service_code ||
             item.code ||
-            `LIP-${String(item.id).padStart(4, '0')}`,
+            `LIP-${String(
+                item.id
+            ).padStart(
+                4,
+                '0'
+            )}`,
 
         requestTitle:
-            coverageConfig?.label ||
+            coverageConfig
+                ?.label ||
             item.coverage_type ||
             'Request Liputan Humas',
 
@@ -342,12 +431,14 @@ const normalizeHumas = (item) => {
             item.created_at,
 
         coverageLabel:
-            coverageConfig?.label ||
+            coverageConfig
+                ?.label ||
             item.coverage_type ||
             'Liputan Humas',
 
         coverageIcon:
-            coverageConfig?.icon ||
+            coverageConfig
+                ?.icon ||
             'bi-camera-reels-fill',
 
         resultUrl:
@@ -357,15 +448,23 @@ const normalizeHumas = (item) => {
     };
 };
 
-const normalizeBorrowing = (item) => ({
+const normalizeBorrowing = (
+    item
+) => ({
     ...item,
 
-    requestType: 'borrowing',
+    requestType:
+        'borrowing',
 
     requestCode:
         item.borrow_code ||
         item.code ||
-        `BRW-${String(item.id).padStart(4, '0')}`,
+        `BRW-${String(
+            item.id
+        ).padStart(
+            4,
+            '0'
+        )}`,
 
     requestTitle:
         item.event_name ||
@@ -382,7 +481,9 @@ const normalizeBorrowing = (item) => ({
 
     requestMeta:
         item.return_date
-            ? `Kembali: ${formatDate(item.return_date)}`
+            ? `Kembali: ${formatDate(
+                item.return_date
+            )}`
             : null,
 
     requestDate:
@@ -398,13 +499,16 @@ const normalizeBorrowing = (item) => ({
 });
 
 export default function MyRequestsPage() {
-    const currentUser = useMemo(
-        () => getCurrentUser(),
-        []
-    );
+    const currentUser =
+        useMemo(
+            () =>
+                getCurrentUser(),
+            []
+        );
 
     const basePath =
-        currentUser.role === 'user'
+        currentUser.role ===
+        'user'
             ? '/user'
             : '/admin';
 
@@ -443,278 +547,413 @@ export default function MyRequestsPage() {
         setEndpointErrors,
     ] = useState([]);
 
-    const fetchRequests = useCallback(
-        async (isRefresh = false) => {
-            try {
-                if (isRefresh) {
-                    setRefreshing(true);
-                } else {
-                    setLoading(true);
-                }
-
-                setEndpointErrors([]);
-
-                const results =
-                    await Promise.allSettled([
-                        api.get('/my-orders'),
-
-                        api.get(
-                            '/my-humas-service-requests'
-                        ),
-
-                        api.get(
-                            '/my-borrow-requests'
-                        ),
-                    ]);
-
-                const nextErrors = [];
-
-                const merchandiseData =
-                    results[0].status === 'fulfilled'
-                        ? extractArray(results[0].value)
-                        : [];
-
-                const humasData =
-                    results[1].status === 'fulfilled'
-                        ? extractArray(results[1].value)
-                        : [];
-
-                const borrowingData =
-                    results[2].status === 'fulfilled'
-                        ? extractArray(results[2].value)
-                        : [];
-
-                if (
-                    results[0].status === 'rejected'
-                ) {
-                    nextErrors.push(
-                        'Merchandise'
-                    );
-
-                    console.error(
-                        'Fetch my merchandise error:',
-                        results[0].reason
-                            ?.response?.data ||
-                            results[0].reason
-                    );
-                }
-
-                if (
-                    results[1].status === 'rejected'
-                ) {
-                    nextErrors.push(
-                        'Liputan Humas'
-                    );
-
-                    console.error(
-                        'Fetch my Humas request error:',
-                        results[1].reason
-                            ?.response?.data ||
-                            results[1].reason
-                    );
-                }
-
-                if (
-                    results[2].status === 'rejected'
-                ) {
-                    nextErrors.push(
-                        'Peminjaman SEKPiM'
-                    );
-
-                    console.error(
-                        'Fetch my borrowing error:',
-                        results[2].reason
-                            ?.response?.data ||
-                            results[2].reason
-                    );
-                }
-
-                const normalizedRequests = [
-                    ...merchandiseData.map(
-                        normalizeMerchandise
-                    ),
-
-                    ...humasData.map(
-                        normalizeHumas
-                    ),
-
-                    ...borrowingData.map(
-                        normalizeBorrowing
-                    ),
-                ];
-
-                normalizedRequests.sort(
-                    (
-                        firstItem,
-                        secondItem
-                    ) => {
-                        const firstDate =
-                            new Date(
-                                firstItem.updatedDate || 0
-                            ).getTime();
-
-                        const secondDate =
-                            new Date(
-                                secondItem.updatedDate || 0
-                            ).getTime();
-
-                        return secondDate - firstDate;
+    const fetchRequests =
+        useCallback(
+            async (
+                isRefresh = false
+            ) => {
+                try {
+                    if (
+                        isRefresh
+                    ) {
+                        setRefreshing(
+                            true
+                        );
+                    } else {
+                        setLoading(
+                            true
+                        );
                     }
-                );
 
-                setRequests(
-                    normalizedRequests
-                );
+                    setEndpointErrors(
+                        []
+                    );
 
-                setEndpointErrors(
-                    nextErrors
-                );
-            } catch (error) {
-                console.error(
-                    'Fetch my requests error:',
-                    error?.response?.data ||
+                    const results =
+                        await Promise.allSettled(
+                            [
+                                api.get(
+                                    '/my-orders'
+                                ),
+
+                                api.get(
+                                    '/my-humas-service-requests'
+                                ),
+
+                                api.get(
+                                    '/my-borrow-requests'
+                                ),
+                            ]
+                        );
+
+                    const nextErrors =
+                        [];
+
+                    const merchandiseData =
+                        results[0]
+                            .status ===
+                        'fulfilled'
+                            ? extractArray(
+                                results[0]
+                                    .value
+                            )
+                            : [];
+
+                    const humasData =
+                        results[1]
+                            .status ===
+                        'fulfilled'
+                            ? extractArray(
+                                results[1]
+                                    .value
+                            )
+                            : [];
+
+                    const borrowingData =
+                        results[2]
+                            .status ===
+                        'fulfilled'
+                            ? extractArray(
+                                results[2]
+                                    .value
+                            )
+                            : [];
+
+                    if (
+                        results[0]
+                            .status ===
+                        'rejected'
+                    ) {
+                        nextErrors.push(
+                            'Merchandise'
+                        );
+
+                        console.error(
+                            'Fetch my merchandise error:',
+                            results[0]
+                                .reason
+                                ?.response
+                                ?.data ||
+                                results[0]
+                                    .reason
+                        );
+                    }
+
+                    if (
+                        results[1]
+                            .status ===
+                        'rejected'
+                    ) {
+                        nextErrors.push(
+                            'Liputan Humas'
+                        );
+
+                        console.error(
+                            'Fetch my Humas request error:',
+                            results[1]
+                                .reason
+                                ?.response
+                                ?.data ||
+                                results[1]
+                                    .reason
+                        );
+                    }
+
+                    if (
+                        results[2]
+                            .status ===
+                        'rejected'
+                    ) {
+                        nextErrors.push(
+                            'Peminjaman SEKPiM'
+                        );
+
+                        console.error(
+                            'Fetch my borrowing error:',
+                            results[2]
+                                .reason
+                                ?.response
+                                ?.data ||
+                                results[2]
+                                    .reason
+                        );
+                    }
+
+                    const normalizedRequests =
+                        [
+                            ...merchandiseData.map(
+                                normalizeMerchandise
+                            ),
+
+                            ...humasData.map(
+                                normalizeHumas
+                            ),
+
+                            ...borrowingData.map(
+                                normalizeBorrowing
+                            ),
+                        ];
+
+                    normalizedRequests.sort(
+                        (
+                            firstItem,
+                            secondItem
+                        ) => {
+                            const firstDate =
+                                new Date(
+                                    firstItem.updatedDate ||
+                                    0
+                                ).getTime();
+
+                            const secondDate =
+                                new Date(
+                                    secondItem.updatedDate ||
+                                    0
+                                ).getTime();
+
+                            return (
+                                secondDate -
+                                firstDate
+                            );
+                        }
+                    );
+
+                    setRequests(
+                        normalizedRequests
+                    );
+
+                    setEndpointErrors(
+                        nextErrors
+                    );
+                } catch (
+                    error
+                ) {
+                    console.error(
+                        'Fetch my requests error:',
                         error
-                );
+                            ?.response
+                            ?.data ||
+                            error
+                    );
 
-                setRequests([]);
-            } finally {
-                setLoading(false);
-                setRefreshing(false);
-            }
-        },
-        []
-    );
+                    setRequests(
+                        []
+                    );
+                } finally {
+                    setLoading(
+                        false
+                    );
+
+                    setRefreshing(
+                        false
+                    );
+                }
+            },
+            []
+        );
 
     useEffect(() => {
         fetchRequests();
     }, [fetchRequests]);
 
-    const requestCounts = useMemo(() => {
-        return {
-            all: requests.length,
+    const requestCounts =
+        useMemo(() => {
+            return {
+                all:
+                    requests.length,
 
-            merchandise: requests.filter(
-                (item) =>
-                    item.requestType ===
-                    'merchandise'
-            ).length,
+                merchandise:
+                    requests.filter(
+                        (
+                            item
+                        ) =>
+                            item.requestType ===
+                            'merchandise'
+                    ).length,
 
-            humas: requests.filter(
-                (item) =>
-                    item.requestType ===
-                    'humas'
-            ).length,
+                humas:
+                    requests.filter(
+                        (
+                            item
+                        ) =>
+                            item.requestType ===
+                            'humas'
+                    ).length,
 
-            borrowing: requests.filter(
-                (item) =>
-                    item.requestType ===
-                    'borrowing'
-            ).length,
-        };
-    }, [requests]);
+                borrowing:
+                    requests.filter(
+                        (
+                            item
+                        ) =>
+                            item.requestType ===
+                            'borrowing'
+                    ).length,
+            };
+        }, [requests]);
 
-    const statusCounts = useMemo(() => {
-        return {
-            pending: requests.filter(
-                (item) =>
-                    item.status === 'pending'
-            ).length,
+    const statusCounts =
+        useMemo(() => {
+            return {
+                pending:
+                    requests.filter(
+                        (
+                            item
+                        ) =>
+                            item.status ===
+                            'pending'
+                    ).length,
 
-            approved: requests.filter(
-                (item) =>
-                    item.status === 'approved'
-            ).length,
+                revision:
+                    requests.filter(
+                        (
+                            item
+                        ) =>
+                            item.requestType ===
+                                'merchandise' &&
+                            item.status ===
+                                'revision'
+                    ).length,
 
-            rejected: requests.filter(
-                (item) =>
-                    item.status === 'rejected'
-            ).length,
+                approved:
+                    requests.filter(
+                        (
+                            item
+                        ) =>
+                            item.status ===
+                            'approved'
+                    ).length,
 
-            completed: requests.filter(
-                (item) =>
-                    item.status === 'completed' ||
-                    item.status === 'returned'
-            ).length,
-        };
-    }, [requests]);
+                rejected:
+                    requests.filter(
+                        (
+                            item
+                        ) =>
+                            item.status ===
+                            'rejected'
+                    ).length,
 
-    const filteredRequests = useMemo(() => {
-        const keyword =
-            searchKeyword
-                .trim()
-                .toLowerCase();
+                completed:
+                    requests.filter(
+                        (
+                            item
+                        ) =>
+                            item.status ===
+                                'completed' ||
+                            item.status ===
+                                'returned'
+                    ).length,
+            };
+        }, [requests]);
 
-        return requests.filter((item) => {
-            const matchesType =
-                activeType === 'all' ||
-                item.requestType === activeType;
+    const filteredRequests =
+        useMemo(() => {
+            const keyword =
+                searchKeyword
+                    .trim()
+                    .toLowerCase();
 
-            const matchesStatus =
-                statusFilter === 'all' ||
-                item.status === statusFilter;
+            return requests.filter(
+                (item) => {
+                    const matchesType =
+                        activeType ===
+                            'all' ||
+                        item.requestType ===
+                            activeType;
 
-            const searchableText = [
-                item.requestCode,
-                item.requestTitle,
-                item.requestDescription,
-                item.requestMeta,
-                item.status,
-                item.admin_note,
-                item.applicant_name,
-                item.unit_name,
-                item.other_unit_name,
-                item.pic_whatsapp,
-                item.coverage_type,
-                item.event_location,
-                item.activity_detail,
-                item.result_note,
-            ]
-                .filter(Boolean)
-                .join(' ')
-                .toLowerCase();
+                    const matchesStatus =
+                        statusFilter ===
+                            'all' ||
+                        item.status ===
+                            statusFilter;
 
-            const matchesKeyword =
-                !keyword ||
-                searchableText.includes(keyword);
+                    const searchableText =
+                        [
+                            item.requestCode,
+                            item.requestTitle,
+                            item.requestDescription,
+                            item.requestMeta,
+                            item.status,
+                            item.admin_note,
+                            item.applicant_name,
+                            item.unit_name,
+                            item.other_unit_name,
+                            item.pic_whatsapp,
+                            item.coverage_type,
+                            item.event_location,
+                            item.activity_detail,
+                            item.result_note,
+                        ]
+                            .filter(
+                                Boolean
+                            )
+                            .join(
+                                ' '
+                            )
+                            .toLowerCase();
 
-            return (
-                matchesType &&
-                matchesStatus &&
-                matchesKeyword
+                    const matchesKeyword =
+                        !keyword ||
+                        searchableText
+                            .includes(
+                                keyword
+                            );
+
+                    return (
+                        matchesType &&
+                        matchesStatus &&
+                        matchesKeyword
+                    );
+                }
             );
-        });
-    }, [
-        requests,
-        activeType,
-        statusFilter,
-        searchKeyword,
-    ]);
+        }, [
+            requests,
+            activeType,
+            statusFilter,
+            searchKeyword,
+        ]);
 
-    const resetFilters = () => {
-        setActiveType('all');
-        setStatusFilter('all');
-        setSearchKeyword('');
-    };
+    const resetFilters =
+        () => {
+            setActiveType(
+                'all'
+            );
 
-    const getStatusConfig = (status) => {
-        return (
-            STATUS_CONFIG[status] || {
-                label:
-                    status ||
-                    'Tidak diketahui',
+            setStatusFilter(
+                'all'
+            );
 
-                badgeClass:
-                    'text-bg-secondary',
+            setSearchKeyword(
+                ''
+            );
+        };
 
-                icon:
-                    'bi-info-circle-fill',
-            }
-        );
-    };
+    const getStatusConfig =
+        (
+            status
+        ) => {
+            return (
+                STATUS_CONFIG[
+                    status
+                ] || {
+                    label:
+                        status ||
+                        'Tidak diketahui',
 
-    const getDetailPath = (item) => {
-        return `${basePath}/my-requests/${item.requestType}/${item.id}/detail`;
-    };
+                    badgeClass:
+                        'text-bg-secondary',
+
+                    icon:
+                        'bi-info-circle-fill',
+                }
+            );
+        };
+
+    const getDetailPath =
+        (
+            item
+        ) => {
+            return `${basePath}/my-requests/${item.requestType}/${item.id}/detail`;
+        };
 
     if (loading) {
         return (
@@ -765,14 +1004,17 @@ export default function MyRequestsPage() {
                             </div>
 
                             <div className="display-5 fw-black text-danger">
-                                {requests.length}
+                                {
+                                    requests.length
+                                }
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            {endpointErrors.length > 0 && (
+            {endpointErrors.length >
+                0 && (
                 <div className="alert alert-warning border-0 rounded-4 shadow-sm mb-4">
                     <div className="d-flex gap-3">
                         <i className="bi bi-exclamation-triangle-fill fs-4" />
@@ -786,7 +1028,9 @@ export default function MyRequestsPage() {
                                 Modul yang belum tersedia:{' '}
 
                                 <strong>
-                                    {endpointErrors.join(', ')}
+                                    {endpointErrors.join(
+                                        ', '
+                                    )}
                                 </strong>
                                 .
                             </div>
@@ -798,63 +1042,114 @@ export default function MyRequestsPage() {
             <section className="row g-3 mb-4">
                 {[
                     {
-                        label: 'Menunggu',
-                        value: statusCounts.pending,
-                        icon: 'bi-hourglass-split',
+                        label:
+                            'Menunggu',
+
+                        value:
+                            statusCounts.pending,
+
+                        icon:
+                            'bi-hourglass-split',
+
                         className:
                             'bg-warning-subtle text-warning',
                     },
+
                     {
-                        label: 'Disetujui',
-                        value: statusCounts.approved,
-                        icon: 'bi-check-circle-fill',
+                        label:
+                            'Perlu Revisi',
+
+                        value:
+                            statusCounts.revision,
+
+                        icon:
+                            'bi-pencil-square',
+
+                        className:
+                            'bg-info-subtle text-info',
+                    },
+
+                    {
+                        label:
+                            'Disetujui',
+
+                        value:
+                            statusCounts.approved,
+
+                        icon:
+                            'bi-check-circle-fill',
+
                         className:
                             'bg-success-subtle text-success',
                     },
+
                     {
-                        label: 'Ditolak',
-                        value: statusCounts.rejected,
-                        icon: 'bi-x-circle-fill',
+                        label:
+                            'Ditolak',
+
+                        value:
+                            statusCounts.rejected,
+
+                        icon:
+                            'bi-x-circle-fill',
+
                         className:
                             'bg-danger-subtle text-danger',
                     },
+
                     {
-                        label: 'Selesai',
-                        value: statusCounts.completed,
-                        icon: 'bi-check2-all',
+                        label:
+                            'Selesai',
+
+                        value:
+                            statusCounts.completed,
+
+                        icon:
+                            'bi-check2-all',
+
                         className:
                             'bg-primary-subtle text-primary',
                     },
-                ].map((statistic) => (
-                    <div
-                        className="col-6 col-xl-3"
-                        key={statistic.label}
-                    >
-                        <div className="card border-0 shadow-sm rounded-4 h-100">
-                            <div className="card-body p-3 p-lg-4">
-                                <div className="d-flex align-items-center justify-content-between gap-3">
-                                    <div>
-                                        <div className="small text-muted fw-bold mb-1">
-                                            {statistic.label}
+                ].map(
+                    (
+                        statistic
+                    ) => (
+                        <div
+                            className="col-6 col-lg-4 col-xl"
+                            key={
+                                statistic.label
+                            }
+                        >
+                            <div className="card border-0 shadow-sm rounded-4 h-100">
+                                <div className="card-body p-3 p-lg-4">
+                                    <div className="d-flex align-items-center justify-content-between gap-3">
+                                        <div>
+                                            <div className="small text-muted fw-bold mb-1">
+                                                {
+                                                    statistic.label
+                                                }
+                                            </div>
+
+                                            <div className="fs-2 fw-black">
+                                                {
+                                                    statistic.value
+                                                }
+                                            </div>
                                         </div>
 
-                                        <div className="fs-2 fw-black">
-                                            {statistic.value}
+                                        <div
+                                            className={`icon-box ${statistic.className}`}
+                                        >
+                                            <i
+                                                className={`bi ${statistic.icon}`}
+                                            />
                                         </div>
-                                    </div>
-
-                                    <div
-                                        className={`icon-box ${statistic.className}`}
-                                    >
-                                        <i
-                                            className={`bi ${statistic.icon}`}
-                                        />
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    )
+                )}
             </section>
 
             <section className="card border-0 shadow-sm rounded-5 mb-4">
@@ -874,10 +1169,16 @@ export default function MyRequestsPage() {
                                     type="search"
                                     className="form-control"
                                     placeholder="Cari kode, unit, liputan, lokasi..."
-                                    value={searchKeyword}
-                                    onChange={(event) =>
+                                    value={
+                                        searchKeyword
+                                    }
+                                    onChange={(
+                                        event
+                                    ) =>
                                         setSearchKeyword(
-                                            event.target.value
+                                            event
+                                                .target
+                                                .value
                                         )
                                     }
                                 />
@@ -891,20 +1192,34 @@ export default function MyRequestsPage() {
 
                             <select
                                 className="form-select"
-                                value={statusFilter}
-                                onChange={(event) =>
+                                value={
+                                    statusFilter
+                                }
+                                onChange={(
+                                    event
+                                ) =>
                                     setStatusFilter(
-                                        event.target.value
+                                        event
+                                            .target
+                                            .value
                                     )
                                 }
                             >
                                 {STATUS_OPTIONS.map(
-                                    (option) => (
+                                    (
+                                        option
+                                    ) => (
                                         <option
-                                            key={option.value}
-                                            value={option.value}
+                                            key={
+                                                option.value
+                                            }
+                                            value={
+                                                option.value
+                                            }
                                         >
-                                            {option.label}
+                                            {
+                                                option.label
+                                            }
                                         </option>
                                     )
                                 )}
@@ -916,9 +1231,12 @@ export default function MyRequestsPage() {
                                 <button
                                     type="button"
                                     className="btn btn-outline-secondary rounded-pill"
-                                    onClick={resetFilters}
+                                    onClick={
+                                        resetFilters
+                                    }
                                 >
                                     <i className="bi bi-arrow-counterclockwise me-2" />
+
                                     Reset
                                 </button>
 
@@ -926,18 +1244,24 @@ export default function MyRequestsPage() {
                                     type="button"
                                     className="btn btn-danger rounded-pill"
                                     onClick={() =>
-                                        fetchRequests(true)
+                                        fetchRequests(
+                                            true
+                                        )
                                     }
-                                    disabled={refreshing}
+                                    disabled={
+                                        refreshing
+                                    }
                                 >
                                     {refreshing ? (
                                         <>
                                             <span className="spinner-border spinner-border-sm me-2" />
+
                                             Memuat...
                                         </>
                                     ) : (
                                         <>
                                             <i className="bi bi-arrow-clockwise me-2" />
+
                                             Refresh
                                         </>
                                     )}
@@ -954,19 +1278,25 @@ export default function MyRequestsPage() {
                         <button
                             type="button"
                             className={`btn rounded-pill ${
-                                activeType === 'all'
+                                activeType ===
+                                'all'
                                     ? 'btn-dark'
                                     : 'btn-light border'
                             }`}
                             onClick={() =>
-                                setActiveType('all')
+                                setActiveType(
+                                    'all'
+                                )
                             }
                         >
                             <i className="bi bi-grid-fill me-2" />
+
                             Semua
 
                             <span className="badge bg-white text-dark ms-2">
-                                {requestCounts.all}
+                                {
+                                    requestCounts.all
+                                }
                             </span>
                         </button>
 
@@ -978,10 +1308,13 @@ export default function MyRequestsPage() {
                                 typeConfig,
                             ]) => (
                                 <button
-                                    key={typeKey}
+                                    key={
+                                        typeKey
+                                    }
                                     type="button"
                                     className={`btn rounded-pill ${
-                                        activeType === typeKey
+                                        activeType ===
+                                        typeKey
                                             ? `btn-${typeConfig.color}`
                                             : 'btn-light border'
                                     }`}
@@ -995,16 +1328,23 @@ export default function MyRequestsPage() {
                                         className={`bi ${typeConfig.icon} me-2`}
                                     />
 
-                                    {typeConfig.label}
+                                    {
+                                        typeConfig.label
+                                    }
 
                                     <span
                                         className={`badge ms-2 ${
-                                            activeType === typeKey
+                                            activeType ===
+                                            typeKey
                                                 ? 'bg-white text-dark'
                                                 : 'text-bg-secondary'
                                         }`}
                                     >
-                                        {requestCounts[typeKey]}
+                                        {
+                                            requestCounts[
+                                                typeKey
+                                            ]
+                                        }
                                     </span>
                                 </button>
                             )
@@ -1013,7 +1353,8 @@ export default function MyRequestsPage() {
                 </div>
 
                 <div className="card-body p-0">
-                    {filteredRequests.length === 0 ? (
+                    {filteredRequests.length ===
+                    0 ? (
                         <div className="text-center py-5 px-4">
                             <div
                                 className="mx-auto mb-3 rounded-circle bg-light d-flex align-items-center justify-content-center"
@@ -1036,7 +1377,9 @@ export default function MyRequestsPage() {
                             <button
                                 type="button"
                                 className="btn btn-outline-danger rounded-pill"
-                                onClick={resetFilters}
+                                onClick={
+                                    resetFilters
+                                }
                             >
                                 Tampilkan Semua
                             </button>
@@ -1070,7 +1413,9 @@ export default function MyRequestsPage() {
 
                                 <tbody>
                                     {filteredRequests.map(
-                                        (item) => {
+                                        (
+                                            item
+                                        ) => {
                                             const typeConfig =
                                                 REQUEST_TYPES[
                                                     item.requestType
@@ -1111,7 +1456,9 @@ export default function MyRequestsPage() {
 
                                                             <div className="min-w-0">
                                                                 <div className="fw-black text-dark mb-1">
-                                                                    {item.requestTitle}
+                                                                    {
+                                                                        item.requestTitle
+                                                                    }
                                                                 </div>
 
                                                                 <div
@@ -1120,18 +1467,25 @@ export default function MyRequestsPage() {
                                                                         maxWidth: 340,
                                                                     }}
                                                                 >
-                                                                    {item.requestDescription}
+                                                                    {
+                                                                        item.requestDescription
+                                                                    }
                                                                 </div>
 
                                                                 {item.requestMeta && (
                                                                     <div className="small text-muted mt-1">
                                                                         <i className="bi bi-info-circle me-1" />
-                                                                        {item.requestMeta}
+
+                                                                        {
+                                                                            item.requestMeta
+                                                                        }
                                                                     </div>
                                                                 )}
 
                                                                 <div className="small text-danger fw-bold mt-1">
-                                                                    {item.requestCode}
+                                                                    {
+                                                                        item.requestCode
+                                                                    }
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1157,6 +1511,7 @@ export default function MyRequestsPage() {
 
                                                         <div className="small text-muted">
                                                             Diperbarui:{' '}
+
                                                             {formatDateTime(
                                                                 item.updatedDate
                                                             )}
@@ -1171,13 +1526,16 @@ export default function MyRequestsPage() {
                                                                 className={`bi ${statusConfig.icon} me-2`}
                                                             />
 
-                                                            {statusConfig.label}
+                                                            {
+                                                                statusConfig.label
+                                                            }
                                                         </span>
 
                                                         {hasHumasResult && (
                                                             <div className="mt-2">
                                                                 <span className="badge rounded-pill bg-success-subtle text-success px-3 py-2">
                                                                     <i className="bi bi-cloud-check-fill me-2" />
+
                                                                     Hasil Tersedia
                                                                 </span>
                                                             </div>
@@ -1195,7 +1553,27 @@ export default function MyRequestsPage() {
                                                                         item.admin_note
                                                                     }
                                                                 >
-                                                                    {item.admin_note}
+                                                                    {
+                                                                        item.admin_note
+                                                                    }
+                                                                </div>
+                                                            )}
+
+                                                        {item.requestType ===
+                                                            'merchandise' &&
+                                                            item.status ===
+                                                                'revision' && (
+                                                                <div
+                                                                    className="small text-info-emphasis mt-2 text-truncate"
+                                                                    style={{
+                                                                        maxWidth: 220,
+                                                                    }}
+                                                                    title={
+                                                                        item.admin_note
+                                                                    }
+                                                                >
+                                                                    {item.admin_note ||
+                                                                        'Pengajuan perlu diperbaiki.'}
                                                                 </div>
                                                             )}
                                                     </td>
@@ -1212,6 +1590,7 @@ export default function MyRequestsPage() {
                                                                     className="btn btn-sm btn-success rounded-pill px-3"
                                                                 >
                                                                     <i className="bi bi-box-arrow-up-right me-2" />
+
                                                                     Buka Hasil
                                                                 </a>
                                                             )}
@@ -1220,10 +1599,32 @@ export default function MyRequestsPage() {
                                                                 to={getDetailPath(
                                                                     item
                                                                 )}
-                                                                className="btn btn-sm btn-outline-danger rounded-pill px-3"
+                                                                className={`btn btn-sm rounded-pill px-3 ${
+                                                                    item.requestType ===
+                                                                        'merchandise' &&
+                                                                    item.status ===
+                                                                        'revision'
+                                                                        ? 'btn-info text-white'
+                                                                        : 'btn-outline-danger'
+                                                                }`}
                                                             >
-                                                                <i className="bi bi-eye-fill me-2" />
-                                                                Detail
+                                                                <i
+                                                                    className={`bi ${
+                                                                        item.requestType ===
+                                                                            'merchandise' &&
+                                                                        item.status ===
+                                                                            'revision'
+                                                                            ? 'bi-pencil-square'
+                                                                            : 'bi-eye-fill'
+                                                                    } me-2`}
+                                                                />
+
+                                                                {item.requestType ===
+                                                                    'merchandise' &&
+                                                                item.status ===
+                                                                    'revision'
+                                                                    ? 'Perbaiki'
+                                                                    : 'Detail'}
                                                             </Link>
                                                         </div>
                                                     </td>
@@ -1243,13 +1644,17 @@ export default function MyRequestsPage() {
                             Menampilkan{' '}
 
                             <strong>
-                                {filteredRequests.length}
+                                {
+                                    filteredRequests.length
+                                }
                             </strong>{' '}
 
                             dari{' '}
 
                             <strong>
-                                {requests.length}
+                                {
+                                    requests.length
+                                }
                             </strong>{' '}
 
                             pengajuan.

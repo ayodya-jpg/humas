@@ -19,51 +19,66 @@ import {
     showErrorAlert,
     showLoadingAlert,
     showSuccessAlert,
+    showWarningAlert,
 } from '../../utils/sweetAlert';
 
 const STATUS_CONFIG = {
     pending: {
         label: 'Menunggu',
-        badgeClass: 'text-bg-warning',
-        icon: 'bi-hourglass-split',
+        badgeClass:
+            'bg-warning-subtle text-warning-emphasis',
+        icon:
+            'bi-hourglass-split',
     },
 
     approved: {
         label: 'Disetujui',
-        badgeClass: 'text-bg-primary',
-        icon: 'bi-check-circle-fill',
+        badgeClass:
+            'bg-primary-subtle text-primary',
+        icon:
+            'bi-check-circle-fill',
     },
 
     rejected: {
         label: 'Ditolak',
-        badgeClass: 'text-bg-danger',
-        icon: 'bi-x-circle-fill',
+        badgeClass:
+            'bg-danger-subtle text-danger',
+        icon:
+            'bi-x-circle-fill',
     },
 
     borrowed: {
         label: 'Sedang Dipinjam',
-        badgeClass: 'text-bg-info',
-        icon: 'bi-box-arrow-up-right',
+        badgeClass:
+            'bg-info-subtle text-info-emphasis',
+        icon:
+            'bi-box-arrow-up-right',
     },
 
     returned: {
         label: 'Dikembalikan',
-        badgeClass: 'text-bg-success',
-        icon: 'bi-box-arrow-in-down-left',
+        badgeClass:
+            'bg-success-subtle text-success',
+        icon:
+            'bi-box-arrow-in-down-left',
     },
 };
 
 const getCurrentUser = () => {
     try {
         return JSON.parse(
-            localStorage.getItem('admin_user') || '{}'
+            localStorage.getItem(
+                'admin_user'
+            ) || '{}'
         );
     } catch {
         return {};
     }
 };
 
-const normalizePermissions = (permissions) => {
+const normalizePermissions = (
+    permissions
+) => {
     if (!Array.isArray(permissions)) {
         return [];
     }
@@ -91,14 +106,19 @@ const hasPermission = (
     ).includes(permission);
 };
 
-const formatDate = (date) => {
+const formatDate = (
+    date
+) => {
     if (!date) {
         return '-';
     }
 
     if (
-        typeof date === 'string' &&
-        /^\d{4}-\d{2}-\d{2}$/.test(date)
+        typeof date ===
+            'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(
+            date
+        )
     ) {
         const [
             year,
@@ -108,23 +128,22 @@ const formatDate = (date) => {
             .split('-')
             .map(Number);
 
-        const parsedDate = new Date(
+        return new Date(
             year,
             month - 1,
             day
-        );
-
-        return parsedDate.toLocaleDateString(
+        ).toLocaleDateString(
             'id-ID',
             {
                 day: '2-digit',
-                month: 'short',
+                month: 'long',
                 year: 'numeric',
             }
         );
     }
 
-    const parsedDate = new Date(date);
+    const parsedDate =
+        new Date(date);
 
     if (
         Number.isNaN(
@@ -134,22 +153,26 @@ const formatDate = (date) => {
         return '-';
     }
 
-    return parsedDate.toLocaleDateString(
-        'id-ID',
-        {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-        }
-    );
+    return parsedDate
+        .toLocaleDateString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+            }
+        );
 };
 
-const formatDateTime = (date) => {
+const formatDateTime = (
+    date
+) => {
     if (!date) {
         return '-';
     }
 
-    const parsedDate = new Date(date);
+    const parsedDate =
+        new Date(date);
 
     if (
         Number.isNaN(
@@ -159,16 +182,18 @@ const formatDateTime = (date) => {
         return '-';
     }
 
-    return parsedDate.toLocaleString(
-        'id-ID',
-        {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        }
-    );
+    return parsedDate
+        .toLocaleString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            }
+        );
 };
 
 const getBackendErrorMessage = (
@@ -189,39 +214,102 @@ const getBackendErrorMessage = (
         }
     }
 
-    if (responseData?.message) {
-        return responseData.message;
-    }
-
-    return fallbackMessage;
+    return (
+        responseData?.message ||
+        fallbackMessage
+    );
 };
 
 const InfoBox = ({
     label,
     value,
+    icon =
+        'bi-info-circle',
 }) => {
     return (
         <div className="p-3 rounded-4 bg-light h-100">
-            <div className="small text-muted mb-1">
-                {label}
+            <div className="d-flex align-items-start gap-3">
+                <div
+                    className="rounded-circle bg-white text-success d-flex align-items-center justify-content-center flex-shrink-0"
+                    style={{
+                        width: 42,
+                        height: 42,
+                    }}
+                >
+                    <i
+                        className={`bi ${icon}`}
+                    />
+                </div>
+
+                <div className="min-w-0">
+                    <div className="small text-muted mb-1">
+                        {label}
+                    </div>
+
+                    <div className="fw-bold text-break">
+                        {value || '-'}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const TimelineItem = ({
+    label,
+    value,
+    icon,
+    active = false,
+    rejected = false,
+}) => {
+    let statusClass =
+        'done';
+
+    if (active) {
+        statusClass =
+            'active';
+    }
+
+    if (rejected) {
+        statusClass =
+            'rejected';
+    }
+
+    return (
+        <div
+            className={`request-timeline-item ${statusClass}`}
+        >
+            <div className="request-timeline-marker">
+                <i
+                    className={`bi ${icon}`}
+                />
             </div>
 
-            <div className="fw-bold text-break">
-                {value || '-'}
+            <div className="request-timeline-content">
+                <div className="fw-black mb-1">
+                    {label}
+                </div>
+
+                <div className="small text-muted">
+                    {value || '-'}
+                </div>
             </div>
         </div>
     );
 };
 
 export default function BorrowingApprovalDetailPage() {
-    const { id } = useParams();
+    const {
+        id,
+    } = useParams();
 
     const navigate =
         useNavigate();
 
     const currentUser =
         useMemo(
-            () => getCurrentUser(),
+            () =>
+                getCurrentUser(),
             []
         );
 
@@ -255,7 +343,9 @@ export default function BorrowingApprovalDetailPage() {
         useCallback(
             async () => {
                 try {
-                    setLoading(true);
+                    setLoading(
+                        true
+                    );
 
                     const response =
                         await api.get(
@@ -263,20 +353,27 @@ export default function BorrowingApprovalDetailPage() {
                         );
 
                     const responseData =
-                        response?.data?.data;
+                        response?.data
+                            ?.data ||
+                        null;
 
                     setBorrowRequest(
-                        responseData || null
+                        responseData
                     );
 
                     setAdminNote(
-                        responseData?.admin_note ||
-                            ''
+                        responseData
+                            ?.admin_note ||
+                        ''
                     );
-                } catch (error) {
+                } catch (
+                    error
+                ) {
                     console.error(
                         'Fetch borrowing detail error:',
-                        error?.response?.data ||
+                        error
+                            ?.response
+                            ?.data ||
                             error
                     );
 
@@ -291,11 +388,14 @@ export default function BorrowingApprovalDetailPage() {
                     navigate(
                         '/admin/borrow-requests',
                         {
-                            replace: true,
+                            replace:
+                                true,
                         }
                     );
                 } finally {
-                    setLoading(false);
+                    setLoading(
+                        false
+                    );
                 }
             },
             [
@@ -306,321 +406,431 @@ export default function BorrowingApprovalDetailPage() {
 
     useEffect(() => {
         fetchBorrowRequest();
-    }, [fetchBorrowRequest]);
+    }, [
+        fetchBorrowRequest,
+    ]);
 
-    const ensureProcessAccess = () => {
-        if (canProcess) {
-            return true;
-        }
+    const ensureProcessAccess =
+        async () => {
+            if (canProcess) {
+                return true;
+            }
 
-        showErrorAlert(
-            'Akses Ditolak',
-            'Akun hanya memiliki izin melihat approval dan tidak dapat memproses peminjaman.'
-        );
-
-        return false;
-    };
-
-    const handleApprove = async () => {
-        if (!ensureProcessAccess()) {
-            return;
-        }
-
-        const confirmation =
-            await showConfirmAlert({
-                title:
-                    'Setujui Peminjaman?',
-
-                text:
-                    `Pengajuan ${borrowRequest.borrow_code} akan disetujui dan stok barang akan dikurangi.`,
-
-                confirmButtonText:
-                    'Ya, setujui',
-
-                icon:
-                    'question',
-
-                confirmButtonColor:
-                    '#2563eb',
-            });
-
-        if (
-            !confirmation.isConfirmed
-        ) {
-            return;
-        }
-
-        try {
-            setProcessing(true);
-
-            showLoadingAlert(
-                'Memproses Approval',
-                'Mohon tunggu sebentar.'
+            await showErrorAlert(
+                'Akses Ditolak',
+                'Akun hanya memiliki izin melihat approval dan tidak dapat memproses peminjaman.'
             );
 
-            const response =
-                await api.put(
-                    `/borrow-requests/${borrowRequest.id}/approve`
+            return false;
+        };
+
+    const validateStatus =
+        async (
+            expectedStatus,
+            message
+        ) => {
+            if (
+                borrowRequest
+                    ?.status ===
+                expectedStatus
+            ) {
+                return true;
+            }
+
+            await showWarningAlert(
+                'Status Tidak Sesuai',
+                message
+            );
+
+            return false;
+        };
+
+    const handleApprove =
+        async () => {
+            if (
+                !(await ensureProcessAccess()) ||
+                !(await validateStatus(
+                    'pending',
+                    'Hanya pengajuan berstatus menunggu yang dapat disetujui.'
+                ))
+            ) {
+                return;
+            }
+
+            const confirmation =
+                await showConfirmAlert({
+                    title:
+                        'Setujui Peminjaman?',
+
+                    text:
+                        `Pengajuan ${borrowRequest.borrow_code} akan disetujui dan stok barang akan dikurangi.`,
+
+                    confirmButtonText:
+                        'Ya, setujui',
+
+                    cancelButtonText:
+                        'Batal',
+
+                    icon:
+                        'question',
+
+                    confirmButtonColor:
+                        '#2563eb',
+                });
+
+            if (
+                !confirmation
+                    .isConfirmed
+            ) {
+                return;
+            }
+
+            try {
+                setProcessing(
+                    true
                 );
 
-            closeAlert();
-
-            await showSuccessAlert(
-                'Approval Berhasil',
-                response?.data?.message ||
-                    'Pengajuan peminjaman berhasil disetujui.'
-            );
-
-            await fetchBorrowRequest();
-        } catch (error) {
-            console.error(
-                'Approve borrowing error:',
-                error?.response?.data ||
-                    error
-            );
-
-            closeAlert();
-
-            await showErrorAlert(
-                'Approval Gagal',
-                getBackendErrorMessage(
-                    error,
-                    'Pengajuan peminjaman gagal disetujui.'
-                )
-            );
-        } finally {
-            setProcessing(false);
-        }
-    };
-
-    const handleReject = async () => {
-        if (!ensureProcessAccess()) {
-            return;
-        }
-
-        if (!adminNote.trim()) {
-            await showErrorAlert(
-                'Catatan Wajib Diisi',
-                'Isi alasan penolakan terlebih dahulu.'
-            );
-
-            return;
-        }
-
-        const confirmation =
-            await showConfirmAlert({
-                title:
-                    'Tolak Peminjaman?',
-
-                text:
-                    `Pengajuan ${borrowRequest.borrow_code} akan ditolak.`,
-
-                confirmButtonText:
-                    'Ya, tolak',
-
-                icon:
-                    'warning',
-
-                confirmButtonColor:
-                    '#dc2626',
-            });
-
-        if (
-            !confirmation.isConfirmed
-        ) {
-            return;
-        }
-
-        try {
-            setProcessing(true);
-
-            showLoadingAlert(
-                'Menolak Pengajuan',
-                'Mohon tunggu sebentar.'
-            );
-
-            const response =
-                await api.put(
-                    `/borrow-requests/${borrowRequest.id}/reject`,
-                    {
-                        admin_note:
-                            adminNote.trim(),
-                    }
+                showLoadingAlert(
+                    'Memproses Approval',
+                    'Mohon tunggu sebentar.'
                 );
 
-            closeAlert();
+                const response =
+                    await api.put(
+                        `/borrow-requests/${borrowRequest.id}/approve`
+                    );
 
-            await showSuccessAlert(
-                'Pengajuan Ditolak',
-                response?.data?.message ||
-                    'Pengajuan peminjaman berhasil ditolak.'
-            );
+                closeAlert();
 
-            await fetchBorrowRequest();
-        } catch (error) {
-            console.error(
-                'Reject borrowing error:',
-                error?.response?.data ||
-                    error
-            );
-
-            closeAlert();
-
-            await showErrorAlert(
-                'Penolakan Gagal',
-                getBackendErrorMessage(
-                    error,
-                    'Pengajuan peminjaman gagal ditolak.'
-                )
-            );
-        } finally {
-            setProcessing(false);
-        }
-    };
-
-    const handleBorrowed = async () => {
-        if (!ensureProcessAccess()) {
-            return;
-        }
-
-        const confirmation =
-            await showConfirmAlert({
-                title:
-                    'Tandai Dipinjam?',
-
-                text:
-                    `Barang pada pengajuan ${borrowRequest.borrow_code} akan ditandai sudah diambil oleh pemohon.`,
-
-                confirmButtonText:
-                    'Ya, tandai dipinjam',
-
-                icon:
-                    'question',
-
-                confirmButtonColor:
-                    '#0f766e',
-            });
-
-        if (
-            !confirmation.isConfirmed
-        ) {
-            return;
-        }
-
-        try {
-            setProcessing(true);
-
-            showLoadingAlert(
-                'Memproses Data',
-                'Mohon tunggu sebentar.'
-            );
-
-            const response =
-                await api.put(
-                    `/borrow-requests/${borrowRequest.id}/borrowed`
+                await showSuccessAlert(
+                    'Approval Berhasil',
+                    response?.data
+                        ?.message ||
+                        'Pengajuan peminjaman berhasil disetujui.'
                 );
 
-            closeAlert();
-
-            await showSuccessAlert(
-                'Barang Dipinjam',
-                response?.data?.message ||
-                    'Barang berhasil ditandai sedang dipinjam.'
-            );
-
-            await fetchBorrowRequest();
-        } catch (error) {
-            console.error(
-                'Borrowed action error:',
-                error?.response?.data ||
+                await fetchBorrowRequest();
+            } catch (
+                error
+            ) {
+                console.error(
+                    'Approve borrowing error:',
                     error
-            );
-
-            closeAlert();
-
-            await showErrorAlert(
-                'Proses Gagal',
-                getBackendErrorMessage(
-                    error,
-                    'Barang gagal ditandai sedang dipinjam.'
-                )
-            );
-        } finally {
-            setProcessing(false);
-        }
-    };
-
-    const handleReturned = async () => {
-        if (!ensureProcessAccess()) {
-            return;
-        }
-
-        const confirmation =
-            await showConfirmAlert({
-                title:
-                    'Tandai Dikembalikan?',
-
-                text:
-                    `Barang pada pengajuan ${borrowRequest.borrow_code} akan ditandai sudah dikembalikan dan stok akan bertambah kembali.`,
-
-                confirmButtonText:
-                    'Ya, tandai kembali',
-
-                icon:
-                    'question',
-
-                confirmButtonColor:
-                    '#0f766e',
-            });
-
-        if (
-            !confirmation.isConfirmed
-        ) {
-            return;
-        }
-
-        try {
-            setProcessing(true);
-
-            showLoadingAlert(
-                'Memproses Pengembalian',
-                'Mohon tunggu sebentar.'
-            );
-
-            const response =
-                await api.put(
-                    `/borrow-requests/${borrowRequest.id}/returned`
+                        ?.response
+                        ?.data ||
+                        error
                 );
 
-            closeAlert();
+                closeAlert();
 
-            await showSuccessAlert(
-                'Barang Dikembalikan',
-                response?.data?.message ||
-                    'Barang berhasil ditandai sudah dikembalikan.'
-            );
+                await showErrorAlert(
+                    'Approval Gagal',
+                    getBackendErrorMessage(
+                        error,
+                        'Pengajuan peminjaman gagal disetujui.'
+                    )
+                );
+            } finally {
+                setProcessing(
+                    false
+                );
+            }
+        };
 
-            await fetchBorrowRequest();
-        } catch (error) {
-            console.error(
-                'Returned action error:',
-                error?.response?.data ||
+    const handleReject =
+        async () => {
+            if (
+                !(await ensureProcessAccess()) ||
+                !(await validateStatus(
+                    'pending',
+                    'Hanya pengajuan berstatus menunggu yang dapat ditolak.'
+                ))
+            ) {
+                return;
+            }
+
+            const normalizedNote =
+                adminNote.trim();
+
+            if (
+                normalizedNote
+                    .length < 5
+            ) {
+                await showWarningAlert(
+                    'Alasan Belum Lengkap',
+                    'Alasan penolakan minimal lima karakter.'
+                );
+
+                return;
+            }
+
+            const confirmation =
+                await showConfirmAlert({
+                    title:
+                        'Tolak Peminjaman?',
+
+                    text:
+                        `Pengajuan ${borrowRequest.borrow_code} akan ditolak.`,
+
+                    confirmButtonText:
+                        'Ya, tolak',
+
+                    cancelButtonText:
+                        'Batal',
+
+                    icon:
+                        'warning',
+
+                    confirmButtonColor:
+                        '#dc2626',
+                });
+
+            if (
+                !confirmation
+                    .isConfirmed
+            ) {
+                return;
+            }
+
+            try {
+                setProcessing(
+                    true
+                );
+
+                showLoadingAlert(
+                    'Menolak Pengajuan',
+                    'Mohon tunggu sebentar.'
+                );
+
+                const response =
+                    await api.put(
+                        `/borrow-requests/${borrowRequest.id}/reject`,
+                        {
+                            admin_note:
+                                normalizedNote,
+                        }
+                    );
+
+                closeAlert();
+
+                await showSuccessAlert(
+                    'Pengajuan Ditolak',
+                    response?.data
+                        ?.message ||
+                        'Pengajuan peminjaman berhasil ditolak.'
+                );
+
+                await fetchBorrowRequest();
+            } catch (
+                error
+            ) {
+                console.error(
+                    'Reject borrowing error:',
                     error
-            );
+                        ?.response
+                        ?.data ||
+                        error
+                );
 
-            closeAlert();
+                closeAlert();
 
-            await showErrorAlert(
-                'Proses Gagal',
-                getBackendErrorMessage(
-                    error,
-                    'Barang gagal ditandai sudah dikembalikan.'
-                )
-            );
-        } finally {
-            setProcessing(false);
-        }
-    };
+                await showErrorAlert(
+                    'Penolakan Gagal',
+                    getBackendErrorMessage(
+                        error,
+                        'Pengajuan peminjaman gagal ditolak.'
+                    )
+                );
+            } finally {
+                setProcessing(
+                    false
+                );
+            }
+        };
+
+    const handleBorrowed =
+        async () => {
+            if (
+                !(await ensureProcessAccess()) ||
+                !(await validateStatus(
+                    'approved',
+                    'Barang hanya dapat ditandai dipinjam setelah pengajuan disetujui.'
+                ))
+            ) {
+                return;
+            }
+
+            const confirmation =
+                await showConfirmAlert({
+                    title:
+                        'Tandai Dipinjam?',
+
+                    text:
+                        `Barang pada pengajuan ${borrowRequest.borrow_code} akan ditandai sudah diambil oleh pemohon.`,
+
+                    confirmButtonText:
+                        'Ya, tandai dipinjam',
+
+                    cancelButtonText:
+                        'Batal',
+
+                    icon:
+                        'question',
+
+                    confirmButtonColor:
+                        '#0f766e',
+                });
+
+            if (
+                !confirmation
+                    .isConfirmed
+            ) {
+                return;
+            }
+
+            try {
+                setProcessing(
+                    true
+                );
+
+                showLoadingAlert(
+                    'Memproses Data',
+                    'Mohon tunggu sebentar.'
+                );
+
+                const response =
+                    await api.put(
+                        `/borrow-requests/${borrowRequest.id}/borrowed`
+                    );
+
+                closeAlert();
+
+                await showSuccessAlert(
+                    'Barang Dipinjam',
+                    response?.data
+                        ?.message ||
+                        'Barang berhasil ditandai sedang dipinjam.'
+                );
+
+                await fetchBorrowRequest();
+            } catch (
+                error
+            ) {
+                console.error(
+                    'Borrowed action error:',
+                    error
+                        ?.response
+                        ?.data ||
+                        error
+                );
+
+                closeAlert();
+
+                await showErrorAlert(
+                    'Proses Gagal',
+                    getBackendErrorMessage(
+                        error,
+                        'Barang gagal ditandai sedang dipinjam.'
+                    )
+                );
+            } finally {
+                setProcessing(
+                    false
+                );
+            }
+        };
+
+    const handleReturned =
+        async () => {
+            if (
+                !(await ensureProcessAccess()) ||
+                !(await validateStatus(
+                    'borrowed',
+                    'Barang hanya dapat dikembalikan ketika berstatus sedang dipinjam.'
+                ))
+            ) {
+                return;
+            }
+
+            const confirmation =
+                await showConfirmAlert({
+                    title:
+                        'Tandai Dikembalikan?',
+
+                    text:
+                        `Barang pada pengajuan ${borrowRequest.borrow_code} akan ditandai sudah dikembalikan dan stok akan bertambah kembali.`,
+
+                    confirmButtonText:
+                        'Ya, tandai kembali',
+
+                    cancelButtonText:
+                        'Batal',
+
+                    icon:
+                        'question',
+
+                    confirmButtonColor:
+                        '#0f766e',
+                });
+
+            if (
+                !confirmation
+                    .isConfirmed
+            ) {
+                return;
+            }
+
+            try {
+                setProcessing(
+                    true
+                );
+
+                showLoadingAlert(
+                    'Memproses Pengembalian',
+                    'Mohon tunggu sebentar.'
+                );
+
+                const response =
+                    await api.put(
+                        `/borrow-requests/${borrowRequest.id}/returned`
+                    );
+
+                closeAlert();
+
+                await showSuccessAlert(
+                    'Barang Dikembalikan',
+                    response?.data
+                        ?.message ||
+                        'Barang berhasil ditandai sudah dikembalikan.'
+                );
+
+                await fetchBorrowRequest();
+            } catch (
+                error
+            ) {
+                console.error(
+                    'Returned action error:',
+                    error
+                        ?.response
+                        ?.data ||
+                        error
+                );
+
+                closeAlert();
+
+                await showErrorAlert(
+                    'Proses Gagal',
+                    getBackendErrorMessage(
+                        error,
+                        'Barang gagal ditandai sudah dikembalikan.'
+                    )
+                );
+            } finally {
+                setProcessing(
+                    false
+                );
+            }
+        };
 
     if (loading) {
         return (
@@ -647,21 +857,27 @@ export default function BorrowingApprovalDetailPage() {
                     <div
                         className="mx-auto mb-3 rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center"
                         style={{
-                            width: 82,
-                            height: 82,
+                            width: 84,
+                            height: 84,
                         }}
                     >
-                        <i className="bi bi-exclamation-circle-fill fs-1" />
+                        <i className="bi bi-exclamation-triangle-fill fs-1" />
                     </div>
 
-                    <h5 className="fw-black mb-3">
+                    <h4 className="fw-black mb-2">
                         Data tidak ditemukan
-                    </h5>
+                    </h4>
+
+                    <p className="text-muted mb-4">
+                        Detail pengajuan peminjaman tidak tersedia.
+                    </p>
 
                     <Link
                         to="/admin/borrow-requests"
                         className="btn btn-success rounded-pill px-4"
                     >
+                        <i className="bi bi-arrow-left me-2" />
+
                         Kembali ke Approval Peminjaman
                     </Link>
                 </div>
@@ -674,11 +890,12 @@ export default function BorrowingApprovalDetailPage() {
             borrowRequest.status
         ] || {
             label:
-                borrowRequest.status ||
+                borrowRequest
+                    .status ||
                 'Tidak diketahui',
 
             badgeClass:
-                'text-bg-secondary',
+                'bg-secondary-subtle text-secondary',
 
             icon:
                 'bi-info-circle-fill',
@@ -691,68 +908,66 @@ export default function BorrowingApprovalDetailPage() {
             ? borrowRequest.items
             : [];
 
+    const requestTitle =
+        borrowRequest.purpose ||
+        borrowRequest.event_name ||
+        'Pengajuan Peminjaman';
+
     return (
         <div className="container-fluid px-0">
-            <section
-                className="card border-0 shadow-sm rounded-5 overflow-hidden mb-4"
-                style={{
-                    background:
-                        'linear-gradient(135deg, rgba(15,118,110,0.96), rgba(15,23,42,0.98))',
-                }}
-            >
-                <div className="card-body p-4 p-lg-5 text-white">
-                    <div className="d-flex flex-wrap align-items-start justify-content-between gap-3">
-                        <div>
-                            <span className="badge rounded-pill text-bg-light text-success px-3 py-2 mb-3">
-                                Detail Approval Peminjaman
-                            </span>
+            <header className="approval-detail-header mb-4">
+                <div className="approval-detail-heading">
+                    <Link
+                        to="/admin/borrow-requests"
+                        className="approval-detail-back-link"
+                    >
+                        <i className="bi bi-arrow-left" />
 
-                            <h1 className="display-6 fw-black mb-3">
-                                {borrowRequest.purpose ||
-                                    borrowRequest.event_name ||
-                                    'Pengajuan Peminjaman'}
-                            </h1>
+                        <span>
+                            Kembali ke Approval Peminjaman
+                        </span>
+                    </Link>
 
-                            <div className="d-flex flex-wrap align-items-center gap-2">
-                                <span className="badge rounded-pill text-bg-success">
-                                    {borrowRequest.borrow_code ||
-                                        `BRW-${borrowRequest.id}`}
-                                </span>
+                    <h2 className="approval-detail-title">
+                        Detail Peminjaman
+                    </h2>
 
-                                <span
-                                    className={`badge rounded-pill ${statusConfig.badgeClass}`}
-                                >
-                                    <i
-                                        className={`bi ${statusConfig.icon} me-2`}
-                                    />
+                    <div className="approval-detail-meta">
+                        <span className="fw-bold text-muted">
+                            {borrowRequest
+                                .borrow_code ||
+                                `BRW-${borrowRequest.id}`}
+                        </span>
 
-                                    {
-                                        statusConfig.label
-                                    }
-                                </span>
-
-                                <span className="badge rounded-pill text-bg-light text-success">
-                                    Submit:{' '}
-
-                                    {formatDateTime(
-                                        borrowRequest.submitted_at ||
-                                            borrowRequest.created_at
-                                    )}
-                                </span>
-                            </div>
-                        </div>
-
-                        <Link
-                            to="/admin/borrow-requests"
-                            className="btn btn-light rounded-pill px-4"
+                        <span
+                            className={`badge rounded-pill px-3 py-2 ${statusConfig.badgeClass}`}
                         >
-                            <i className="bi bi-arrow-left me-2" />
+                            <i
+                                className={`bi ${statusConfig.icon} me-2`}
+                            />
 
-                            Kembali
-                        </Link>
+                            {
+                                statusConfig.label
+                            }
+                        </span>
                     </div>
                 </div>
-            </section>
+
+                <div className="approval-detail-date">
+                    <span className="small text-muted">
+                        Dikirim
+                    </span>
+
+                    <strong>
+                        {formatDateTime(
+                            borrowRequest
+                                .submitted_at ||
+                                borrowRequest
+                                    .created_at
+                        )}
+                    </strong>
+                </div>
+            </header>
 
             {!canProcess && (
                 <div className="alert alert-info border-0 shadow-sm rounded-4 mb-4">
@@ -765,92 +980,191 @@ export default function BorrowingApprovalDetailPage() {
                             </div>
 
                             <div className="small">
-                                Akun dapat melihat detail peminjaman, tetapi tidak memiliki izin untuk menyetujui, menolak, menyerahkan, atau menerima pengembalian barang.
+                                Akun dapat melihat detail peminjaman, tetapi tidak dapat menyetujui, menolak, menyerahkan, atau menerima pengembalian barang.
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            <div className="row g-4">
+            <div className="row g-4 align-items-start">
                 <div className="col-xl-8">
                     <section className="card border-0 shadow-sm rounded-5 mb-4">
-                        <div className="card-body p-4">
-                            <h4 className="fw-black mb-1">
-                                Informasi Peminjaman
-                            </h4>
+                        <div className="card-body p-4 p-lg-5">
+                            <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
+                                <div>
+                                    <h4 className="fw-black mb-1">
+                                        Informasi Peminjaman
+                                    </h4>
 
-                            <p className="text-muted mb-4">
-                                Detail pemohon, tanggal, dan keperluan peminjaman.
-                            </p>
+                                    <p className="text-muted mb-0">
+                                        Informasi pemohon, jadwal, lokasi, dan keperluan peminjaman.
+                                    </p>
+                                </div>
+
+                                <div className="icon-box bg-success-subtle text-success">
+                                    <i className="bi bi-box-seam-fill" />
+                                </div>
+                            </div>
 
                             <div className="row g-3">
-                                <div className="col-md-6 col-xl-3">
+                                <div className="col-md-6">
                                     <InfoBox
-                                        label="Pemohon"
+                                        label="Nama Pemohon"
                                         value={
-                                            borrowRequest.user?.name ||
-                                            borrowRequest.applicant_name ||
+                                            borrowRequest
+                                                .user
+                                                ?.name ||
+                                            borrowRequest
+                                                .applicant_name ||
                                             '-'
                                         }
+                                        icon="bi-person-fill"
                                     />
                                 </div>
 
-                                <div className="col-md-6 col-xl-3">
+                                <div className="col-md-6">
                                     <InfoBox
-                                        label="Tanggal Pinjam"
-                                        value={formatDate(
-                                            borrowRequest.borrow_date ||
-                                                borrowRequest.borrow_at
-                                        )}
-                                    />
-                                </div>
-
-                                <div className="col-md-6 col-xl-3">
-                                    <InfoBox
-                                        label="Tanggal Kembali"
-                                        value={formatDate(
-                                            borrowRequest.return_date ||
-                                                borrowRequest.return_at
-                                        )}
-                                    />
-                                </div>
-
-                                <div className="col-md-6 col-xl-3">
-                                    <InfoBox
-                                        label="Kode"
+                                        label="Kode Peminjaman"
                                         value={
-                                            borrowRequest.borrow_code ||
+                                            borrowRequest
+                                                .borrow_code ||
                                             `BRW-${borrowRequest.id}`
                                         }
+                                        icon="bi-upc-scan"
+                                    />
+                                </div>
+
+                                <div className="col-md-6">
+                                    <InfoBox
+                                        label="Nama Kegiatan"
+                                        value={
+                                            borrowRequest
+                                                .event_name ||
+                                            borrowRequest
+                                                .activity_name ||
+                                            '-'
+                                        }
+                                        icon="bi-calendar-event-fill"
+                                    />
+                                </div>
+
+                                <div className="col-md-6">
+                                    <InfoBox
+                                        label="Penanggung Jawab"
+                                        value={
+                                            borrowRequest
+                                                .person_in_charge ||
+                                            borrowRequest
+                                                .pic_name ||
+                                            '-'
+                                        }
+                                        icon="bi-person-check-fill"
+                                    />
+                                </div>
+
+                                <div className="col-md-6">
+                                    <InfoBox
+                                        label="Tanggal Pengambilan"
+                                        value={formatDateTime(
+                                            borrowRequest
+                                                .borrow_at ||
+                                            borrowRequest
+                                                .borrow_date
+                                        )}
+                                        icon="bi-calendar-plus-fill"
+                                    />
+                                </div>
+
+                                <div className="col-md-6">
+                                    <InfoBox
+                                        label="Tanggal Pengembalian"
+                                        value={formatDateTime(
+                                            borrowRequest
+                                                .return_at ||
+                                            borrowRequest
+                                                .return_date
+                                        )}
+                                        icon="bi-calendar-minus-fill"
+                                    />
+                                </div>
+
+                                <div className="col-md-6">
+                                    <InfoBox
+                                        label="Lokasi Kegiatan"
+                                        value={
+                                            borrowRequest
+                                                .location ||
+                                            '-'
+                                        }
+                                        icon="bi-geo-alt-fill"
+                                    />
+                                </div>
+
+                                <div className="col-md-6">
+                                    <InfoBox
+                                        label="Nomor WhatsApp"
+                                        value={
+                                            borrowRequest
+                                                .phone_number ||
+                                            borrowRequest
+                                                .whatsapp_number ||
+                                            '-'
+                                        }
+                                        icon="bi-whatsapp"
                                     />
                                 </div>
 
                                 <div className="col-12">
-                                    <InfoBox
-                                        label="Keperluan"
-                                        value={
-                                            borrowRequest.purpose ||
-                                            '-'
-                                        }
-                                    />
+                                    <div className="p-4 rounded-4 border bg-light">
+                                        <div className="small fw-bold text-muted mb-2">
+                                            Keperluan Peminjaman
+                                        </div>
+
+                                        <div
+                                            style={{
+                                                whiteSpace:
+                                                    'pre-line',
+
+                                                lineHeight:
+                                                    1.8,
+                                            }}
+                                        >
+                                            {borrowRequest
+                                                .purpose ||
+                                                requestTitle ||
+                                                '-'}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </section>
 
                     <section className="card border-0 shadow-sm rounded-5 mb-4">
-                        <div className="card-body p-4">
-                            <h4 className="fw-black mb-1">
-                                Item Barang
-                            </h4>
+                        <div className="card-body p-4 p-lg-5">
+                            <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
+                                <div>
+                                    <h4 className="fw-black mb-1">
+                                        Item Barang
+                                    </h4>
 
-                            <p className="text-muted mb-4">
-                                Daftar barang yang diajukan untuk dipinjam.
-                            </p>
+                                    <p className="text-muted mb-0">
+                                        Daftar barang yang diajukan untuk dipinjam.
+                                    </p>
+                                </div>
 
-                            {borrowItems.length === 0 ? (
-                                <div className="alert alert-warning border-0 rounded-4 mb-0">
+                                <span className="badge rounded-pill text-bg-success px-3 py-2">
+                                    {
+                                        borrowItems.length
+                                    }{' '}
+                                    item
+                                </span>
+                            </div>
+
+                            {borrowItems.length ===
+                            0 ? (
+                                <div className="alert alert-warning rounded-4 mb-0">
                                     Tidak ada item barang pada pengajuan ini.
                                 </div>
                             ) : (
@@ -858,19 +1172,19 @@ export default function BorrowingApprovalDetailPage() {
                                     <table className="table align-middle mb-0">
                                         <thead className="table-light">
                                             <tr>
-                                                <th>
+                                                <th className="ps-4 py-3">
                                                     Barang
                                                 </th>
 
-                                                <th>
+                                                <th className="py-3">
                                                     Kategori
                                                 </th>
 
-                                                <th className="text-end">
-                                                    Qty
+                                                <th className="text-end py-3">
+                                                    Jumlah
                                                 </th>
 
-                                                <th className="text-end">
+                                                <th className="text-end pe-4 py-3">
                                                     Stok Saat Ini
                                                 </th>
                                             </tr>
@@ -888,28 +1202,49 @@ export default function BorrowingApprovalDetailPage() {
                                                             index
                                                         }
                                                     >
-                                                        <td className="fw-bold">
-                                                            {item.product
-                                                                ?.name ||
-                                                                item.product_name ||
-                                                                '-'}
+                                                        <td className="ps-4 py-3">
+                                                            <div className="fw-black">
+                                                                {item
+                                                                    .product
+                                                                    ?.name ||
+                                                                    item
+                                                                        .product_name ||
+                                                                    '-'}
+                                                            </div>
+
+                                                            {item
+                                                                .product
+                                                                ?.description && (
+                                                                <div className="small text-muted mt-1">
+                                                                    {
+                                                                        item
+                                                                            .product
+                                                                            .description
+                                                                    }
+                                                                </div>
+                                                            )}
                                                         </td>
 
-                                                        <td>
-                                                            {item.product
+                                                        <td className="py-3">
+                                                            {item
+                                                                .product
                                                                 ?.category
                                                                 ?.name ||
-                                                                item.category_name ||
+                                                                item
+                                                                    .category_name ||
                                                                 '-'}
                                                         </td>
 
-                                                        <td className="text-end fw-bold">
-                                                            {item.quantity ||
-                                                                0}
+                                                        <td className="text-end py-3 fw-black">
+                                                            {Number(
+                                                                item.quantity ||
+                                                                    0
+                                                            )}
                                                         </td>
 
-                                                        <td className="text-end">
-                                                            {item.product
+                                                        <td className="text-end pe-4 py-3">
+                                                            {item
+                                                                .product
                                                                 ?.stock ??
                                                                 '-'}
                                                         </td>
@@ -924,255 +1259,333 @@ export default function BorrowingApprovalDetailPage() {
                     </section>
 
                     <section className="card border-0 shadow-sm rounded-5">
-                        <div className="card-body p-4">
+                        <div className="card-body p-4 p-lg-5">
                             <h4 className="fw-black mb-3">
                                 Catatan Admin
                             </h4>
 
-                            <div className="p-3 rounded-4 border h-100">
-                                <div className="small fw-bold text-muted mb-1">
-                                    Catatan Terakhir
-                                </div>
-
-                                <p
-                                    className="mb-0 text-muted"
+                            <div
+                                className={`p-4 rounded-4 border ${
+                                    borrowRequest
+                                        .status ===
+                                    'rejected'
+                                        ? 'bg-danger-subtle'
+                                        : 'bg-light'
+                                }`}
+                            >
+                                <div
                                     style={{
-                                        lineHeight: 1.7,
                                         whiteSpace:
                                             'pre-line',
+
+                                        lineHeight:
+                                            1.8,
                                     }}
                                 >
-                                    {borrowRequest.admin_note ||
+                                    {borrowRequest
+                                        .admin_note ||
                                         'Belum ada catatan admin.'}
-                                </p>
+                                </div>
                             </div>
                         </div>
                     </section>
                 </div>
 
                 <div className="col-xl-4">
-                    <section className="card border-0 shadow-sm rounded-5 mb-4">
-                        <div className="card-body p-4">
-                            <h4 className="fw-black mb-1">
-                                Aksi Approval
-                            </h4>
+                    <div
+                        className="position-sticky"
+                        style={{
+                            top: 110,
+                        }}
+                    >
+                        <section className="card border-0 shadow-sm rounded-5 mb-4">
+                            <div className="card-body p-4">
+                                <h4 className="fw-black mb-1">
+                                    Informasi Status
+                                </h4>
 
-                            <p className="text-muted mb-4">
-                                Proses pengajuan berdasarkan status saat ini.
-                            </p>
+                                <p className="text-muted mb-4">
+                                    Perkembangan proses peminjaman.
+                                </p>
 
-                            {!canProcess ? (
-                                <div className="p-4 rounded-4 bg-light border text-center">
-                                    <i className="bi bi-shield-lock-fill fs-2 text-secondary" />
+                                <div className="request-timeline">
+                                    <TimelineItem
+                                        label="Dikirim"
+                                        value={formatDateTime(
+                                            borrowRequest
+                                                .submitted_at ||
+                                            borrowRequest
+                                                .created_at
+                                        )}
+                                        icon="bi-send-check-fill"
+                                    />
 
-                                    <h6 className="fw-black mt-3 mb-2">
-                                        Tidak memiliki akses proses
-                                    </h6>
+                                    {borrowRequest
+                                        .approved_at && (
+                                        <TimelineItem
+                                            label="Disetujui"
+                                            value={formatDateTime(
+                                                borrowRequest
+                                                    .approved_at
+                                            )}
+                                            icon="bi-check-circle-fill"
+                                        />
+                                    )}
 
-                                    <p className="small text-muted mb-0">
-                                        Hubungi superadmin untuk mendapatkan permission proses approval peminjaman.
-                                    </p>
-                                </div>
-                            ) : (
-                                <>
-                                    {borrowRequest.status ===
+                                    {borrowRequest
+                                        .borrowed_at && (
+                                        <TimelineItem
+                                            label="Barang Dipinjam"
+                                            value={formatDateTime(
+                                                borrowRequest
+                                                    .borrowed_at
+                                            )}
+                                            icon="bi-box-arrow-up-right"
+                                        />
+                                    )}
+
+                                    {borrowRequest
+                                        .returned_at && (
+                                        <TimelineItem
+                                            label="Barang Dikembalikan"
+                                            value={formatDateTime(
+                                                borrowRequest
+                                                    .returned_at
+                                            )}
+                                            icon="bi-box-arrow-in-down-left"
+                                        />
+                                    )}
+
+                                    {borrowRequest
+                                        .rejected_at && (
+                                        <TimelineItem
+                                            label="Ditolak"
+                                            value={formatDateTime(
+                                                borrowRequest
+                                                    .rejected_at
+                                            )}
+                                            icon="bi-x-circle-fill"
+                                            rejected
+                                        />
+                                    )}
+
+                                    {borrowRequest
+                                        .status ===
                                         'pending' && (
-                                        <>
-                                            <label className="form-label fw-bold">
-                                                Alasan Penolakan
-                                            </label>
-
-                                            <textarea
-                                                className="form-control rounded-4 mb-3"
-                                                rows="5"
-                                                placeholder="Isi catatan hanya jika pengajuan akan ditolak..."
-                                                value={
-                                                    adminNote
-                                                }
-                                                onChange={(
-                                                    event
-                                                ) =>
-                                                    setAdminNote(
-                                                        event
-                                                            .target
-                                                            .value
-                                                    )
-                                                }
-                                                disabled={
-                                                    processing
-                                                }
-                                            />
-
-                                            <div className="d-grid gap-2">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-primary rounded-pill"
-                                                    onClick={
-                                                        handleApprove
-                                                    }
-                                                    disabled={
-                                                        processing
-                                                    }
-                                                >
-                                                    <i className="bi bi-check-lg me-2" />
-
-                                                    Setujui
-                                                </button>
-
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-danger rounded-pill"
-                                                    onClick={
-                                                        handleReject
-                                                    }
-                                                    disabled={
-                                                        processing
-                                                    }
-                                                >
-                                                    <i className="bi bi-x-lg me-2" />
-
-                                                    Tolak
-                                                </button>
-                                            </div>
-                                        </>
+                                        <TimelineItem
+                                            label="Menunggu Pemeriksaan"
+                                            value="Admin sedang memeriksa pengajuan peminjaman."
+                                            icon="bi-hourglass-split"
+                                            active
+                                        />
                                     )}
 
-                                    {borrowRequest.status ===
+                                    {borrowRequest
+                                        .status ===
                                         'approved' && (
-                                        <>
-                                            <div className="p-3 rounded-4 bg-success-subtle mb-3">
-                                                <div className="fw-black text-success">
-                                                    Peminjaman sudah disetujui
-                                                </div>
-
-                                                <div className="small text-muted">
-                                                    Tandai dipinjam ketika barang sudah diambil oleh pemohon.
-                                                </div>
-                                            </div>
-
-                                            <button
-                                                type="button"
-                                                className="btn btn-success rounded-pill w-100"
-                                                onClick={
-                                                    handleBorrowed
-                                                }
-                                                disabled={
-                                                    processing
-                                                }
-                                            >
-                                                <i className="bi bi-box-arrow-up me-2" />
-
-                                                Tandai Dipinjam
-                                            </button>
-                                        </>
+                                        <TimelineItem
+                                            label="Menunggu Pengambilan"
+                                            value="Barang siap diproses dan menunggu diambil oleh pemohon."
+                                            icon="bi-box-seam-fill"
+                                            active
+                                        />
                                     )}
 
-                                    {borrowRequest.status ===
+                                    {borrowRequest
+                                        .status ===
                                         'borrowed' && (
-                                        <>
-                                            <div className="p-3 rounded-4 bg-warning-subtle mb-3">
-                                                <div className="fw-black text-warning-emphasis">
-                                                    Barang sedang dipinjam
-                                                </div>
-
-                                                <div className="small text-muted">
-                                                    Tandai dikembalikan ketika barang sudah diterima kembali. Stok akan bertambah otomatis.
-                                                </div>
-                                            </div>
-
-                                            <button
-                                                type="button"
-                                                className="btn btn-success rounded-pill w-100"
-                                                onClick={
-                                                    handleReturned
-                                                }
-                                                disabled={
-                                                    processing
-                                                }
-                                            >
-                                                <i className="bi bi-box-arrow-in-down me-2" />
-
-                                                Tandai Dikembalikan
-                                            </button>
-                                        </>
+                                        <TimelineItem
+                                            label="Sedang Digunakan"
+                                            value="Barang sedang dipinjam dan belum dikembalikan."
+                                            icon="bi-clock-history"
+                                            active
+                                        />
                                     )}
+                                </div>
+                            </div>
+                        </section>
 
-                                    {[
-                                        'rejected',
-                                        'returned',
-                                    ].includes(
-                                        borrowRequest.status
-                                    ) && (
-                                        <div className="p-3 rounded-4 bg-light border">
-                                            <div className="fw-black mb-1">
-                                                Tidak ada aksi
-                                            </div>
+                        <section className="card border-0 shadow-sm rounded-5">
+                            <div className="card-body p-4">
+                                <h4 className="fw-black mb-1">
+                                    Tindakan Admin
+                                </h4>
 
-                                            <p
-                                                className="text-muted mb-0"
-                                                style={{
-                                                    lineHeight: 1.7,
-                                                }}
-                                            >
-                                                Pengajuan berada pada status{' '}
+                                <p className="text-muted mb-4">
+                                    Proses peminjaman berdasarkan status saat ini.
+                                </p>
+
+                                {!canProcess ? (
+                                    <div className="p-4 rounded-4 bg-light border text-center">
+                                        <i className="bi bi-shield-lock-fill fs-2 text-secondary" />
+
+                                        <h6 className="fw-black mt-3 mb-2">
+                                            Mode hanya lihat
+                                        </h6>
+
+                                        <p className="small text-muted mb-0">
+                                            Akun tidak memiliki permission proses approval peminjaman.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {borrowRequest
+                                            .status ===
+                                            'pending' && (
+                                            <>
+                                                <label className="form-label fw-bold">
+                                                    Alasan Penolakan
+                                                </label>
+
+                                                <textarea
+                                                    className="form-control rounded-4 mb-2"
+                                                    rows="5"
+                                                    maxLength="2000"
+                                                    placeholder="Diisi apabila pengajuan akan ditolak."
+                                                    value={
+                                                        adminNote
+                                                    }
+                                                    onChange={(
+                                                        event
+                                                    ) =>
+                                                        setAdminNote(
+                                                            event
+                                                                .target
+                                                                .value
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        processing
+                                                    }
+                                                />
+
+                                                <div className="small text-muted text-end mb-3">
+                                                    {
+                                                        adminNote.length
+                                                    }
+                                                    /2000 karakter
+                                                </div>
+
+                                                <div className="d-grid gap-2">
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-primary rounded-pill"
+                                                        onClick={
+                                                            handleApprove
+                                                        }
+                                                        disabled={
+                                                            processing
+                                                        }
+                                                    >
+                                                        <i className="bi bi-check-lg me-2" />
+
+                                                        Setujui Peminjaman
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline-danger rounded-pill"
+                                                        onClick={
+                                                            handleReject
+                                                        }
+                                                        disabled={
+                                                            processing
+                                                        }
+                                                    >
+                                                        <i className="bi bi-x-lg me-2" />
+
+                                                        Tolak Peminjaman
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {borrowRequest
+                                            .status ===
+                                            'approved' && (
+                                            <>
+                                                <div className="p-3 rounded-4 bg-success-subtle mb-3">
+                                                    <div className="fw-black text-success mb-1">
+                                                        Peminjaman Disetujui
+                                                    </div>
+
+                                                    <div className="small text-muted">
+                                                        Tandai dipinjam setelah barang diserahkan kepada pemohon.
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-success rounded-pill w-100"
+                                                    onClick={
+                                                        handleBorrowed
+                                                    }
+                                                    disabled={
+                                                        processing
+                                                    }
+                                                >
+                                                    <i className="bi bi-box-arrow-up-right me-2" />
+
+                                                    Tandai Dipinjam
+                                                </button>
+                                            </>
+                                        )}
+
+                                        {borrowRequest
+                                            .status ===
+                                            'borrowed' && (
+                                            <>
+                                                <div className="p-3 rounded-4 bg-warning-subtle mb-3">
+                                                    <div className="fw-black text-warning-emphasis mb-1">
+                                                        Barang Sedang Dipinjam
+                                                    </div>
+
+                                                    <div className="small text-muted">
+                                                        Tandai dikembalikan setelah seluruh barang diterima kembali.
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-success rounded-pill w-100"
+                                                    onClick={
+                                                        handleReturned
+                                                    }
+                                                    disabled={
+                                                        processing
+                                                    }
+                                                >
+                                                    <i className="bi bi-box-arrow-in-down-left me-2" />
+
+                                                    Tandai Dikembalikan
+                                                </button>
+                                            </>
+                                        )}
+
+                                        {[
+                                            'rejected',
+                                            'returned',
+                                        ].includes(
+                                            borrowRequest
+                                                .status
+                                        ) && (
+                                            <div className="alert alert-light border rounded-4 mb-0">
+                                                Peminjaman berstatus{' '}
 
                                                 <strong>
-                                                    {statusConfig.label}
-                                                </strong>
-                                                .
-                                            </p>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    </section>
+                                                    {
+                                                        statusConfig.label
+                                                    }
+                                                </strong>{' '}
 
-                    <section className="card border-0 shadow-sm rounded-5">
-                        <div className="card-body p-4">
-                            <h4 className="fw-black mb-3">
-                                Timeline Status
-                            </h4>
-
-                            <div className="d-flex flex-column gap-3">
-                                <InfoBox
-                                    label="Dikirim"
-                                    value={formatDateTime(
-                                        borrowRequest.submitted_at ||
-                                            borrowRequest.created_at
-                                    )}
-                                />
-
-                                <InfoBox
-                                    label="Disetujui"
-                                    value={formatDateTime(
-                                        borrowRequest.approved_at
-                                    )}
-                                />
-
-                                <InfoBox
-                                    label="Dipinjam"
-                                    value={formatDateTime(
-                                        borrowRequest.borrowed_at
-                                    )}
-                                />
-
-                                <InfoBox
-                                    label="Dikembalikan"
-                                    value={formatDateTime(
-                                        borrowRequest.returned_at
-                                    )}
-                                />
-
-                                <InfoBox
-                                    label="Ditolak"
-                                    value={formatDateTime(
-                                        borrowRequest.rejected_at
-                                    )}
-                                />
+                                                dan tidak memiliki tindakan lanjutan.
+                                            </div>
+                                        )}
+                                    </>
+                                )}
                             </div>
-                        </div>
-                    </section>
+                        </section>
+                    </div>
                 </div>
             </div>
         </div>

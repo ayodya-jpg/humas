@@ -1603,3 +1603,280 @@ img {
         top: 38px;
     }
 }
+/* =========================================================
+   CONSISTENT APPROVAL DETAIL HEADER
+   Dipakai oleh:
+   - Detail Approval Merchandise
+   - Detail Approval Peminjaman
+   - Detail Approval Liputan Humas
+========================================================= */
+
+.approval-detail-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 0 2px;
+}
+
+.approval-detail-heading {
+    min-width: 0;
+    flex: 1;
+}
+
+.approval-detail-back-link {
+    width: fit-content;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 14px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.4;
+    text-decoration: none;
+    transition:
+        color 0.18s ease,
+        transform 0.18s ease;
+}
+
+.approval-detail-back-link:hover {
+    color: #dc2626;
+    transform: translateX(-2px);
+}
+
+.approval-detail-back-link i {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.approval-detail-title {
+    margin: 0 0 9px;
+    color: #0f172a;
+    font-size: clamp(1.65rem, 2.5vw, 2.15rem);
+    font-weight: 900;
+    letter-spacing: -0.045em;
+    line-height: 1.15;
+}
+
+.approval-detail-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.approval-detail-meta > span {
+    line-height: 1.3;
+}
+
+.approval-detail-date {
+    min-width: 210px;
+    padding: 14px 18px;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.approval-detail-date span {
+    display: block;
+    margin-bottom: 3px;
+}
+
+.approval-detail-date strong {
+    display: block;
+    color: #0f172a;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+/* =========================================================
+   CONSISTENT DETAIL CARD
+========================================================= */
+
+.approval-detail-header + .alert,
+.approval-detail-header + .row {
+    position: relative;
+}
+
+.approval-detail-header .badge {
+    font-size: 12px;
+    font-weight: 850;
+    line-height: 1.2;
+}
+
+.approval-detail-header .text-muted {
+    color: #64748b !important;
+}
+
+/* =========================================================
+   STICKY ACTION PANEL
+========================================================= */
+
+.approval-detail-sticky {
+    position: sticky;
+    top: 110px;
+}
+
+.approval-detail-action-card textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+
+.approval-detail-action-card .btn {
+    min-height: 44px;
+}
+
+/* =========================================================
+   DETAIL TABLE
+========================================================= */
+
+.approval-detail-table {
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+}
+
+.approval-detail-table .table {
+    margin-bottom: 0;
+}
+
+.approval-detail-table .table > :not(caption) > * > * {
+    padding-top: 14px;
+    padding-bottom: 14px;
+}
+
+.approval-detail-table thead th {
+    color: #475569;
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.035em;
+    white-space: nowrap;
+}
+
+.approval-detail-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+/* =========================================================
+   DETAIL INFO BOX
+========================================================= */
+
+.approval-info-box {
+    height: 100%;
+    padding: 16px;
+    border: 1px solid rgba(226, 232, 240, 0.92);
+    border-radius: 18px;
+    background: #f8fafc;
+}
+
+.approval-info-box-label {
+    margin-bottom: 5px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.approval-info-box-value {
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+/* =========================================================
+   RESPONSIVE APPROVAL DETAIL
+========================================================= */
+
+@media (max-width: 1199.98px) {
+    .approval-detail-sticky,
+    .position-sticky[style*="top: 110"] {
+        position: static !important;
+        top: auto !important;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .approval-detail-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .approval-detail-title {
+        font-size: 1.7rem;
+    }
+
+    .approval-detail-date {
+        width: 100%;
+        min-width: 0;
+        padding: 13px 15px;
+        text-align: left;
+    }
+
+    .approval-detail-meta {
+        gap: 8px;
+    }
+
+    .approval-detail-meta .badge {
+        white-space: normal;
+        text-align: left;
+    }
+}
+
+@media (max-width: 575.98px) {
+    /*
+     * App.css lama menggunakan:
+     * .btn { width: 100%; }
+     *
+     * Override berikut menjaga link kembali tetap kecil
+     * dan tidak berubah menjadi tombol lebar/lingkaran.
+     */
+    .approval-detail-back-link {
+        width: fit-content !important;
+        max-width: 100%;
+        margin-bottom: 12px;
+        font-size: 12px;
+    }
+
+    .approval-detail-back-link span {
+        white-space: normal;
+    }
+
+    .approval-detail-header {
+        gap: 14px;
+    }
+
+    .approval-detail-title {
+        font-size: 1.5rem;
+        line-height: 1.2;
+    }
+
+    .approval-detail-date strong {
+        font-size: 13px;
+    }
+
+    .approval-detail-meta {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .approval-detail-meta > span {
+        width: fit-content;
+        max-width: 100%;
+    }
+
+    .approval-detail-header .badge {
+        width: fit-content !important;
+        max-width: 100%;
+    }
+
+    .approval-detail-action-card .btn,
+    .approval-detail-sticky .btn {
+        width: 100%;
+    }
+}

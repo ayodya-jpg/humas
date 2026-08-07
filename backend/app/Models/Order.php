@@ -25,6 +25,8 @@ class Order extends Model
         'user_note',
         'admin_note',
         'submitted_at',
+        'revision_requested_at',
+        'resubmitted_at',
         'approved_at',
         'rejected_at',
         'completed_at',
@@ -35,8 +37,12 @@ class Order extends Model
     ];
 
     protected $casts = [
-        'activity_date' => 'date',
+        'id' => 'integer',
+        'user_id' => 'integer',
+        'activity_date' => 'date:Y-m-d',
         'submitted_at' => 'datetime',
+        'revision_requested_at' => 'datetime',
+        'resubmitted_at' => 'datetime',
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
         'completed_at' => 'datetime',
@@ -48,16 +54,24 @@ class Order extends Model
             return null;
         }
 
-        return asset(Storage::url($this->proof_file_path));
+        return asset(
+            Storage::url(
+                $this->proof_file_path
+            )
+        );
     }
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(
+            User::class
+        );
     }
 
     public function items(): HasMany
     {
-        return $this->hasMany(OrderItem::class);
+        return $this->hasMany(
+            OrderItem::class
+        );
     }
 }
