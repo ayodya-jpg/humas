@@ -1,50 +1,72 @@
-import { Link, useLocation } from 'react-router-dom';
+import {
+    Link,
+    useLocation,
+} from 'react-router-dom';
 
-const breadcrumbMap = [
+import {
+    getDefaultPath,
+    getStoredUser,
+    hasPermission,
+} from './ProtectedRoute';
+
+const createBreadcrumbMap = (
+    basePath
+) => [
     {
-        match: (path) => path === '/admin/dashboard',
+        match: (path) =>
+            path === `${basePath}/dashboard`,
+
         items: [
             {
                 label: 'Dashboard',
-                path: '/admin/dashboard',
-            },
-        ],
-    },
-
-    {
-        match: (path) => path === '/admin/request/merchandise',
-        items: [
-            {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
-            },
-            {
-                label: 'Ajukan Merchandise',
                 path: null,
             },
         ],
     },
 
     {
-        match: (path) => path === '/admin/request/humas-service',
+        match: (path) =>
+            path ===
+            `${basePath}/request/merchandise`,
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
-                label: 'Layanan Humas',
+                label: 'Pengajuan Merchandise',
                 path: null,
             },
         ],
     },
 
     {
-        match: (path) => path === '/admin/request/sekpim-borrowing',
+        match: (path) =>
+            path ===
+            `${basePath}/request/humas-service`,
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
+            },
+            {
+                label: 'Request Liputan Humas',
+                path: null,
+            },
+        ],
+    },
+
+    {
+        match: (path) =>
+            path ===
+            `${basePath}/request/sekpim-borrowing`,
+
+        items: [
+            {
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Peminjaman SEKPiM',
@@ -54,11 +76,14 @@ const breadcrumbMap = [
     },
 
     {
-        match: (path) => path === '/admin/my-requests',
+        match: (path) =>
+            path ===
+            `${basePath}/my-requests`,
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Riwayat Pengajuan',
@@ -69,16 +94,23 @@ const breadcrumbMap = [
 
     {
         match: (path) =>
-            path.startsWith('/admin/my-requests/') &&
+            path.startsWith(
+                `${basePath}/my-requests/`
+            ) &&
             path.endsWith('/detail'),
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Riwayat Pengajuan',
-                path: '/admin/my-requests',
+                path:
+                    `${basePath}/my-requests`,
+
+                permission:
+                    'request.history.view',
             },
             {
                 label: 'Detail Pengajuan',
@@ -88,11 +120,13 @@ const breadcrumbMap = [
     },
 
     {
-        match: (path) => path === '/admin/orders',
+        match: (path) =>
+            path === '/admin/orders',
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Approval Merchandise',
@@ -102,15 +136,21 @@ const breadcrumbMap = [
     },
 
     {
-        match: (path) => path.startsWith('/admin/orders/'),
+        match: (path) =>
+            path.startsWith(
+                '/admin/orders/'
+            ),
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Approval Merchandise',
                 path: '/admin/orders',
+                permission:
+                    'approval.merchandise.view',
             },
             {
                 label: 'Detail Pengajuan',
@@ -120,11 +160,57 @@ const breadcrumbMap = [
     },
 
     {
-        match: (path) => path === '/admin/borrow-requests',
+        match: (path) =>
+            path ===
+            '/admin/humas-services',
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
+            },
+            {
+                label: 'Approval Liputan Humas',
+                path: null,
+            },
+        ],
+    },
+
+    {
+        match: (path) =>
+            path.startsWith(
+                '/admin/humas-services/'
+            ),
+
+        items: [
+            {
+                label: 'Beranda',
+                home: true,
+            },
+            {
+                label: 'Approval Liputan Humas',
+                path:
+                    '/admin/humas-services',
+
+                permission:
+                    'approval.humas.view',
+            },
+            {
+                label: 'Detail Request',
+                path: null,
+            },
+        ],
+    },
+
+    {
+        match: (path) =>
+            path ===
+            '/admin/borrow-requests',
+
+        items: [
+            {
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Approval Peminjaman',
@@ -135,15 +221,22 @@ const breadcrumbMap = [
 
     {
         match: (path) =>
-            path.startsWith('/admin/borrow-requests/'),
+            path.startsWith(
+                '/admin/borrow-requests/'
+            ),
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Approval Peminjaman',
-                path: '/admin/borrow-requests',
+                path:
+                    '/admin/borrow-requests',
+
+                permission:
+                    'approval.borrowing.view',
             },
             {
                 label: 'Detail Peminjaman',
@@ -153,25 +246,14 @@ const breadcrumbMap = [
     },
 
     {
-        match: (path) => path === '/admin/humas-services',
-        items: [
-            {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
-            },
-            {
-                label: 'Approval Layanan Humas',
-                path: null,
-            },
-        ],
-    },
+        match: (path) =>
+            path ===
+            '/admin/categories',
 
-    {
-        match: (path) => path === '/admin/categories',
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Data Kategori',
@@ -181,15 +263,22 @@ const breadcrumbMap = [
     },
 
     {
-        match: (path) => path === '/admin/categories/create',
+        match: (path) =>
+            path ===
+            '/admin/categories/create',
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Data Kategori',
-                path: '/admin/categories',
+                path:
+                    '/admin/categories',
+
+                permission:
+                    'categories.view',
             },
             {
                 label: 'Tambah Kategori',
@@ -200,16 +289,23 @@ const breadcrumbMap = [
 
     {
         match: (path) =>
-            path.startsWith('/admin/categories/') &&
+            path.startsWith(
+                '/admin/categories/'
+            ) &&
             path.endsWith('/edit'),
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Data Kategori',
-                path: '/admin/categories',
+                path:
+                    '/admin/categories',
+
+                permission:
+                    'categories.view',
             },
             {
                 label: 'Edit Kategori',
@@ -219,11 +315,14 @@ const breadcrumbMap = [
     },
 
     {
-        match: (path) => path === '/admin/products',
+        match: (path) =>
+            path ===
+            '/admin/products',
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Data Produk',
@@ -233,15 +332,22 @@ const breadcrumbMap = [
     },
 
     {
-        match: (path) => path === '/admin/products/create',
+        match: (path) =>
+            path ===
+            '/admin/products/create',
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Data Produk',
-                path: '/admin/products',
+                path:
+                    '/admin/products',
+
+                permission:
+                    'products.view',
             },
             {
                 label: 'Tambah Produk',
@@ -252,16 +358,23 @@ const breadcrumbMap = [
 
     {
         match: (path) =>
-            path.startsWith('/admin/products/') &&
+            path.startsWith(
+                '/admin/products/'
+            ) &&
             path.endsWith('/edit'),
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Data Produk',
-                path: '/admin/products',
+                path:
+                    '/admin/products',
+
+                permission:
+                    'products.view',
             },
             {
                 label: 'Edit Produk',
@@ -271,11 +384,14 @@ const breadcrumbMap = [
     },
 
     {
-        match: (path) => path === '/admin/users',
+        match: (path) =>
+            path ===
+            '/admin/users',
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Data User',
@@ -285,15 +401,24 @@ const breadcrumbMap = [
     },
 
     {
-        match: (path) => path === '/admin/users/create',
+        match: (path) =>
+            path ===
+            '/admin/users/create',
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Data User',
-                path: '/admin/users',
+                path:
+                    '/admin/users',
+
+                permission: [
+                    'users.view',
+                    'users.manage',
+                ],
             },
             {
                 label: 'Tambah User',
@@ -304,16 +429,25 @@ const breadcrumbMap = [
 
     {
         match: (path) =>
-            path.startsWith('/admin/users/') &&
+            path.startsWith(
+                '/admin/users/'
+            ) &&
             path.endsWith('/edit'),
+
         items: [
             {
-                label: 'Dashboard',
-                path: '/admin/dashboard',
+                label: 'Beranda',
+                home: true,
             },
             {
                 label: 'Data User',
-                path: '/admin/users',
+                path:
+                    '/admin/users',
+
+                permission: [
+                    'users.view',
+                    'users.manage',
+                ],
             },
             {
                 label: 'Edit User',
@@ -321,67 +455,171 @@ const breadcrumbMap = [
             },
         ],
     },
+
+    {
+        match: (path) =>
+            path ===
+                '/admin/unauthorized' ||
+            path ===
+                '/user/unauthorized',
+
+        items: [
+            {
+                label: 'Beranda',
+                home: true,
+            },
+            {
+                label: 'Akses Ditolak',
+                path: null,
+            },
+        ],
+    },
 ];
 
 export default function Breadcrumbs() {
-    const location = useLocation();
+    const location =
+        useLocation();
 
-    const foundBreadcrumb = breadcrumbMap.find((breadcrumb) =>
-        breadcrumb.match(location.pathname)
-    );
+    const currentUser =
+        getStoredUser();
 
-    const items = foundBreadcrumb?.items || [
-        {
-            label: 'Dashboard',
-            path: '/admin/dashboard',
-        },
-        {
-            label: 'Halaman',
-            path: null,
-        },
-    ];
+    const basePath =
+        currentUser?.role ===
+        'user'
+            ? '/user'
+            : '/admin';
 
-    if (location.pathname === '/admin/dashboard') {
+    const defaultPath =
+        getDefaultPath(
+            currentUser
+        );
+
+    const breadcrumbMap =
+        createBreadcrumbMap(
+            basePath
+        );
+
+    const foundBreadcrumb =
+        breadcrumbMap.find(
+            (breadcrumb) =>
+                breadcrumb.match(
+                    location.pathname
+                )
+        );
+
+    const isDefaultPage =
+        location.pathname ===
+        defaultPath;
+
+    if (
+        isDefaultPage ||
+        location.pathname ===
+            `${basePath}/dashboard`
+    ) {
         return null;
     }
+
+    const originalItems =
+        foundBreadcrumb?.items || [
+            {
+                label: 'Beranda',
+                home: true,
+            },
+            {
+                label: 'Halaman',
+                path: null,
+            },
+        ];
+
+    const items =
+        originalItems.map(
+            (item) => {
+                if (item.home) {
+                    return {
+                        ...item,
+                        path:
+                            defaultPath,
+                    };
+                }
+
+                if (
+                    item.permission &&
+                    !hasPermission(
+                        currentUser,
+                        item.permission
+                    )
+                ) {
+                    return {
+                        ...item,
+                        path: null,
+                    };
+                }
+
+                return item;
+            }
+        );
 
     return (
         <div className="breadcrumb-wrapper">
             <nav aria-label="breadcrumb">
                 <ol className="breadcrumb custom-breadcrumb mb-0">
-                    {items.map((item, index) => {
-                        const isLast = index === items.length - 1;
+                    {items.map(
+                        (
+                            item,
+                            index
+                        ) => {
+                            const isLast =
+                                index ===
+                                items.length -
+                                    1;
 
-                        return (
-                            <li
-                                key={`${item.label}-${index}`}
-                                className={`breadcrumb-item ${
-                                    isLast ? 'active' : ''
-                                }`}
-                                aria-current={
-                                    isLast ? 'page' : undefined
-                                }
-                            >
-                                {item.path && !isLast ? (
-                                    <Link to={item.path}>
-                                        {index === 0 && (
-                                            <i className="bi bi-house-door-fill me-2" />
-                                        )}
+                            const icon =
+                                index === 0
+                                    ? (
+                                        <i className="bi bi-house-door-fill me-2" />
+                                    )
+                                    : null;
 
-                                        {item.label}
-                                    </Link>
-                                ) : (
-                                    <>
-                                        {index === 0 && (
-                                            <i className="bi bi-house-door-fill me-2" />
-                                        )}
+                            return (
+                                <li
+                                    key={`${item.label}-${index}`}
+                                    className={`breadcrumb-item ${
+                                        isLast
+                                            ? 'active'
+                                            : ''
+                                    }`}
+                                    aria-current={
+                                        isLast
+                                            ? 'page'
+                                            : undefined
+                                    }
+                                >
+                                    {item.path &&
+                                    !isLast ? (
+                                        <Link
+                                            to={
+                                                item.path
+                                            }
+                                        >
+                                            {icon}
 
-                                        {item.label}
-                                    </>
-                                )}
-                            </li>
-                        );
-                    })}
+                                            {
+                                                item.label
+                                            }
+                                        </Link>
+                                    ) : (
+                                        <>
+                                            {icon}
+
+                                            {
+                                                item.label
+                                            }
+                                        </>
+                                    )}
+                                </li>
+                            );
+                        }
+                    )}
                 </ol>
             </nav>
         </div>

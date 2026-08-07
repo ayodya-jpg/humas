@@ -5,9 +5,19 @@ import {
     useState,
 } from 'react';
 
-import { Link } from 'react-router-dom';
+import {
+    Link,
+    Navigate,
+} from 'react-router-dom';
 
 import api from '../api/axios';
+
+import {
+    getDefaultPath,
+    getStoredUser,
+    hasPermission,
+    normalizePermissions,
+} from '../components/ProtectedRoute';
 
 const EMPTY_DATA = {
     orders: [],
@@ -17,54 +27,17 @@ const EMPTY_DATA = {
     users: [],
 };
 
-const getCurrentUser = () => {
-    try {
-        return JSON.parse(
-            localStorage.getItem('admin_user') || '{}'
-        );
-    } catch {
-        return {};
-    }
+const ROLE_LABELS = {
+    user: 'User',
+    admin: 'Admin',
+    admin_humas: 'Admin Humas',
+    admin_sekpim: 'Admin SEKPiM',
+    superadmin: 'Super Admin',
 };
 
-const normalizePermissions = (permissions) => {
-    if (!Array.isArray(permissions)) {
-        return [];
-    }
-
-    return [
-        ...new Set(
-            permissions.filter(Boolean)
-        ),
-    ];
-};
-
-const hasPermission = (
-    currentUser,
-    permission
+const extractArray = (
+    response
 ) => {
-    if (!permission) {
-        return true;
-    }
-
-    if (
-        currentUser?.role ===
-        'superadmin'
-    ) {
-        return true;
-    }
-
-    const permissions =
-        normalizePermissions(
-            currentUser?.permissions
-        );
-
-    return permissions.includes(
-        permission
-    );
-};
-
-const extractArray = (response) => {
     const payload =
         response?.data?.data;
 
@@ -74,7 +47,9 @@ const extractArray = (response) => {
 
     if (
         payload &&
-        Array.isArray(payload.data)
+        Array.isArray(
+            payload.data
+        )
     ) {
         return payload.data;
     }
@@ -82,14 +57,19 @@ const extractArray = (response) => {
     return [];
 };
 
-const formatDate = (date) => {
+const formatDate = (
+    date
+) => {
     if (!date) {
         return '-';
     }
 
     if (
-        typeof date === 'string' &&
-        /^\d{4}-\d{2}-\d{2}$/.test(date)
+        typeof date ===
+            'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(
+            date
+        )
     ) {
         const [
             year,
@@ -99,13 +79,11 @@ const formatDate = (date) => {
             .split('-')
             .map(Number);
 
-        const parsedDate = new Date(
+        return new Date(
             year,
             month - 1,
             day
-        );
-
-        return parsedDate.toLocaleDateString(
+        ).toLocaleDateString(
             'id-ID',
             {
                 day: '2-digit',
@@ -115,7 +93,8 @@ const formatDate = (date) => {
         );
     }
 
-    const parsedDate = new Date(date);
+    const parsedDate =
+        new Date(date);
 
     if (
         Number.isNaN(
@@ -135,12 +114,15 @@ const formatDate = (date) => {
     );
 };
 
-const formatDateTime = (date) => {
+const formatDateTime = (
+    date
+) => {
     if (!date) {
         return '-';
     }
 
-    const parsedDate = new Date(date);
+    const parsedDate =
+        new Date(date);
 
     if (
         Number.isNaN(
@@ -158,27 +140,24 @@ const formatDateTime = (date) => {
             year: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
+            hour12: false,
         }
     );
 };
 
-const getRoleLabel = (role) => {
-    const labels = {
-        user: 'User',
-        admin: 'Admin',
-        admin_humas: 'Admin Humas',
-        admin_sekpim: 'Admin SEKPiM',
-        superadmin: 'Super Admin',
-    };
-
+const getRoleLabel = (
+    role
+) => {
     return (
-        labels[role] ||
+        ROLE_LABELS[role] ||
         role ||
         'Pengguna'
     );
 };
 
-const getStatusLabel = (status) => {
+const getStatusLabel = (
+    status
+) => {
     const labels = {
         pending: 'Menunggu',
         approved: 'Disetujui',
@@ -195,7 +174,9 @@ const getStatusLabel = (status) => {
     );
 };
 
-const getStatusClass = (status) => {
+const getStatusClass = (
+    status
+) => {
     const classes = {
         pending:
             'text-bg-warning',
@@ -251,22 +232,25 @@ const getCoverageLabel = (
 
 export default function Dashboard() {
     const currentUser =
-        useMemo(
-            () => getCurrentUser(),
-            []
-        );
+        getStoredUser();
 
     const role =
         currentUser?.role ||
         'user';
 
     const isUser =
-        role === 'user';
+        role ===
+        'user';
 
     const basePath =
         isUser
             ? '/user'
             : '/admin';
+
+    const defaultPath =
+        getDefaultPath(
+            currentUser
+        );
 
     const canViewDashboard =
         hasPermission(
@@ -331,19 +315,18 @@ export default function Dashboard() {
     const canViewUsers =
         hasPermission(
             currentUser,
-            'users.view'
-        );
-
-    const canManageUsers =
-        hasPermission(
-            currentUser,
-            'users.manage'
+            [
+                'users.view',
+                'users.manage',
+            ]
         );
 
     const [
         dashboardData,
         setDashboardData,
-    ] = useState(EMPTY_DATA);
+    ] = useState(
+        EMPTY_DATA
+    );
 
     const [
         loading,
@@ -363,9 +346,11 @@ export default function Dashboard() {
     const fetchDashboardData =
         useCallback(
             async (
-                isRefresh = false
+                refresh = false
             ) => {
-                if (!canViewDashboard) {
+                if (
+                    !canViewDashboard
+                ) {
                     setDashboardData(
                         EMPTY_DATA
                     );
@@ -376,23 +361,20 @@ export default function Dashboard() {
                     return;
                 }
 
+                if (refresh) {
+                    setRefreshing(true);
+                } else {
+                    setLoading(true);
+                }
+
+                setEndpointErrors([]);
+
                 try {
-                    if (isRefresh) {
-                        setRefreshing(true);
-                    } else {
-                        setLoading(true);
-                    }
+                    const requests =
+                        [];
 
-                    setEndpointErrors([]);
-
-                    const requests = [];
-                    const requestKeys = [];
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Pengajuan pribadi
-                    |--------------------------------------------------------------------------
-                    */
+                    const requestKeys =
+                        [];
 
                     if (
                         canViewHistory
@@ -427,12 +409,6 @@ export default function Dashboard() {
                             'myBorrowing'
                         );
                     }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Data approval
-                    |--------------------------------------------------------------------------
-                    */
 
                     if (
                         canViewMerchandiseApproval
@@ -475,12 +451,6 @@ export default function Dashboard() {
                             'approvalBorrowing'
                         );
                     }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Master data
-                    |--------------------------------------------------------------------------
-                    */
 
                     if (
                         canViewProducts
@@ -526,7 +496,9 @@ export default function Dashboard() {
                             requests
                         );
 
-                    const resultMap = {};
+                    const resultMap =
+                        {};
+
                     const errors = [];
 
                     responses.forEach(
@@ -554,16 +526,15 @@ export default function Dashboard() {
                             resultMap[key] =
                                 [];
 
-                            const message =
-                                result.reason
-                                    ?.response
-                                    ?.data
-                                    ?.message ||
-                                'Data tidak dapat dimuat.';
-
                             errors.push({
                                 key,
-                                message,
+
+                                message:
+                                    result.reason
+                                        ?.response
+                                        ?.data
+                                        ?.message ||
+                                    'Data tidak dapat dimuat.',
                             });
 
                             console.error(
@@ -576,44 +547,33 @@ export default function Dashboard() {
                         }
                     );
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Prioritaskan data approval ketika user mempunyai akses approval.
-                    | Jika tidak, gunakan riwayat pengajuan pribadi.
-                    |--------------------------------------------------------------------------
-                    */
-
-                    const orders =
-                        canViewMerchandiseApproval
-                            ? resultMap
-                                  .approvalOrders ||
-                              []
-                            : resultMap
-                                  .myOrders ||
-                              [];
-
-                    const humasRequests =
-                        canViewHumasApproval
-                            ? resultMap
-                                  .approvalHumas ||
-                              []
-                            : resultMap
-                                  .myHumas ||
-                              [];
-
-                    const borrowRequests =
-                        canViewBorrowingApproval
-                            ? resultMap
-                                  .approvalBorrowing ||
-                              []
-                            : resultMap
-                                  .myBorrowing ||
-                              [];
-
                     setDashboardData({
-                        orders,
-                        humasRequests,
-                        borrowRequests,
+                        orders:
+                            canViewMerchandiseApproval
+                                ? resultMap
+                                      .approvalOrders ||
+                                  []
+                                : resultMap
+                                      .myOrders ||
+                                  [],
+
+                        humasRequests:
+                            canViewHumasApproval
+                                ? resultMap
+                                      .approvalHumas ||
+                                  []
+                                : resultMap
+                                      .myHumas ||
+                                  [],
+
+                        borrowRequests:
+                            canViewBorrowingApproval
+                                ? resultMap
+                                      .approvalBorrowing ||
+                                  []
+                                : resultMap
+                                      .myBorrowing ||
+                                  [],
 
                         products:
                             resultMap.products ||
@@ -645,11 +605,10 @@ export default function Dashboard() {
                                 'dashboard',
 
                             message:
-                                error
-                                    ?.response
+                                error?.response
                                     ?.data
                                     ?.message ||
-                                'Data dashboard gagal dimuat dari server.',
+                                'Data dashboard gagal dimuat.',
                         },
                     ]);
                 } finally {
@@ -670,7 +629,9 @@ export default function Dashboard() {
 
     useEffect(() => {
         fetchDashboardData();
-    }, [fetchDashboardData]);
+    }, [
+        fetchDashboardData,
+    ]);
 
     const {
         orders,
@@ -682,210 +643,171 @@ export default function Dashboard() {
 
     const histories =
         useMemo(() => {
-            const merchandiseHistories =
+            const merchandise =
                 orders.map(
-                    (order) => ({
-                        ...order,
+                    (item) => ({
+                        ...item,
 
-                        history_type:
+                        type:
                             'merchandise',
 
-                        history_label:
+                        typeLabel:
                             'Merchandise',
 
-                        history_icon:
+                        icon:
                             'bi-gift-fill',
 
-                        history_color:
+                        color:
                             'primary',
 
                         code:
-                            order.order_code ||
-                            `MER-${order.id}`,
+                            item.order_code ||
+                            `MER-${item.id}`,
 
                         title:
-                            order.event_name ||
-                            order.activity_name ||
+                            item.event_name ||
+                            item.activity_name ||
                             'Pengajuan Merchandise',
 
-                        subtitle:
-                            order.institution_name ||
-                            order.requester_unit ||
-                            '-',
-
                         requester:
-                            order.user
-                                ?.name ||
-                            order
-                                .applicant_name ||
-                            currentUser.name ||
+                            item.user?.name ||
+                            item.applicant_name ||
+                            currentUser?.name ||
                             '-',
 
-                        main_date:
-                            order.activity_date ||
-                            order.created_at,
+                        mainDate:
+                            item.activity_date ||
+                            item.created_at,
 
-                        submitted_date:
-                            order.submitted_at ||
-                            order.created_at,
+                        submittedDate:
+                            item.submitted_at ||
+                            item.created_at,
 
-                        detail_url:
+                        detailUrl:
                             canViewMerchandiseApproval
-                                ? `/admin/orders/${order.id}`
-                                : `${basePath}/my-requests/merchandise/${order.id}/detail`,
+                                ? `/admin/orders/${item.id}`
+                                : `${basePath}/my-requests/merchandise/${item.id}/detail`,
                     })
                 );
 
-            const humasHistories =
+            const humas =
                 humasRequests.map(
-                    (request) => ({
-                        ...request,
+                    (item) => ({
+                        ...item,
 
-                        history_type:
+                        type:
                             'humas',
 
-                        history_label:
+                        typeLabel:
                             'Liputan Humas',
 
-                        history_icon:
+                        icon:
                             'bi-camera-reels-fill',
 
-                        history_color:
+                        color:
                             'danger',
 
                         code:
-                            request.service_code ||
-                            `HMS-${request.id}`,
+                            item.service_code ||
+                            `HMS-${item.id}`,
 
                         title:
                             getCoverageLabel(
-                                request.coverage_type
+                                item.coverage_type
                             ),
 
-                        subtitle:
-                            request.event_location ||
-                            request.activity_detail ||
-                            '-',
-
                         requester:
-                            request.user
-                                ?.name ||
-                            request
-                                .applicant_name ||
-                            currentUser.name ||
+                            item.user?.name ||
+                            item.applicant_name ||
+                            currentUser?.name ||
                             '-',
 
-                        main_date:
-                            request.event_date ||
-                            request.created_at,
+                        mainDate:
+                            item.event_date ||
+                            item.created_at,
 
-                        submitted_date:
-                            request.submitted_at ||
-                            request.created_at,
+                        submittedDate:
+                            item.submitted_at ||
+                            item.created_at,
 
-                        detail_url:
+                        detailUrl:
                             canViewHumasApproval
-                                ? `/admin/humas-services/${request.id}`
-                                : `${basePath}/my-requests/humas/${request.id}/detail`,
+                                ? `/admin/humas-services/${item.id}`
+                                : `${basePath}/my-requests/humas/${item.id}/detail`,
                     })
                 );
 
-            const borrowingHistories =
+            const borrowing =
                 borrowRequests.map(
-                    (request) => ({
-                        ...request,
+                    (item) => ({
+                        ...item,
 
-                        history_type:
+                        type:
                             'borrowing',
 
-                        history_label:
+                        typeLabel:
                             'Peminjaman',
 
-                        history_icon:
+                        icon:
                             'bi-box-seam-fill',
 
-                        history_color:
+                        color:
                             'success',
 
                         code:
-                            request.borrow_code ||
-                            `BRW-${request.id}`,
+                            item.borrow_code ||
+                            `BRW-${item.id}`,
 
                         title:
-                            request.event_name ||
-                            request.purpose ||
+                            item.event_name ||
+                            item.purpose ||
                             'Peminjaman SEKPiM',
 
-                        subtitle: [
-                            formatDate(
-                                request.borrow_date ||
-                                    request.borrow_at
-                            ),
-
-                            formatDate(
-                                request.return_date ||
-                                    request.return_at
-                            ),
-                        ].join(' - '),
-
                         requester:
-                            request.user
-                                ?.name ||
-                            request
-                                .applicant_name ||
-                            currentUser.name ||
+                            item.user?.name ||
+                            item.applicant_name ||
+                            currentUser?.name ||
                             '-',
 
-                        main_date:
-                            request.borrow_date ||
-                            request.borrow_at ||
-                            request.created_at,
+                        mainDate:
+                            item.borrow_date ||
+                            item.borrow_at ||
+                            item.created_at,
 
-                        submitted_date:
-                            request.submitted_at ||
-                            request.created_at,
+                        submittedDate:
+                            item.submitted_at ||
+                            item.created_at,
 
-                        detail_url:
+                        detailUrl:
                             canViewBorrowingApproval
-                                ? `/admin/borrow-requests/${request.id}`
-                                : `${basePath}/my-requests/borrowing/${request.id}/detail`,
+                                ? `/admin/borrow-requests/${item.id}`
+                                : `${basePath}/my-requests/borrowing/${item.id}/detail`,
                     })
                 );
 
             return [
-                ...merchandiseHistories,
-                ...humasHistories,
-                ...borrowingHistories,
+                ...merchandise,
+                ...humas,
+                ...borrowing,
             ].sort(
                 (
-                    firstItem,
-                    secondItem
-                ) => {
-                    const firstDate =
-                        new Date(
-                            firstItem.submitted_date ||
-                                firstItem.created_at ||
-                                0
-                        ).getTime();
-
-                    const secondDate =
-                        new Date(
-                            secondItem.submitted_date ||
-                                secondItem.created_at ||
-                                0
-                        ).getTime();
-
-                    return (
-                        secondDate -
-                        firstDate
-                    );
-                }
+                    first,
+                    second
+                ) =>
+                    new Date(
+                        second.submittedDate ||
+                            0
+                    ).getTime() -
+                    new Date(
+                        first.submittedDate ||
+                            0
+                    ).getTime()
             );
         }, [
             orders,
             humasRequests,
             borrowRequests,
-            currentUser.name,
+            currentUser?.name,
             basePath,
             canViewMerchandiseApproval,
             canViewHumasApproval,
@@ -893,9 +815,9 @@ export default function Dashboard() {
         ]);
 
     const summary =
-        useMemo(() => {
-            return {
-                totalRequests:
+        useMemo(
+            () => ({
+                total:
                     histories.length,
 
                 pending:
@@ -923,101 +845,62 @@ export default function Dashboard() {
                             )
                     ).length,
 
-                rejected:
-                    histories.filter(
-                        (item) =>
-                            item.status ===
-                            'rejected'
-                    ).length,
-
-                merchandise:
-                    histories.filter(
-                        (item) =>
-                            item.history_type ===
-                            'merchandise'
-                    ).length,
-
-                humas:
-                    histories.filter(
-                        (item) =>
-                            item.history_type ===
-                            'humas'
-                    ).length,
-
-                borrowing:
-                    histories.filter(
-                        (item) =>
-                            item.history_type ===
-                            'borrowing'
-                    ).length,
-
-                productTotal:
-                    products.length,
-
                 lowStock:
                     products.filter(
-                        (product) =>
+                        (item) =>
                             Number(
-                                product.stock ||
+                                item.stock ||
                                     0
                             ) <= 5
                     ).length,
 
-                activeProducts:
-                    products.filter(
-                        (product) =>
-                            product.status ===
-                            'active'
-                    ).length,
-
-                userTotal:
+                users:
                     users.length,
-            };
-        }, [
-            histories,
-            products,
-            users,
-        ]);
+            }),
+            [
+                histories,
+                products,
+                users,
+            ]
+        );
 
     const recentHistories =
-        useMemo(
-            () =>
-                histories.slice(
-                    0,
-                    6
-                ),
-            [histories]
+        histories.slice(
+            0,
+            6
         );
 
     const lowStockProducts =
-        useMemo(() => {
-            return products
-                .filter(
-                    (product) =>
-                        Number(
-                            product.stock ||
-                                0
-                        ) <= 5
-                )
-                .sort(
-                    (
-                        firstProduct,
-                        secondProduct
-                    ) =>
-                        Number(
-                            firstProduct.stock ||
-                                0
-                        ) -
-                        Number(
-                            secondProduct.stock ||
-                                0
-                        )
-                )
-                .slice(
-                    0,
-                    6
-                );
-        }, [products]);
+        useMemo(
+            () =>
+                products
+                    .filter(
+                        (item) =>
+                            Number(
+                                item.stock ||
+                                    0
+                            ) <= 5
+                    )
+                    .sort(
+                        (
+                            first,
+                            second
+                        ) =>
+                            Number(
+                                first.stock ||
+                                    0
+                            ) -
+                            Number(
+                                second.stock ||
+                                    0
+                            )
+                    )
+                    .slice(
+                        0,
+                        6
+                    ),
+            [products]
+        );
 
     const quickActions =
         useMemo(() => {
@@ -1039,12 +922,14 @@ export default function Dashboard() {
                     color:
                         'primary',
 
-                    url:
+                    path:
                         `${basePath}/request/merchandise`,
                 });
             }
 
-            if (canCreateHumas) {
+            if (
+                canCreateHumas
+            ) {
                 actions.push({
                     title:
                         'Request Liputan Humas',
@@ -1058,7 +943,7 @@ export default function Dashboard() {
                     color:
                         'danger',
 
-                    url:
+                    path:
                         `${basePath}/request/humas-service`,
                 });
             }
@@ -1079,18 +964,20 @@ export default function Dashboard() {
                     color:
                         'success',
 
-                    url:
+                    path:
                         `${basePath}/request/sekpim-borrowing`,
                 });
             }
 
-            if (canViewHistory) {
+            if (
+                canViewHistory
+            ) {
                 actions.push({
                     title:
-                        'Riwayat Saya',
+                        'Riwayat Pengajuan',
 
                     description:
-                        'Pantau seluruh pengajuan pribadi.',
+                        'Pantau pengajuan pribadi.',
 
                     icon:
                         'bi-clock-history',
@@ -1098,7 +985,7 @@ export default function Dashboard() {
                     color:
                         'info',
 
-                    url:
+                    path:
                         `${basePath}/my-requests`,
                 });
             }
@@ -1119,7 +1006,7 @@ export default function Dashboard() {
                     color:
                         'primary',
 
-                    url:
+                    path:
                         '/admin/orders',
                 });
             }
@@ -1140,7 +1027,7 @@ export default function Dashboard() {
                     color:
                         'danger',
 
-                    url:
+                    path:
                         '/admin/humas-services',
                 });
             }
@@ -1161,12 +1048,14 @@ export default function Dashboard() {
                     color:
                         'success',
 
-                    url:
+                    path:
                         '/admin/borrow-requests',
                 });
             }
 
-            if (canViewProducts) {
+            if (
+                canViewProducts
+            ) {
                 actions.push({
                     title:
                         'Data Produk',
@@ -1182,18 +1071,21 @@ export default function Dashboard() {
                     color:
                         'warning',
 
-                    url:
+                    path:
                         '/admin/products',
                 });
             }
 
-            if (canViewUsers) {
+            if (
+                canViewUsers
+            ) {
                 actions.push({
                     title:
-                        'Manajemen User',
+                        'Data User',
 
                     description:
-                        canManageUsers
+                        role ===
+                        'superadmin'
                             ? 'Kelola akun dan hak akses.'
                             : 'Lihat daftar akun.',
 
@@ -1203,7 +1095,7 @@ export default function Dashboard() {
                     color:
                         'dark',
 
-                    url:
+                    path:
                         '/admin/users',
                 });
             }
@@ -1214,6 +1106,7 @@ export default function Dashboard() {
             );
         }, [
             basePath,
+            role,
             canCreateMerchandise,
             canCreateHumas,
             canCreateBorrowing,
@@ -1224,48 +1117,20 @@ export default function Dashboard() {
             canViewProducts,
             canManageProducts,
             canViewUsers,
-            canManageUsers,
         ]);
 
-    const activityListPath =
-        useMemo(() => {
-            if (
-                canViewMerchandiseApproval
-            ) {
-                return '/admin/orders';
-            }
-
-            if (
-                canViewHumasApproval
-            ) {
-                return '/admin/humas-services';
-            }
-
-            if (
-                canViewBorrowingApproval
-            ) {
-                return '/admin/borrow-requests';
-            }
-
-            if (canViewHistory) {
-                return `${basePath}/my-requests`;
-            }
-
-            return `${basePath}/dashboard`;
-        }, [
-            basePath,
-            canViewMerchandiseApproval,
-            canViewHumasApproval,
-            canViewBorrowingApproval,
-            canViewHistory,
-        ]);
-
-    const showAdministrativeSummary =
-        canViewMerchandiseApproval ||
-        canViewHumasApproval ||
-        canViewBorrowingApproval ||
-        canViewProducts ||
-        canViewUsers;
+    if (
+        !canViewDashboard
+    ) {
+        return (
+            <Navigate
+                to={
+                    defaultPath
+                }
+                replace
+            />
+        );
+    }
 
     if (loading) {
         return (
@@ -1298,12 +1163,12 @@ export default function Dashboard() {
                     <div className="row align-items-center g-4">
                         <div className="col-lg-8">
                             <span className="badge rounded-pill text-bg-light text-danger px-3 py-2 mb-3">
-                                Dashboard HUMAS & SEKPiM
+                                Dashboard HUMAS &amp; SEKPiM
                             </span>
 
                             <h1 className="display-6 fw-black mb-3">
                                 Halo,{' '}
-                                {currentUser.name ||
+                                {currentUser?.name ||
                                     'Pengguna'}
                                 .
                             </h1>
@@ -1311,14 +1176,18 @@ export default function Dashboard() {
                             <p
                                 className="mb-0 text-white-50"
                                 style={{
-                                    maxWidth: 780,
-                                    lineHeight: 1.8,
+                                    maxWidth:
+                                        780,
+
+                                    lineHeight:
+                                        1.8,
                                 }}
                             >
-                                Pantau pengajuan, layanan
-                                Humas, peminjaman SEKPiM,
-                                dan menu administrasi sesuai
-                                hak akses akun kamu.
+                                Pantau pengajuan,
+                                layanan Humas,
+                                peminjaman SEKPiM,
+                                dan menu administrasi
+                                sesuai hak akses akun.
                             </p>
                         </div>
 
@@ -1327,7 +1196,7 @@ export default function Dashboard() {
                                 <div className="d-flex align-items-center gap-3">
                                     <div className="profile-avatar bg-white text-danger">
                                         {(
-                                            currentUser.name ||
+                                            currentUser?.name ||
                                             'U'
                                         )
                                             .charAt(0)
@@ -1336,7 +1205,7 @@ export default function Dashboard() {
 
                                     <div className="min-w-0">
                                         <div className="fw-black fs-5 text-truncate">
-                                            {currentUser.name ||
+                                            {currentUser?.name ||
                                                 'Pengguna'}
                                         </div>
 
@@ -1353,7 +1222,7 @@ export default function Dashboard() {
                                 <div className="small text-white-50">
                                     {
                                         normalizePermissions(
-                                            currentUser.permissions
+                                            currentUser?.permissions
                                         ).length
                                     }{' '}
                                     hak akses aktif.
@@ -1364,9 +1233,10 @@ export default function Dashboard() {
                 </div>
             </section>
 
-            {endpointErrors.length > 0 && (
+            {endpointErrors.length >
+                0 && (
                 <div className="alert alert-warning border-0 shadow-sm rounded-4 mb-4">
-                    <div className="d-flex align-items-start gap-3">
+                    <div className="d-flex flex-wrap align-items-start gap-3">
                         <i className="bi bi-exclamation-triangle-fill fs-4" />
 
                         <div className="flex-grow-1">
@@ -1374,24 +1244,9 @@ export default function Dashboard() {
                                 Sebagian data belum dapat dimuat
                             </div>
 
-                            <div className="small mb-2">
-                                Dashboard tetap ditampilkan menggunakan data yang berhasil diambil.
+                            <div className="small">
+                                Dashboard tetap menampilkan data yang berhasil diterima.
                             </div>
-
-                            <ul className="small mb-0 ps-3">
-                                {endpointErrors.map(
-                                    (
-                                        error,
-                                        index
-                                    ) => (
-                                        <li
-                                            key={`${error.key}-${index}`}
-                                        >
-                                            {error.message}
-                                        </li>
-                                    )
-                                )}
-                            </ul>
                         </div>
 
                         <button
@@ -1414,126 +1269,109 @@ export default function Dashboard() {
             )}
 
             <div className="row g-4 mb-4">
-                <div className="col-md-6 col-xl-3">
-                    <div className="card border-0 shadow-sm rounded-5 h-100">
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-start justify-content-between gap-3">
-                                <div>
-                                    <div className="text-muted fw-bold small mb-2">
-                                        Total Pengajuan
+                {[
+                    {
+                        title:
+                            'Total Pengajuan',
+
+                        value:
+                            summary.total,
+
+                        icon:
+                            'bi-files',
+
+                        color:
+                            'primary',
+                    },
+
+                    {
+                        title:
+                            'Menunggu',
+
+                        value:
+                            summary.pending,
+
+                        icon:
+                            'bi-hourglass-split',
+
+                        color:
+                            'warning',
+                    },
+
+                    {
+                        title:
+                            'Disetujui',
+
+                        value:
+                            summary.approved,
+
+                        icon:
+                            'bi-check-circle-fill',
+
+                        color:
+                            'success',
+                    },
+
+                    {
+                        title:
+                            canViewProducts
+                                ? 'Stok Rendah'
+                                : 'Selesai',
+
+                        value:
+                            canViewProducts
+                                ? summary.lowStock
+                                : summary.completed,
+
+                        icon:
+                            canViewProducts
+                                ? 'bi-boxes'
+                                : 'bi-check2-all',
+
+                        color:
+                            'danger',
+                    },
+                ].map(
+                    (card) => (
+                        <div
+                            className="col-md-6 col-xl-3"
+                            key={
+                                card.title
+                            }
+                        >
+                            <div className="card border-0 shadow-sm rounded-5 h-100">
+                                <div className="card-body p-4">
+                                    <div className="d-flex align-items-start justify-content-between gap-3">
+                                        <div>
+                                            <div className="text-muted fw-bold small mb-2">
+                                                {
+                                                    card.title
+                                                }
+                                            </div>
+
+                                            <div className="display-6 fw-black">
+                                                {
+                                                    card.value
+                                                }
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            className={`icon-box bg-${card.color}-subtle text-${card.color}`}
+                                        >
+                                            <i
+                                                className={`bi ${card.icon} fs-4`}
+                                            />
+                                        </div>
                                     </div>
-
-                                    <div className="display-6 fw-black">
-                                        {
-                                            summary.totalRequests
-                                        }
-                                    </div>
-                                </div>
-
-                                <div className="icon-box bg-primary-subtle text-primary">
-                                    <i className="bi bi-files fs-4" />
-                                </div>
-                            </div>
-
-                            <p className="text-muted mb-0 mt-3">
-                                Seluruh layanan yang dapat dilihat.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-md-6 col-xl-3">
-                    <div className="card border-0 shadow-sm rounded-5 h-100">
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-start justify-content-between gap-3">
-                                <div>
-                                    <div className="text-muted fw-bold small mb-2">
-                                        Menunggu
-                                    </div>
-
-                                    <div className="display-6 fw-black">
-                                        {summary.pending}
-                                    </div>
-                                </div>
-
-                                <div className="icon-box bg-warning-subtle text-warning">
-                                    <i className="bi bi-hourglass-split fs-4" />
-                                </div>
-                            </div>
-
-                            <p className="text-muted mb-0 mt-3">
-                                Pengajuan berstatus pending.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-md-6 col-xl-3">
-                    <div className="card border-0 shadow-sm rounded-5 h-100">
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-start justify-content-between gap-3">
-                                <div>
-                                    <div className="text-muted fw-bold small mb-2">
-                                        Disetujui
-                                    </div>
-
-                                    <div className="display-6 fw-black">
-                                        {summary.approved}
-                                    </div>
-                                </div>
-
-                                <div className="icon-box bg-success-subtle text-success">
-                                    <i className="bi bi-check-circle-fill fs-4" />
-                                </div>
-                            </div>
-
-                            <p className="text-muted mb-0 mt-3">
-                                Pengajuan yang telah disetujui.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-md-6 col-xl-3">
-                    <div className="card border-0 shadow-sm rounded-5 h-100">
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-start justify-content-between gap-3">
-                                <div>
-                                    <div className="text-muted fw-bold small mb-2">
-                                        {canViewProducts
-                                            ? 'Stok Rendah'
-                                            : 'Selesai'}
-                                    </div>
-
-                                    <div className="display-6 fw-black">
-                                        {canViewProducts
-                                            ? summary.lowStock
-                                            : summary.completed}
-                                    </div>
-                                </div>
-
-                                <div className="icon-box bg-danger-subtle text-danger">
-                                    <i
-                                        className={`bi ${
-                                            canViewProducts
-                                                ? 'bi-boxes'
-                                                : 'bi-check2-all'
-                                        } fs-4`}
-                                    />
                                 </div>
                             </div>
-
-                            <p className="text-muted mb-0 mt-3">
-                                {canViewProducts
-                                    ? 'Produk dengan stok lima atau kurang.'
-                                    : 'Pengajuan yang telah selesai.'}
-                            </p>
                         </div>
-                    </div>
-                </div>
+                    )
+                )}
             </div>
 
-            <div className="row g-4 mb-4">
+            <div className="row g-4">
                 <div className="col-xl-8">
                     <section className="card border-0 shadow-sm rounded-5 h-100">
                         <div className="card-body p-4">
@@ -1544,39 +1382,28 @@ export default function Dashboard() {
                                     </h4>
 
                                     <p className="text-muted mb-0">
-                                        Pengajuan terbaru yang dapat dilihat akun ini.
+                                        Data terbaru yang dapat dilihat akun ini.
                                     </p>
                                 </div>
 
-                                <div className="d-flex gap-2">
-                                    <button
-                                        type="button"
-                                        className="btn btn-outline-secondary rounded-pill"
-                                        onClick={() =>
-                                            fetchDashboardData(
-                                                true
-                                            )
-                                        }
-                                        disabled={
-                                            refreshing
-                                        }
-                                    >
-                                        {refreshing ? (
-                                            <span className="spinner-border spinner-border-sm" />
-                                        ) : (
-                                            <i className="bi bi-arrow-clockwise" />
-                                        )}
-                                    </button>
-
-                                    <Link
-                                        to={
-                                            activityListPath
-                                        }
-                                        className="btn btn-outline-danger rounded-pill"
-                                    >
-                                        Lihat Semua
-                                    </Link>
-                                </div>
+                                <button
+                                    type="button"
+                                    className="btn btn-outline-secondary rounded-pill"
+                                    onClick={() =>
+                                        fetchDashboardData(
+                                            true
+                                        )
+                                    }
+                                    disabled={
+                                        refreshing
+                                    }
+                                >
+                                    {refreshing ? (
+                                        <span className="spinner-border spinner-border-sm" />
+                                    ) : (
+                                        <i className="bi bi-arrow-clockwise" />
+                                    )}
+                                </button>
                             </div>
 
                             {recentHistories.length ===
@@ -1589,7 +1416,7 @@ export default function Dashboard() {
                                     </h5>
 
                                     <p className="text-muted mb-0">
-                                        Data pengajuan akan muncul setelah ada aktivitas.
+                                        Aktivitas akan muncul setelah terdapat pengajuan.
                                     </p>
                                 </div>
                             ) : (
@@ -1597,27 +1424,27 @@ export default function Dashboard() {
                                     {recentHistories.map(
                                         (item) => (
                                             <div
-                                                key={`${item.history_type}-${item.id}`}
+                                                key={`${item.type}-${item.id}`}
                                                 className="p-3 rounded-4 border"
                                             >
                                                 <div className="row g-3 align-items-center">
                                                     <div className="col-lg-6">
                                                         <div className="d-flex align-items-start gap-3">
                                                             <div
-                                                                className={`icon-box bg-${item.history_color}-subtle text-${item.history_color}`}
+                                                                className={`icon-box bg-${item.color}-subtle text-${item.color}`}
                                                             >
                                                                 <i
-                                                                    className={`bi ${item.history_icon} fs-5`}
+                                                                    className={`bi ${item.icon}`}
                                                                 />
                                                             </div>
 
                                                             <div className="min-w-0">
                                                                 <div className="d-flex flex-wrap gap-2 mb-2">
                                                                     <span
-                                                                        className={`badge rounded-pill bg-${item.history_color}-subtle text-${item.history_color}`}
+                                                                        className={`badge rounded-pill bg-${item.color}-subtle text-${item.color}`}
                                                                     >
                                                                         {
-                                                                            item.history_label
+                                                                            item.typeLabel
                                                                         }
                                                                     </span>
 
@@ -1633,13 +1460,15 @@ export default function Dashboard() {
                                                                 </div>
 
                                                                 <div className="fw-black text-truncate">
-                                                                    {item.title ||
-                                                                        '-'}
+                                                                    {
+                                                                        item.title
+                                                                    }
                                                                 </div>
 
-                                                                <div className="text-muted small text-truncate">
-                                                                    {item.code ||
-                                                                        '-'}{' '}
+                                                                <div className="small text-muted text-truncate">
+                                                                    {
+                                                                        item.code
+                                                                    }{' '}
                                                                     •{' '}
                                                                     {
                                                                         item.requester
@@ -1651,12 +1480,12 @@ export default function Dashboard() {
 
                                                     <div className="col-md-6 col-lg-3">
                                                         <div className="small text-muted">
-                                                            Tanggal utama
+                                                            Tanggal
                                                         </div>
 
                                                         <div className="fw-bold">
                                                             {formatDate(
-                                                                item.main_date
+                                                                item.mainDate
                                                             )}
                                                         </div>
                                                     </div>
@@ -1664,15 +1493,15 @@ export default function Dashboard() {
                                                     <div className="col-md-6 col-lg-3 text-lg-end">
                                                         <div className="small text-muted mb-2">
                                                             {formatDateTime(
-                                                                item.submitted_date
+                                                                item.submittedDate
                                                             )}
                                                         </div>
 
                                                         <Link
                                                             to={
-                                                                item.detail_url
+                                                                item.detailUrl
                                                             }
-                                                            className={`btn btn-sm rounded-pill btn-${item.history_color}`}
+                                                            className={`btn btn-sm rounded-pill btn-${item.color}`}
                                                         >
                                                             Detail
                                                         </Link>
@@ -1695,7 +1524,7 @@ export default function Dashboard() {
                             </h4>
 
                             <p className="text-muted mb-4">
-                                Menu sesuai permission akun.
+                                Menu sesuai hak akses akun.
                             </p>
 
                             {quickActions.length ===
@@ -1708,9 +1537,9 @@ export default function Dashboard() {
                                     {quickActions.map(
                                         (action) => (
                                             <Link
-                                                key={`${action.title}-${action.url}`}
+                                                key={`${action.title}-${action.path}`}
                                                 to={
-                                                    action.url
+                                                    action.path
                                                 }
                                                 className="text-decoration-none"
                                             >
@@ -1720,11 +1549,11 @@ export default function Dashboard() {
                                                             className={`icon-box bg-${action.color}-subtle text-${action.color}`}
                                                         >
                                                             <i
-                                                                className={`bi ${action.icon} fs-5`}
+                                                                className={`bi ${action.icon}`}
                                                             />
                                                         </div>
 
-                                                        <div>
+                                                        <div className="min-w-0">
                                                             <div className="fw-black text-dark">
                                                                 {
                                                                     action.title
@@ -1749,201 +1578,87 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {showAdministrativeSummary && (
-                <div className="row g-4">
-                    <div className="col-xl-8">
-                        <section className="card border-0 shadow-sm rounded-5">
-                            <div className="card-body p-4">
-                                <div className="mb-4">
-                                    <h4 className="fw-black mb-1">
-                                        Ringkasan Layanan
-                                    </h4>
+            {canViewProducts && (
+                <section className="card border-0 shadow-sm rounded-5 mt-4">
+                    <div className="card-body p-4">
+                        <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+                            <div>
+                                <h4 className="fw-black mb-1">
+                                    Stok Rendah
+                                </h4>
 
-                                    <p className="text-muted mb-0">
-                                        Komposisi pengajuan berdasarkan jenis layanan.
-                                    </p>
-                                </div>
-
-                                <div className="row g-3">
-                                    <div className="col-md-4">
-                                        <div className="p-4 rounded-5 bg-primary-subtle h-100">
-                                            <div className="d-flex align-items-center justify-content-between gap-3">
-                                                <div>
-                                                    <div className="text-primary fw-bold mb-1">
-                                                        Merchandise
-                                                    </div>
-
-                                                    <div className="display-6 fw-black">
-                                                        {
-                                                            summary.merchandise
-                                                        }
-                                                    </div>
-                                                </div>
-
-                                                <i className="bi bi-gift-fill fs-1 text-primary" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="col-md-4">
-                                        <div className="p-4 rounded-5 bg-danger-subtle h-100">
-                                            <div className="d-flex align-items-center justify-content-between gap-3">
-                                                <div>
-                                                    <div className="text-danger fw-bold mb-1">
-                                                        Liputan Humas
-                                                    </div>
-
-                                                    <div className="display-6 fw-black">
-                                                        {
-                                                            summary.humas
-                                                        }
-                                                    </div>
-                                                </div>
-
-                                                <i className="bi bi-camera-reels-fill fs-1 text-danger" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="col-md-4">
-                                        <div className="p-4 rounded-5 bg-success-subtle h-100">
-                                            <div className="d-flex align-items-center justify-content-between gap-3">
-                                                <div>
-                                                    <div className="text-success fw-bold mb-1">
-                                                        Peminjaman
-                                                    </div>
-
-                                                    <div className="display-6 fw-black">
-                                                        {
-                                                            summary.borrowing
-                                                        }
-                                                    </div>
-                                                </div>
-
-                                                <i className="bi bi-box-seam-fill fs-1 text-success" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <p className="text-muted mb-0">
+                                    Produk dengan stok lima atau kurang.
+                                </p>
                             </div>
-                        </section>
-                    </div>
 
-                    <div className="col-xl-4">
-                        <section className="card border-0 shadow-sm rounded-5">
-                            <div className="card-body p-4">
-                                <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-                                    <div>
-                                        <h4 className="fw-black mb-1">
-                                            {canViewProducts
-                                                ? 'Stok Rendah'
-                                                : 'Informasi Sistem'}
-                                        </h4>
+                            <Link
+                                to="/admin/products"
+                                className="btn btn-outline-warning rounded-pill"
+                            >
+                                {canManageProducts
+                                    ? 'Kelola Produk'
+                                    : 'Lihat Produk'}
+                            </Link>
+                        </div>
 
-                                        <p className="text-muted mb-0">
-                                            {canViewProducts
-                                                ? 'Produk dengan stok lima atau kurang.'
-                                                : 'Ringkasan akses administrasi.'}
-                                        </p>
-                                    </div>
+                        {lowStockProducts.length ===
+                        0 ? (
+                            <div className="p-4 rounded-4 bg-light text-center">
+                                <i className="bi bi-check-circle-fill fs-1 text-success" />
 
-                                    {canViewProducts && (
-                                        <Link
-                                            to="/admin/products"
-                                            className="btn btn-outline-warning rounded-pill btn-sm"
+                                <p className="text-muted mt-2 mb-0">
+                                    Tidak ada produk dengan stok rendah.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="row g-3">
+                                {lowStockProducts.map(
+                                    (product) => (
+                                        <div
+                                            className="col-md-6 col-xl-4"
+                                            key={
+                                                product.id
+                                            }
                                         >
-                                            {canManageProducts
-                                                ? 'Kelola'
-                                                : 'Lihat'}
-                                        </Link>
-                                    )}
-                                </div>
+                                            <div className="p-3 rounded-4 border h-100">
+                                                <div className="fw-black text-truncate">
+                                                    {product.name ||
+                                                        'Produk'}
+                                                </div>
 
-                                {canViewProducts ? (
-                                    lowStockProducts.length ===
-                                    0 ? (
-                                        <div className="p-4 rounded-4 bg-light text-center">
-                                            <i className="bi bi-check-circle-fill fs-1 text-success" />
+                                                <div className="small text-muted text-truncate mb-3">
+                                                    {product.category
+                                                        ?.name ||
+                                                        '-'}
+                                                </div>
 
-                                            <p className="text-muted mt-2 mb-0">
-                                                Tidak ada stok rendah.
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <div className="d-flex flex-column gap-2">
-                                            {lowStockProducts.map(
-                                                (
-                                                    product
-                                                ) => (
-                                                    <div
-                                                        key={
-                                                            product.id
-                                                        }
-                                                        className="p-3 rounded-4 border d-flex align-items-center justify-content-between gap-3"
-                                                    >
-                                                        <div className="min-w-0">
-                                                            <div className="fw-bold text-truncate">
-                                                                {
-                                                                    product.name
-                                                                }
-                                                            </div>
-
-                                                            <div className="small text-muted text-truncate">
-                                                                {product
-                                                                    .category
-                                                                    ?.name ||
-                                                                    '-'}
-                                                            </div>
-                                                        </div>
-
-                                                        <span className="badge rounded-pill text-bg-warning flex-shrink-0">
-                                                            Stok{' '}
-                                                            {product.stock ||
-                                                                0}
-                                                        </span>
-                                                    </div>
-                                                )
-                                            )}
+                                                <span className="badge rounded-pill text-bg-warning">
+                                                    Stok{' '}
+                                                    {Number(
+                                                        product.stock ||
+                                                            0
+                                                    )}
+                                                </span>
+                                            </div>
                                         </div>
                                     )
-                                ) : (
-                                    <div className="row g-3">
-                                        {canViewUsers && (
-                                            <div className="col-12">
-                                                <div className="p-3 rounded-4 bg-light">
-                                                    <div className="small text-muted">
-                                                        Total User
-                                                    </div>
-
-                                                    <div className="fs-3 fw-black">
-                                                        {
-                                                            summary.userTotal
-                                                        }
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <div className="col-12">
-                                            <div className="p-3 rounded-4 bg-light">
-                                                <div className="small text-muted">
-                                                    Hak Akses Aktif
-                                                </div>
-
-                                                <div className="fs-3 fw-black">
-                                                    {
-                                                        normalizePermissions(
-                                                            currentUser.permissions
-                                                        ).length
-                                                    }
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
                                 )}
                             </div>
-                        </section>
+                        )}
                     </div>
+                </section>
+            )}
+
+            {canViewUsers && (
+                <div className="alert alert-light border shadow-sm rounded-4 mt-4 mb-0">
+                    <i className="bi bi-people-fill me-2 text-danger" />
+
+                    Total akun yang dapat dilihat:{' '}
+
+                    <strong>
+                        {summary.users}
+                    </strong>
                 </div>
             )}
         </div>

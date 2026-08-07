@@ -12,7 +12,15 @@ import {
     useNavigate,
 } from 'react-router-dom';
 
-import api from '../api/axios';
+import api, {
+    clearLocalSession,
+} from '../api/axios';
+
+import {
+    getDefaultPath,
+    getStoredUser,
+    hasPermission,
+} from './ProtectedRoute';
 
 import {
     closeAlert,
@@ -49,49 +57,17 @@ const COVERAGE_TYPE_CONFIG = {
     },
 };
 
-const getCurrentUser = () => {
-    try {
-        return JSON.parse(
-            localStorage.getItem('admin_user') || '{}'
-        );
-    } catch {
-        return {};
-    }
+const ROLE_LABELS = {
+    user: 'User',
+    admin: 'Admin',
+    admin_humas: 'Admin Humas',
+    admin_sekpim: 'Admin SEKPiM',
+    superadmin: 'Super Admin',
 };
 
-const normalizePermissions = (permissions) => {
-    if (!Array.isArray(permissions)) {
-        return [];
-    }
-
-    return [
-        ...new Set(
-            permissions.filter(Boolean)
-        ),
-    ];
-};
-
-const hasPermission = (
-    currentUser,
-    permission
+const extractResponseData = (
+    response
 ) => {
-    if (!permission) {
-        return true;
-    }
-
-    if (
-        currentUser?.role ===
-        'superadmin'
-    ) {
-        return true;
-    }
-
-    return normalizePermissions(
-        currentUser?.permissions
-    ).includes(permission);
-};
-
-const extractResponseData = (response) => {
     const payload =
         response?.data?.data;
 
@@ -109,12 +85,15 @@ const extractResponseData = (response) => {
     return [];
 };
 
-const formatDateTime = (date) => {
+const formatDateTime = (
+    date
+) => {
     if (!date) {
         return '-';
     }
 
-    const parsedDate = new Date(date);
+    const parsedDate =
+        new Date(date);
 
     if (
         Number.isNaN(
@@ -132,21 +111,16 @@ const formatDateTime = (date) => {
             year: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
+            hour12: false,
         }
     );
 };
 
-const getRoleLabel = (role) => {
-    const labels = {
-        user: 'User',
-        admin: 'Admin',
-        admin_humas: 'Admin Humas',
-        admin_sekpim: 'Admin SEKPiM',
-        superadmin: 'Super Admin',
-    };
-
+const getRoleLabel = (
+    role
+) => {
     return (
-        labels[role] ||
+        ROLE_LABELS[role] ||
         role ||
         'Pengguna'
     );
@@ -169,7 +143,9 @@ const getCoverageConfig = (
     );
 };
 
-const getHumasDescription = (item) => {
+const getHumasDescription = (
+    item
+) => {
     const coverageConfig =
         getCoverageConfig(
             item.coverage_type
@@ -190,7 +166,8 @@ const getStatusNotification = (
     item = {}
 ) => {
     if (
-        requestType === 'humas'
+        requestType ===
+        'humas'
     ) {
         const statusMap = {
             approved: {
@@ -335,7 +312,8 @@ const createPageMap = (
             path ===
             `${basePath}/dashboard`,
 
-        title: 'Dashboard',
+        title:
+            'Dashboard',
 
         subtitle:
             'Ringkasan aktivitas layanan HUMAS dan SEKPiM.',
@@ -551,7 +529,9 @@ const createPageMap = (
             path.startsWith(
                 '/admin/categories/'
             ) &&
-            path.endsWith('/edit'),
+            path.endsWith(
+                '/edit'
+            ),
 
         title:
             'Edit Kategori',
@@ -598,7 +578,9 @@ const createPageMap = (
             path.startsWith(
                 '/admin/products/'
             ) &&
-            path.endsWith('/edit'),
+            path.endsWith(
+                '/edit'
+            ),
 
         title:
             'Edit Produk',
@@ -645,7 +627,9 @@ const createPageMap = (
             path.startsWith(
                 '/admin/users/'
             ) &&
-            path.endsWith('/edit'),
+            path.endsWith(
+                '/edit'
+            ),
 
         title:
             'Edit User',
@@ -705,20 +689,27 @@ export default function Topbar({
         setNotifications,
     ] = useState([]);
 
+    /*
+     * Ambil data user pada setiap render.
+     * Data ini berasal dari /admin/me yang telah disimpan ke localStorage.
+     */
     const currentUser =
-        useMemo(
-            () => getCurrentUser(),
-            []
-        );
+        getStoredUser();
 
     const role =
         currentUser?.role ||
         'user';
 
     const basePath =
-        role === 'user'
+        role ===
+        'user'
             ? '/user'
             : '/admin';
+
+    const defaultPath =
+        getDefaultPath(
+            currentUser
+        );
 
     const canViewHistory =
         hasPermission(
@@ -928,15 +919,11 @@ export default function Topbar({
                 const requests = [];
                 const requestKeys = [];
 
-                /*
-                |--------------------------------------------------------------------------
-                | Notifikasi riwayat pribadi
-                |--------------------------------------------------------------------------
-                */
-
                 if (canViewHistory) {
                     requests.push(
-                        api.get('/my-orders')
+                        api.get(
+                            '/my-orders'
+                        )
                     );
 
                     requestKeys.push(
@@ -964,17 +951,13 @@ export default function Topbar({
                     );
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | Notifikasi approval
-                |--------------------------------------------------------------------------
-                */
-
                 if (
                     canViewMerchandiseApproval
                 ) {
                     requests.push(
-                        api.get('/orders')
+                        api.get(
+                            '/orders'
+                        )
                     );
 
                     requestKeys.push(
@@ -1010,9 +993,13 @@ export default function Topbar({
                     );
                 }
 
-                if (canViewProducts) {
+                if (
+                    canViewProducts
+                ) {
                     requests.push(
-                        api.get('/products')
+                        api.get(
+                            '/products'
+                        )
                     );
 
                     requestKeys.push(
@@ -1021,7 +1008,8 @@ export default function Topbar({
                 }
 
                 if (
-                    requests.length === 0
+                    requests.length ===
+                    0
                 ) {
                     setNotifications([]);
                     return;
@@ -1054,7 +1042,8 @@ export default function Topbar({
                             return;
                         }
 
-                        resultMap[key] = [];
+                        resultMap[key] =
+                            [];
 
                         console.error(
                             `Fetch topbar notification ${key} error:`,
@@ -1066,7 +1055,8 @@ export default function Topbar({
                     }
                 );
 
-                const nextNotifications = [];
+                const nextNotifications =
+                    [];
 
                 if (canViewHistory) {
                     addUserNotifications(
@@ -1092,16 +1082,20 @@ export default function Topbar({
                 }
 
                 const orders =
-                    resultMap.orders || [];
+                    resultMap.orders ||
+                    [];
 
                 const humasRequests =
-                    resultMap.humas || [];
+                    resultMap.humas ||
+                    [];
 
                 const borrowRequests =
-                    resultMap.borrowing || [];
+                    resultMap.borrowing ||
+                    [];
 
                 const products =
-                    resultMap.products || [];
+                    resultMap.products ||
+                    [];
 
                 orders
                     .filter(
@@ -1376,7 +1370,9 @@ export default function Topbar({
                     event.target
                 )
             ) {
-                setNotificationOpen(false);
+                setNotificationOpen(
+                    false
+                );
             }
         };
 
@@ -1401,124 +1397,114 @@ export default function Topbar({
         setIsSidebarOpen(true);
     };
 
-    const getNotificationFooterPath = () => {
-        if (canViewHistory) {
-            return `${basePath}/my-requests`;
-        }
+    const getNotificationFooterPath =
+        () => {
+            if (canViewHistory) {
+                return `${basePath}/my-requests`;
+            }
 
-        if (
-            canViewMerchandiseApproval
-        ) {
-            return '/admin/orders';
-        }
+            if (
+                canViewMerchandiseApproval
+            ) {
+                return '/admin/orders';
+            }
 
-        if (
-            canViewHumasApproval
-        ) {
-            return '/admin/humas-services';
-        }
+            if (
+                canViewHumasApproval
+            ) {
+                return '/admin/humas-services';
+            }
 
-        if (
-            canViewBorrowingApproval
-        ) {
-            return '/admin/borrow-requests';
-        }
+            if (
+                canViewBorrowingApproval
+            ) {
+                return '/admin/borrow-requests';
+            }
 
-        if (canViewProducts) {
-            return '/admin/products';
-        }
+            if (
+                canViewProducts
+            ) {
+                return '/admin/products';
+            }
 
-        return `${basePath}/dashboard`;
-    };
+            return defaultPath;
+        };
 
-    const handleLogout = async () => {
-        const confirmation =
-            await showConfirmAlert({
-                title:
-                    'Logout dari sistem?',
+    const handleLogout =
+        async () => {
+            const confirmation =
+                await showConfirmAlert({
+                    title:
+                        'Logout dari sistem?',
 
-                text:
-                    'Sesi login kamu akan diakhiri.',
+                    text:
+                        'Sesi login kamu akan diakhiri.',
 
-                confirmButtonText:
-                    'Ya, logout',
+                    confirmButtonText:
+                        'Ya, logout',
 
-                icon:
-                    'question',
+                    icon:
+                        'question',
 
-                confirmButtonColor:
-                    '#dc2626',
-            });
+                    confirmButtonColor:
+                        '#dc2626',
+                });
 
-        if (
-            !confirmation.isConfirmed
-        ) {
-            return;
-        }
+            if (
+                !confirmation.isConfirmed
+            ) {
+                return;
+            }
 
-        try {
-            showLoadingAlert(
-                'Logout',
-                'Mengakhiri sesi login...'
-            );
+            try {
+                showLoadingAlert(
+                    'Logout',
+                    'Mengakhiri sesi login...'
+                );
 
-            await api.post(
-                '/admin/logout'
-            );
+                await api.post(
+                    '/admin/logout'
+                );
 
-            closeAlert();
+                closeAlert();
+                clearLocalSession();
 
-            localStorage.removeItem(
-                'admin_token'
-            );
+                await showSuccessAlert(
+                    'Logout Berhasil',
+                    'Kamu berhasil keluar dari sistem.'
+                );
 
-            localStorage.removeItem(
-                'admin_user'
-            );
+                navigate(
+                    '/login',
+                    {
+                        replace: true,
+                    }
+                );
+            } catch (error) {
+                console.error(
+                    'Logout error:',
+                    error?.response?.data ||
+                        error
+                );
 
-            await showSuccessAlert(
-                'Logout Berhasil',
-                'Kamu berhasil keluar dari sistem.'
-            );
+                closeAlert();
+                clearLocalSession();
 
-            navigate(
-                '/login',
-                {
-                    replace: true,
-                }
-            );
-        } catch (error) {
-            console.error(
-                'Logout error:',
-                error?.response?.data ||
-                    error
-            );
+                await showErrorAlert(
+                    'Logout Bermasalah',
+                    error?.response?.data
+                        ?.message ||
+                        'Sesi lokal sudah dihapus. Silakan login kembali.'
+                );
 
-            closeAlert();
-
-            localStorage.removeItem(
-                'admin_token'
-            );
-
-            localStorage.removeItem(
-                'admin_user'
-            );
-
-            await showErrorAlert(
-                'Logout Bermasalah',
-                error?.response?.data
-                    ?.message ||
-                    'Sesi lokal sudah dihapus. Silakan login kembali.'
-            );
-
-            navigate(
-                '/login',
-                {
-                    replace: true,
-                }
-            );
-        }
-    };
+                navigate(
+                    '/login',
+                    {
+                        replace: true,
+                    }
+                );
+            }
+        };
 
     return (
         <header className="topbar">
@@ -1526,7 +1512,9 @@ export default function Topbar({
                 <button
                     type="button"
                     className="btn btn-light rounded-circle d-lg-none topbar-menu-button"
-                    onClick={openSidebar}
+                    onClick={
+                        openSidebar
+                    }
                     aria-label="Buka sidebar"
                 >
                     <i className="bi bi-list fs-4" />
@@ -1552,14 +1540,18 @@ export default function Topbar({
             <div className="topbar-right">
                 <div
                     className="topbar-notification"
-                    ref={notificationRef}
+                    ref={
+                        notificationRef
+                    }
                 >
                     <button
                         type="button"
                         className="topbar-notification-button"
                         onClick={() =>
                             setNotificationOpen(
-                                (previousState) =>
+                                (
+                                    previousState
+                                ) =>
                                     !previousState
                             )
                         }
@@ -1678,7 +1670,9 @@ export default function Topbar({
 
                             <div className="topbar-notification-footer">
                                 <Link
-                                    to={getNotificationFooterPath()}
+                                    to={
+                                        getNotificationFooterPath()
+                                    }
                                     onClick={() =>
                                         setNotificationOpen(
                                             false
@@ -1695,7 +1689,7 @@ export default function Topbar({
                 <div className="topbar-user d-none d-md-flex">
                     <div className="profile-avatar bg-danger text-white">
                         {(
-                            currentUser.name ||
+                            currentUser?.name ||
                             'U'
                         )
                             .charAt(0)
@@ -1704,7 +1698,7 @@ export default function Topbar({
 
                     <div className="min-w-0">
                         <div className="topbar-user-name text-truncate">
-                            {currentUser.name ||
+                            {currentUser?.name ||
                                 'Pengguna'}
                         </div>
 
@@ -1719,7 +1713,9 @@ export default function Topbar({
                 <button
                     type="button"
                     className="btn btn-outline-danger rounded-pill"
-                    onClick={handleLogout}
+                    onClick={
+                        handleLogout
+                    }
                 >
                     <i className="bi bi-box-arrow-right me-lg-2" />
 

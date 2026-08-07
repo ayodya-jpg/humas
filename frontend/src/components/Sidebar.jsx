@@ -12,6 +12,12 @@ import {
 
 import api from '../api/axios';
 
+import {
+    getDefaultPath,
+    getStoredUser,
+    hasPermission,
+} from './ProtectedRoute';
+
 const EMPTY_BADGES = {
     merchandisePending: 0,
     humasPending: 0,
@@ -19,57 +25,17 @@ const EMPTY_BADGES = {
     lowStock: 0,
 };
 
-const getCurrentUser = () => {
-    try {
-        return JSON.parse(
-            localStorage.getItem('admin_user') || '{}'
-        );
-    } catch {
-        return {};
-    }
+const ROLE_LABELS = {
+    user: 'User',
+    admin: 'Admin',
+    admin_humas: 'Admin Humas',
+    admin_sekpim: 'Admin SEKPiM',
+    superadmin: 'Super Admin',
 };
 
-const normalizePermissions = (permissions) => {
-    if (!Array.isArray(permissions)) {
-        return [];
-    }
-
-    return [
-        ...new Set(
-            permissions.filter(Boolean)
-        ),
-    ];
-};
-
-const hasPermission = (
-    currentUser,
-    requiredPermission
+const extractResponseData = (
+    response
 ) => {
-    if (!requiredPermission) {
-        return true;
-    }
-
-    if (currentUser?.role === 'superadmin') {
-        return true;
-    }
-
-    const permissions = normalizePermissions(
-        currentUser?.permissions
-    );
-
-    if (Array.isArray(requiredPermission)) {
-        return requiredPermission.some(
-            (permission) =>
-                permissions.includes(permission)
-        );
-    }
-
-    return permissions.includes(
-        requiredPermission
-    );
-};
-
-const extractResponseData = (response) => {
     const payload =
         response?.data?.data;
 
@@ -88,23 +54,16 @@ const extractResponseData = (response) => {
 };
 
 const getRoleLabel = (role) => {
-    const roleLabels = {
-        user: 'User',
-        admin: 'Admin',
-        admin_humas: 'Admin Humas',
-        admin_sekpim: 'Admin SEKPiM',
-        superadmin: 'Super Admin',
-    };
-
     return (
-        roleLabels[role] ||
+        ROLE_LABELS[role] ||
         role ||
         'Pengguna'
     );
 };
 
 const createMenuGroups = (
-    basePath
+    basePath,
+    isSuperadmin
 ) => [
     {
         title: 'Utama',
@@ -193,6 +152,8 @@ const createMenuGroups = (
     {
         title: 'Layanan Humas',
 
+        adminOnly: true,
+
         items: [
             {
                 label:
@@ -233,6 +194,8 @@ const createMenuGroups = (
     {
         title: 'Layanan SEKPiM',
 
+        adminOnly: true,
+
         items: [
             {
                 label:
@@ -255,6 +218,8 @@ const createMenuGroups = (
 
     {
         title: 'Master Data',
+
+        adminOnly: true,
 
         items: [
             {
@@ -295,6 +260,8 @@ const createMenuGroups = (
     {
         title: 'Manajemen Sistem',
 
+        adminOnly: true,
+
         items: [
             {
                 label:
@@ -306,14 +273,82 @@ const createMenuGroups = (
                 path:
                     '/admin/users',
 
-                permission:
+                permission: [
                     'users.view',
+                    'users.manage',
+                ],
+
+                badgeKey: null,
+            },
+
+            {
+                label:
+                    'Tambah User',
+
+                icon:
+                    'bi-person-plus-fill',
+
+                path:
+                    '/admin/users/create',
+
+                superadminOnly: true,
+
+                permission: null,
 
                 badgeKey: null,
             },
         ],
     },
-];
+
+    {
+        title: 'Akses Superadmin',
+
+        adminOnly: true,
+        superadminOnly: true,
+
+        items: [
+            {
+                label:
+                    'Pengaturan Hak Akses',
+
+                icon:
+                    'bi-shield-lock-fill',
+
+                path:
+                    '/admin/users',
+
+                permission: null,
+
+                superadminOnly: true,
+
+                badgeKey: null,
+            },
+        ],
+    },
+].filter(
+    (group) =>
+        !group.superadminOnly ||
+        isSuperadmin
+);
+
+const isItemAllowed = (
+    item,
+    currentUser
+) => {
+    if (
+        item.superadminOnly
+    ) {
+        return (
+            currentUser?.role ===
+            'superadmin'
+        );
+    }
+
+    return hasPermission(
+        currentUser,
+        item.permission
+    );
+};
 
 export default function Sidebar({
     sidebarOpen = false,
@@ -321,32 +356,62 @@ export default function Sidebar({
     isSidebarOpen = false,
     setIsSidebarOpen = () => {},
 }) {
-    const location = useLocation();
+    const location =
+        useLocation();
 
-    const [badges, setBadges] =
-        useState(EMPTY_BADGES);
-
-    const currentUser = useMemo(
-        () => getCurrentUser(),
-        []
+    const [
+        badges,
+        setBadges,
+    ] = useState(
+        EMPTY_BADGES
     );
 
+    /*
+     * getStoredUser dipanggil ketika komponen render.
+     * Setelah login ulang atau layout dibuat ulang,
+     * data permission terbaru langsung digunakan.
+     */
+    const currentUser =
+        getStoredUser();
+
     const role =
-        currentUser?.role || 'user';
+        currentUser?.role ||
+        'user';
+
+    const isSuperadmin =
+        role ===
+        'superadmin';
+
+    const isUserRole =
+        role ===
+        'user';
 
     const basePath =
-        role === 'user'
+        isUserRole
             ? '/user'
             : '/admin';
+
+    const defaultPath =
+        getDefaultPath(
+            currentUser
+        );
 
     const isOpen =
         Boolean(sidebarOpen) ||
         Boolean(isSidebarOpen);
 
-    const menuGroups = useMemo(
-        () => createMenuGroups(basePath),
-        [basePath]
-    );
+    const menuGroups =
+        useMemo(
+            () =>
+                createMenuGroups(
+                    basePath,
+                    isSuperadmin
+                ),
+            [
+                basePath,
+                isSuperadmin,
+            ]
+        );
 
     const canViewMerchandiseApproval =
         hasPermission(
@@ -372,186 +437,206 @@ export default function Sidebar({
             'products.view'
         );
 
-    const fetchBadgeData = useCallback(
-        async () => {
-            const token =
-                localStorage.getItem(
-                    'admin_token'
-                );
-
-            if (!token) {
-                setBadges(
-                    EMPTY_BADGES
-                );
-
-                return;
-            }
-
-            const requests = [];
-            const requestKeys = [];
-
-            if (
-                canViewMerchandiseApproval
-            ) {
-                requests.push(
-                    api.get('/orders')
-                );
-
-                requestKeys.push(
-                    'orders'
-                );
-            }
-
-            if (
-                canViewHumasApproval
-            ) {
-                requests.push(
-                    api.get(
-                        '/humas-service-requests'
-                    )
-                );
-
-                requestKeys.push(
-                    'humas'
-                );
-            }
-
-            if (
-                canViewBorrowingApproval
-            ) {
-                requests.push(
-                    api.get(
-                        '/borrow-requests'
-                    )
-                );
-
-                requestKeys.push(
-                    'borrowing'
-                );
-            }
-
-            if (canViewProducts) {
-                requests.push(
-                    api.get('/products')
-                );
-
-                requestKeys.push(
-                    'products'
-                );
-            }
-
-            if (
-                requests.length === 0
-            ) {
-                setBadges(
-                    EMPTY_BADGES
-                );
-
-                return;
-            }
-
-            try {
-                const responses =
-                    await Promise.allSettled(
-                        requests
+    const fetchBadgeData =
+        useCallback(
+            async () => {
+                const token =
+                    localStorage.getItem(
+                        'admin_token'
                     );
 
-                const resultMap = {};
+                if (!token) {
+                    setBadges(
+                        EMPTY_BADGES
+                    );
 
-                responses.forEach(
-                    (
-                        result,
-                        index
-                    ) => {
-                        const key =
-                            requestKeys[
-                                index
-                            ];
+                    return;
+                }
 
-                        if (
-                            result.status ===
-                            'fulfilled'
-                        ) {
-                            resultMap[key] =
-                                extractResponseData(
-                                    result.value
-                                );
-                        } else {
+                const requests = [];
+                const requestKeys = [];
+
+                if (
+                    canViewMerchandiseApproval
+                ) {
+                    requests.push(
+                        api.get(
+                            '/orders'
+                        )
+                    );
+
+                    requestKeys.push(
+                        'orders'
+                    );
+                }
+
+                if (
+                    canViewHumasApproval
+                ) {
+                    requests.push(
+                        api.get(
+                            '/humas-service-requests'
+                        )
+                    );
+
+                    requestKeys.push(
+                        'humas'
+                    );
+                }
+
+                if (
+                    canViewBorrowingApproval
+                ) {
+                    requests.push(
+                        api.get(
+                            '/borrow-requests'
+                        )
+                    );
+
+                    requestKeys.push(
+                        'borrowing'
+                    );
+                }
+
+                if (
+                    canViewProducts
+                ) {
+                    requests.push(
+                        api.get(
+                            '/products'
+                        )
+                    );
+
+                    requestKeys.push(
+                        'products'
+                    );
+                }
+
+                if (
+                    requests.length ===
+                    0
+                ) {
+                    setBadges(
+                        EMPTY_BADGES
+                    );
+
+                    return;
+                }
+
+                try {
+                    const responses =
+                        await Promise.allSettled(
+                            requests
+                        );
+
+                    const resultMap = {};
+
+                    responses.forEach(
+                        (
+                            result,
+                            index
+                        ) => {
+                            const key =
+                                requestKeys[
+                                    index
+                                ];
+
+                            if (
+                                result.status ===
+                                'fulfilled'
+                            ) {
+                                resultMap[key] =
+                                    extractResponseData(
+                                        result.value
+                                    );
+
+                                return;
+                            }
+
                             resultMap[key] =
                                 [];
 
+                            /*
+                             * Jangan tampilkan alert untuk badge.
+                             * Kegagalan salah satu endpoint tidak boleh
+                             * membuat seluruh sidebar berhenti.
+                             */
                             console.error(
-                                `Fetch badge ${key} error:`,
+                                `Fetch sidebar badge ${key} error:`,
                                 result.reason
                                     ?.response
                                     ?.data ||
                                     result.reason
                             );
                         }
-                    }
-                );
+                    );
 
-                const orders =
-                    resultMap.orders || [];
+                    const orders =
+                        resultMap.orders ||
+                        [];
 
-                const humasRequests =
-                    resultMap.humas || [];
+                    const humasRequests =
+                        resultMap.humas ||
+                        [];
 
-                const borrowRequests =
-                    resultMap.borrowing || [];
+                    const borrowRequests =
+                        resultMap.borrowing ||
+                        [];
 
-                const products =
-                    resultMap.products || [];
+                    const products =
+                        resultMap.products ||
+                        [];
 
-                setBadges({
-                    merchandisePending:
-                        orders.filter(
-                            (item) =>
-                                item.status ===
-                                'pending'
-                        ).length,
+                    setBadges({
+                        merchandisePending:
+                            orders.filter(
+                                (item) =>
+                                    item.status ===
+                                    'pending'
+                            ).length,
 
-                    humasPending:
-                        humasRequests.filter(
-                            (item) =>
-                                item.status ===
-                                'pending'
-                        ).length,
+                        humasPending:
+                            humasRequests.filter(
+                                (item) =>
+                                    item.status ===
+                                    'pending'
+                            ).length,
 
-                    borrowingPending:
-                        borrowRequests.filter(
-                            (item) =>
-                                item.status ===
-                                'pending'
-                        ).length,
+                        borrowingPending:
+                            borrowRequests.filter(
+                                (item) =>
+                                    item.status ===
+                                    'pending'
+                            ).length,
 
-                    lowStock:
-                        products.filter(
-                            (item) =>
-                                Number(
-                                    item.stock || 0
-                                ) <= 5
-                        ).length,
-                });
-            } catch (error) {
-                console.error(
-                    'Fetch sidebar badges error:',
-                    error?.response?.data ||
-                        error
-                );
+                        lowStock:
+                            products.filter(
+                                (item) =>
+                                    Number(
+                                        item.stock ||
+                                            0
+                                    ) <= 5
+                            ).length,
+                    });
+                } catch (error) {
+                    console.error(
+                        'Fetch sidebar badges error:',
+                        error?.response?.data ||
+                            error
+                    );
 
-                setBadges(
-                    EMPTY_BADGES
-                );
-            }
-        },
-        [
-            canViewMerchandiseApproval,
-            canViewHumasApproval,
-            canViewBorrowingApproval,
-            canViewProducts,
-        ]
-    );
+                    setBadges(
+                        EMPTY_BADGES
+                    );
+                }
+            },
+            [
+                canViewMerchandiseApproval,
+                canViewHumasApproval,
+                canViewBorrowingApproval,
+                canViewProducts,
+            ]
+        );
 
     useEffect(() => {
         fetchBadgeData();
@@ -574,38 +659,49 @@ export default function Sidebar({
         };
     }, [fetchBadgeData]);
 
-    const allowedGroups = useMemo(
-        () =>
-            menuGroups
-                .map((group) => ({
-                    ...group,
+    const allowedGroups =
+        useMemo(
+            () =>
+                menuGroups
+                    .filter(
+                        (group) =>
+                            !group.adminOnly ||
+                            !isUserRole
+                    )
+                    .map(
+                        (group) => ({
+                            ...group,
 
-                    items:
-                        group.items.filter(
-                            (item) =>
-                                hasPermission(
-                                    currentUser,
-                                    item.permission
-                                )
-                        ),
-                }))
-                .filter(
-                    (group) =>
-                        group.items.length >
-                        0
-                ),
-        [
-            menuGroups,
-            currentUser,
-        ]
-    );
+                            items:
+                                group.items.filter(
+                                    (item) =>
+                                        isItemAllowed(
+                                            item,
+                                            currentUser
+                                        )
+                                ),
+                        })
+                    )
+                    .filter(
+                        (group) =>
+                            group.items.length >
+                            0
+                    ),
+            [
+                menuGroups,
+                currentUser,
+                isUserRole,
+            ]
+        );
 
     const closeSidebar = () => {
         setSidebarOpen(false);
         setIsSidebarOpen(false);
     };
 
-    const isActiveMenu = (item) => {
+    const isActiveMenu = (
+        item
+    ) => {
         if (
             item.path ===
             `${basePath}/dashboard`
@@ -613,6 +709,27 @@ export default function Sidebar({
             return (
                 location.pathname ===
                 item.path
+            );
+        }
+
+        /*
+         * Hindari /admin/users dianggap aktif untuk semua halaman
+         * ketika menu Tambah User juga tersedia.
+         */
+        if (
+            item.path ===
+            '/admin/users'
+        ) {
+            return (
+                location.pathname ===
+                '/admin/users' ||
+                (
+                    location.pathname.startsWith(
+                        '/admin/users/'
+                    ) &&
+                    location.pathname !==
+                        '/admin/users/create'
+                )
             );
         }
 
@@ -633,7 +750,8 @@ export default function Sidebar({
         }
 
         return Number(
-            badges[badgeKey] || 0
+            badges[badgeKey] ||
+                0
         );
     };
 
@@ -675,7 +793,9 @@ export default function Sidebar({
             >
                 <div className="sidebar-brand">
                     <Link
-                        to={`${basePath}/dashboard`}
+                        to={
+                            defaultPath
+                        }
                         className="sidebar-logo text-decoration-none"
                         onClick={
                             closeSidebar
@@ -725,7 +845,7 @@ export default function Sidebar({
                 <div className="sidebar-user">
                     <div className="profile-avatar bg-white text-danger">
                         {(
-                            currentUser.name ||
+                            currentUser?.name ||
                             'U'
                         )
                             .charAt(0)
@@ -734,7 +854,7 @@ export default function Sidebar({
 
                     <div className="min-w-0">
                         <div className="sidebar-user-name text-truncate">
-                            {currentUser.name ||
+                            {currentUser?.name ||
                                 'Pengguna'}
                         </div>
 
@@ -777,7 +897,7 @@ export default function Sidebar({
                                             return (
                                                 <Link
                                                     key={
-                                                        item.path
+                                                        `${group.title}-${item.path}-${item.label}`
                                                     }
                                                     to={
                                                         item.path
@@ -842,9 +962,7 @@ export default function Sidebar({
                                 </div>
 
                                 <div className="small">
-                                    Akun ini belum
-                                    memiliki hak akses
-                                    aktif.
+                                    Akun ini belum memiliki hak akses aktif.
                                 </div>
                             </div>
                         </div>
@@ -854,13 +972,11 @@ export default function Sidebar({
                 <div className="sidebar-footer">
                     <div className="sidebar-footer-card">
                         <div className="fw-bold mb-1">
-                            HUMAS & SEKPiM
+                            HUMAS &amp; SEKPiM
                         </div>
 
                         <div className="small">
-                            Sistem layanan
-                            terpadu Telkom
-                            University Surabaya.
+                            Sistem layanan terpadu Telkom University Surabaya.
                         </div>
                     </div>
                 </div>

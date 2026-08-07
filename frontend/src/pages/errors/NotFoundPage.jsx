@@ -1,68 +1,301 @@
-import { Link, useLocation } from 'react-router-dom';
+import {
+    Link,
+    useLocation,
+    useNavigate,
+} from 'react-router-dom';
+
+import {
+    getDefaultPath,
+    getStoredUser,
+    hasPermission,
+} from '../../components/ProtectedRoute';
+
+const ROLE_LABELS = {
+    user: 'User',
+    admin: 'Admin',
+    admin_humas: 'Admin Humas',
+    admin_sekpim: 'Admin SEKPiM',
+    superadmin: 'Super Admin',
+};
+
+const getRoleLabel = (role) => {
+    return (
+        ROLE_LABELS[role] ||
+        role ||
+        'Pengguna'
+    );
+};
 
 export default function NotFoundPage() {
-    const location = useLocation();
+    const location =
+        useLocation();
 
-    let currentUser = {};
+    const navigate =
+        useNavigate();
 
-    try {
-        currentUser = JSON.parse(localStorage.getItem('admin_user') || '{}');
-    } catch {
-        currentUser = {};
-    }
+    const currentUser =
+        getStoredUser();
 
-    const role = currentUser.role || 'user';
+    const role =
+        currentUser?.role ||
+        'user';
+
+    const basePath =
+        role === 'user'
+            ? '/user'
+            : '/admin';
+
+    const defaultPath =
+        getDefaultPath(
+            currentUser
+        );
 
     const recommendedMenus = [
         {
-            label: 'Dashboard',
-            description: 'Kembali ke halaman utama sistem.',
-            icon: 'bi-speedometer2',
-            color: 'primary',
-            path: '/admin/dashboard',
-            roles: ['user', 'admin', 'superadmin'],
+            label:
+                'Dashboard',
+
+            description:
+                'Kembali ke halaman ringkasan sistem.',
+
+            icon:
+                'bi-speedometer2',
+
+            color:
+                'primary',
+
+            path:
+                `${basePath}/dashboard`,
+
+            permission:
+                'dashboard.view',
         },
+
         {
-            label: 'Riwayat Saya',
-            description: 'Lihat status pengajuan pribadi.',
-            icon: 'bi-clock-history',
-            color: 'info',
-            path: '/admin/my-requests',
-            roles: ['user', 'admin', 'superadmin'],
+            label:
+                'Ajukan Merchandise',
+
+            description:
+                'Buat pengajuan paket merchandise.',
+
+            icon:
+                'bi-cart-plus-fill',
+
+            color:
+                'primary',
+
+            path:
+                `${basePath}/request/merchandise`,
+
+            permission:
+                'request.merchandise.create',
         },
+
         {
-            label: 'Approval Merchandise',
-            description: 'Kelola pengajuan merchandise.',
-            icon: 'bi-gift-fill',
-            color: 'primary',
-            path: '/admin/orders',
-            roles: ['admin', 'superadmin'],
+            label:
+                'Request Liputan Humas',
+
+            description:
+                'Ajukan kebutuhan liputan atau dokumentasi.',
+
+            icon:
+                'bi-camera-reels-fill',
+
+            color:
+                'danger',
+
+            path:
+                `${basePath}/request/humas-service`,
+
+            permission:
+                'request.humas.create',
         },
+
         {
-            label: 'Approval Peminjaman',
-            description: 'Kelola peminjaman barang.',
-            icon: 'bi-box-seam-fill',
-            color: 'success',
-            path: '/admin/borrow-requests',
-            roles: ['admin', 'superadmin'],
+            label:
+                'Peminjaman SEKPiM',
+
+            description:
+                'Ajukan peminjaman perlengkapan.',
+
+            icon:
+                'bi-box-seam-fill',
+
+            color:
+                'success',
+
+            path:
+                `${basePath}/request/sekpim-borrowing`,
+
+            permission:
+                'request.borrowing.create',
         },
+
         {
-            label: 'Paket Merchandise',
-            description: 'Kelola produk dan stok.',
-            icon: 'bi-boxes',
-            color: 'warning',
-            path: '/admin/products',
-            roles: ['superadmin'],
+            label:
+                'Riwayat Pengajuan',
+
+            description:
+                'Pantau status pengajuan pribadi.',
+
+            icon:
+                'bi-clock-history',
+
+            color:
+                'info',
+
+            path:
+                `${basePath}/my-requests`,
+
+            permission:
+                'request.history.view',
         },
+
         {
-            label: 'Data User',
-            description: 'Kelola akun pengguna sistem.',
-            icon: 'bi-people-fill',
-            color: 'danger',
-            path: '/admin/users',
-            roles: ['superadmin'],
+            label:
+                'Approval Merchandise',
+
+            description:
+                'Periksa pengajuan merchandise.',
+
+            icon:
+                'bi-gift-fill',
+
+            color:
+                'primary',
+
+            path:
+                '/admin/orders',
+
+            permission:
+                'approval.merchandise.view',
         },
-    ].filter((menu) => menu.roles.includes(role));
+
+        {
+            label:
+                'Approval Liputan Humas',
+
+            description:
+                'Periksa request layanan Humas.',
+
+            icon:
+                'bi-camera-reels-fill',
+
+            color:
+                'danger',
+
+            path:
+                '/admin/humas-services',
+
+            permission:
+                'approval.humas.view',
+        },
+
+        {
+            label:
+                'Approval Peminjaman',
+
+            description:
+                'Periksa peminjaman SEKPiM.',
+
+            icon:
+                'bi-clipboard-check-fill',
+
+            color:
+                'success',
+
+            path:
+                '/admin/borrow-requests',
+
+            permission:
+                'approval.borrowing.view',
+        },
+
+        {
+            label:
+                'Data Kategori',
+
+            description:
+                'Lihat kategori produk sistem.',
+
+            icon:
+                'bi-tags-fill',
+
+            color:
+                'warning',
+
+            path:
+                '/admin/categories',
+
+            permission:
+                'categories.view',
+        },
+
+        {
+            label:
+                'Data Produk',
+
+            description:
+                'Lihat produk dan stok.',
+
+            icon:
+                'bi-boxes',
+
+            color:
+                'warning',
+
+            path:
+                '/admin/products',
+
+            permission:
+                'products.view',
+        },
+
+        {
+            label:
+                'Data User',
+
+            description:
+                'Lihat daftar akun sistem.',
+
+            icon:
+                'bi-people-fill',
+
+            color:
+                'dark',
+
+            path:
+                '/admin/users',
+
+            permission: [
+                'users.view',
+                'users.manage',
+            ],
+        },
+    ].filter(
+        (menu) =>
+            hasPermission(
+                currentUser,
+                menu.permission
+            )
+    );
+
+    const handleBack = () => {
+        if (
+            window.history.length >
+            1
+        ) {
+            navigate(-1);
+            return;
+        }
+
+        navigate(
+            defaultPath,
+            {
+                replace: true,
+            }
+        );
+    };
 
     return (
         <div className="container-fluid px-0">
@@ -77,24 +310,27 @@ export default function NotFoundPage() {
                     <div className="row align-items-center g-5">
                         <div className="col-lg-7">
                             <span className="badge rounded-pill text-bg-light text-primary px-3 py-2 mb-3">
-                                404 Not Found
+                                404 — Halaman Tidak Ditemukan
                             </span>
 
                             <h1 className="display-5 fw-black mb-3">
-                                Halaman yang kamu cari tidak ditemukan.
+                                Halaman yang kamu cari tidak tersedia.
                             </h1>
 
                             <p
                                 className="text-white-50 mb-4"
-                                style={{ maxWidth: 720, lineHeight: 1.8 }}
+                                style={{
+                                    maxWidth: 720,
+                                    lineHeight: 1.8,
+                                }}
                             >
-                                URL yang kamu buka tidak tersedia, sudah dipindahkan,
-                                atau kamu mengetik alamat halaman yang kurang tepat.
+                                URL mungkin salah, halaman telah dipindahkan,
+                                atau route tersebut belum tersedia di sistem.
                             </p>
 
                             <div className="p-3 rounded-4 bg-white bg-opacity-10 mb-4">
                                 <div className="small text-white-50 mb-1">
-                                    URL yang dicoba:
+                                    URL yang dibuka
                                 </div>
 
                                 <div className="fw-bold text-break">
@@ -104,19 +340,25 @@ export default function NotFoundPage() {
 
                             <div className="d-flex flex-wrap gap-2">
                                 <Link
-                                    to="/admin/dashboard"
+                                    to={
+                                        defaultPath
+                                    }
                                     className="btn btn-light rounded-pill px-4"
                                 >
-                                    <i className="bi bi-house-door-fill me-2"></i>
-                                    Dashboard
+                                    <i className="bi bi-house-door-fill me-2" />
+
+                                    Halaman Utama
                                 </Link>
 
                                 <button
                                     type="button"
                                     className="btn btn-outline-light rounded-pill px-4"
-                                    onClick={() => window.history.back()}
+                                    onClick={
+                                        handleBack
+                                    }
                                 >
-                                    <i className="bi bi-arrow-left me-2"></i>
+                                    <i className="bi bi-arrow-left me-2" />
+
                                     Kembali
                                 </button>
                             </div>
@@ -126,18 +368,26 @@ export default function NotFoundPage() {
                             <div className="bg-white bg-opacity-10 rounded-5 p-4 p-lg-5 text-center">
                                 <div
                                     className="mx-auto mb-4 d-flex align-items-center justify-content-center rounded-circle bg-white text-primary"
-                                    style={{ width: 112, height: 112 }}
+                                    style={{
+                                        width: 112,
+                                        height: 112,
+                                    }}
                                 >
-                                    <i className="bi bi-compass-fill display-4"></i>
+                                    <i className="bi bi-compass-fill display-4" />
                                 </div>
 
                                 <h4 className="fw-black mb-3">
-                                    Sepertinya kamu tersesat
+                                    Kamu tersesat
                                 </h4>
 
-                                <p className="text-white-50 mb-0" style={{ lineHeight: 1.8 }}>
-                                    Tenang, sistemnya aman. Pilih salah satu menu yang
-                                    tersedia di bawah untuk kembali ke alur yang benar.
+                                <p
+                                    className="text-white-50 mb-0"
+                                    style={{
+                                        lineHeight: 1.8,
+                                    }}
+                                >
+                                    Pilih halaman utama atau salah satu menu yang
+                                    tersedia sesuai permission akun.
                                 </p>
                             </div>
                         </div>
@@ -151,44 +401,73 @@ export default function NotFoundPage() {
                         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
                             <div>
                                 <h4 className="fw-black mb-1">
-                                    Menu yang bisa kamu buka
+                                    Menu yang dapat diakses
                                 </h4>
 
                                 <p className="text-muted mb-0">
-                                    Rekomendasi berdasarkan role kamu saat ini.
+                                    Rekomendasi berdasarkan permission akun saat ini.
                                 </p>
                             </div>
 
-                            <span className="badge rounded-pill text-bg-light text-capitalize px-3 py-2">
-                                Role: {role}
+                            <span className="badge rounded-pill text-bg-light px-3 py-2">
+                                {getRoleLabel(
+                                    role
+                                )}
                             </span>
                         </div>
 
-                        <div className="row g-3">
-                            {recommendedMenus.map((menu) => (
-                                <div className="col-md-6 col-xl-4" key={menu.path}>
-                                    <Link to={menu.path} className="text-decoration-none">
-                                        <div className="p-3 rounded-4 border action-card h-100">
-                                            <div className="d-flex align-items-start gap-3">
-                                                <div className={`icon-box bg-${menu.color}-subtle text-${menu.color}`}>
-                                                    <i className={`bi ${menu.icon}`}></i>
-                                                </div>
+                        {recommendedMenus.length ===
+                        0 ? (
+                            <div className="alert alert-warning border-0 rounded-4 mb-0">
+                                <i className="bi bi-exclamation-triangle-fill me-2" />
 
-                                                <div>
-                                                    <div className="fw-black text-dark mb-1">
-                                                        {menu.label}
-                                                    </div>
+                                Akun belum memiliki menu yang dapat dibuka.
+                            </div>
+                        ) : (
+                            <div className="row g-3">
+                                {recommendedMenus.map(
+                                    (menu) => (
+                                        <div
+                                            className="col-md-6 col-xl-4"
+                                            key={`${menu.label}-${menu.path}`}
+                                        >
+                                            <Link
+                                                to={
+                                                    menu.path
+                                                }
+                                                className="text-decoration-none"
+                                            >
+                                                <div className="p-3 rounded-4 border action-card h-100">
+                                                    <div className="d-flex align-items-start gap-3">
+                                                        <div
+                                                            className={`icon-box bg-${menu.color}-subtle text-${menu.color}`}
+                                                        >
+                                                            <i
+                                                                className={`bi ${menu.icon}`}
+                                                            />
+                                                        </div>
 
-                                                    <div className="small text-muted">
-                                                        {menu.description}
+                                                        <div className="min-w-0">
+                                                            <div className="fw-black text-dark mb-1">
+                                                                {
+                                                                    menu.label
+                                                                }
+                                                            </div>
+
+                                                            <div className="small text-muted">
+                                                                {
+                                                                    menu.description
+                                                                }
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </Link>
                                         </div>
-                                    </Link>
-                                </div>
-                            ))}
-                        </div>
+                                    )
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </section>
