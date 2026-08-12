@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderRevisionHistory;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -35,14 +36,20 @@ class OrderController extends Controller
             );
         }
 
-        $orders = Order::query()
-            ->with([
-                'user',
-                'items.product.category',
-            ])
-            ->latest('updated_at')
-            ->latest('created_at')
-            ->get();
+        $orders =
+            Order::query()
+                ->with([
+                    'user',
+                    'items.product.category',
+                    'revisionHistories.requestedBy',
+                ])
+                ->latest(
+                    'updated_at'
+                )
+                ->latest(
+                    'created_at'
+                )
+                ->get();
 
         return response()->json([
             'success' => true,
@@ -69,18 +76,24 @@ class OrderController extends Controller
             );
         }
 
-        $orders = Order::query()
-            ->with([
-                'user',
-                'items.product.category',
-            ])
-            ->where(
-                'user_id',
-                $user->id
-            )
-            ->latest('updated_at')
-            ->latest('created_at')
-            ->get();
+        $orders =
+            Order::query()
+                ->with([
+                    'user',
+                    'items.product.category',
+                    'revisionHistories.requestedBy',
+                ])
+                ->where(
+                    'user_id',
+                    $user->id
+                )
+                ->latest(
+                    'updated_at'
+                )
+                ->latest(
+                    'created_at'
+                )
+                ->get();
 
         return response()->json([
             'success' => true,
@@ -93,12 +106,16 @@ class OrderController extends Controller
         Request $request,
         int $id
     ): JsonResponse {
-        $order = Order::query()
-            ->with([
-                'user',
-                'items.product.category',
-            ])
-            ->findOrFail($id);
+        $order =
+            Order::query()
+                ->with([
+                    'user',
+                    'items.product.category',
+                    'revisionHistories.requestedBy',
+                ])
+                ->findOrFail(
+                    $id
+                );
 
         if (
             !$this->canAccessOrder(
@@ -142,7 +159,8 @@ class OrderController extends Controller
                 true
             );
 
-        $proofFilePath = null;
+        $proofFilePath =
+            null;
 
         try {
             $proofFile =
@@ -156,121 +174,147 @@ class OrderController extends Controller
                     'public'
                 );
 
-            $order = DB::transaction(
-                function () use (
-                    $user,
-                    $validated,
-                    $proofFile,
-                    $proofFilePath
-                ): Order {
-                    $this->validateOrderItems(
-                        $validated['items']
-                    );
+            $order =
+                DB::transaction(
+                    function () use (
+                        $user,
+                        $validated,
+                        $proofFile,
+                        $proofFilePath
+                    ): Order {
+                        $this->validateOrderItems(
+                            $validated[
+                                'items'
+                            ]
+                        );
 
-                    $order = Order::query()
-                        ->create([
-                            'user_id' =>
-                                $user->id,
+                        $order =
+                            Order::query()
+                                ->create([
+                                    'user_id' =>
+                                        $user->id,
 
-                            'order_code' =>
-                                $this->generateOrderCode(),
+                                    'order_code' =>
+                                        $this->generateOrderCode(),
 
-                            'event_name' =>
-                                trim(
-                                    $validated['event_name']
-                                ),
+                                    'event_name' =>
+                                        trim(
+                                            $validated[
+                                                'event_name'
+                                            ]
+                                        ),
 
-                            'institution_name' =>
-                                trim(
-                                    $validated['institution_name']
-                                ),
+                                    'institution_name' =>
+                                        trim(
+                                            $validated[
+                                                'institution_name'
+                                            ]
+                                        ),
 
-                            'guest_name' =>
-                                trim(
-                                    $validated['guest_name']
-                                ),
+                                    'guest_name' =>
+                                        trim(
+                                            $validated[
+                                                'guest_name'
+                                            ]
+                                        ),
 
-                            'guest_position' =>
-                                trim(
-                                    $validated['guest_position']
-                                ),
+                                    'guest_position' =>
+                                        trim(
+                                            $validated[
+                                                'guest_position'
+                                            ]
+                                        ),
 
-                            'activity_date' =>
-                                $validated['activity_date'],
+                                    'activity_date' =>
+                                        $validated[
+                                            'activity_date'
+                                        ],
 
-                            'proof_link' =>
-                                null,
+                                    'proof_link' =>
+                                        null,
 
-                            'proof_file_path' =>
-                                $proofFilePath,
+                                    'proof_file_path' =>
+                                        $proofFilePath,
 
-                            'proof_file_name' =>
-                                $proofFile
-                                    ->getClientOriginalName(),
+                                    'proof_file_name' =>
+                                        $proofFile
+                                            ->getClientOriginalName(),
 
-                            'proof_file_mime' =>
-                                $proofFile
-                                    ->getMimeType(),
+                                    'proof_file_mime' =>
+                                        $proofFile
+                                            ->getMimeType(),
 
-                            'status' =>
-                                'pending',
+                                    'status' =>
+                                        'pending',
 
-                            'user_note' =>
-                                trim(
-                                    $validated['user_note']
-                                ),
+                                    'user_note' =>
+                                        trim(
+                                            $validated[
+                                                'user_note'
+                                            ]
+                                        ),
 
-                            'admin_note' =>
-                                null,
+                                    'admin_note' =>
+                                        null,
 
-                            'submitted_at' =>
-                                now(),
+                                    'submitted_at' =>
+                                        now(),
 
-                            'revision_requested_at' =>
-                                null,
+                                    'revision_requested_at' =>
+                                        null,
 
-                            'resubmitted_at' =>
-                                null,
+                                    'resubmitted_at' =>
+                                        null,
 
-                            'approved_at' =>
-                                null,
+                                    'approved_at' =>
+                                        null,
 
-                            'rejected_at' =>
-                                null,
+                                    'rejected_at' =>
+                                        null,
 
-                            'completed_at' =>
-                                null,
-                        ]);
+                                    'completed_at' =>
+                                        null,
+                                ]);
 
-                    $this->replaceOrderItems(
-                        $order,
-                        $validated['items']
-                    );
+                        $this->replaceOrderItems(
+                            $order,
+                            $validated[
+                                'items'
+                            ]
+                        );
 
-                    return $order->load([
-                        'user',
-                        'items.product.category',
-                    ]);
-                }
-            );
+                        return $order
+                            ->load([
+                                'user',
+                                'items.product.category',
+                                'revisionHistories.requestedBy',
+                            ]);
+                    }
+                );
 
             return response()->json([
                 'success' => true,
                 'message' => 'Pengajuan merchandise berhasil dikirim.',
                 'data' => $order,
             ], 201);
-        } catch (HttpResponseException $error) {
+        } catch (
+            HttpResponseException $error
+        ) {
             $this->deleteFileIfExists(
                 $proofFilePath
             );
 
             throw $error;
-        } catch (Throwable $error) {
+        } catch (
+            Throwable $error
+        ) {
             $this->deleteFileIfExists(
                 $proofFilePath
             );
 
-            report($error);
+            report(
+                $error
+            );
 
             return response()->json([
                 'success' => false,
@@ -281,7 +325,7 @@ class OrderController extends Controller
     }
 
     /**
-     * Admin meminta user memperbaiki pengajuan.
+     * Admin meminta revisi merchandise.
      */
     public function revision(
         Request $request,
@@ -296,6 +340,9 @@ class OrderController extends Controller
                 'Kamu tidak memiliki izin meminta revisi pengajuan merchandise.'
             );
         }
+
+        $user =
+            $request->user();
 
         $validated =
             $request->validate([
@@ -317,68 +364,112 @@ class OrderController extends Controller
             ]);
 
         try {
-            $order = DB::transaction(
-                function () use (
-                    $id,
-                    $validated
-                ): Order {
-                    $lockedOrder =
-                        Order::query()
-                            ->lockForUpdate()
-                            ->findOrFail($id);
+            $order =
+                DB::transaction(
+                    function () use (
+                        $id,
+                        $validated,
+                        $user
+                    ): Order {
+                        $lockedOrder =
+                            Order::query()
+                                ->lockForUpdate()
+                                ->findOrFail(
+                                    $id
+                                );
 
-                    if (
-                        $lockedOrder->status !==
-                        'pending'
-                    ) {
-                        $this->abortJson(
-                            'Revisi hanya dapat diminta saat status pengajuan masih menunggu.',
-                            422
-                        );
-                    }
+                        if (
+                            $lockedOrder->status !==
+                            'pending'
+                        ) {
+                            $this->abortJson(
+                                'Revisi hanya dapat diminta saat status pengajuan masih menunggu.',
+                                422
+                            );
+                        }
 
-                    $lockedOrder->update([
-                        'status' =>
-                            'revision',
-
-                        'admin_note' =>
+                        $revisionNote =
                             trim(
-                                $validated['admin_note']
-                            ),
+                                $validated[
+                                    'admin_note'
+                                ]
+                            );
 
-                        'revision_requested_at' =>
-                            now(),
+                        $requestedAt =
+                            now();
 
-                        'resubmitted_at' =>
-                            null,
+                        /*
+                         * Simpan riwayat revisi terlebih dahulu.
+                         *
+                         * Walaupun admin_note order nantinya
+                         * dihapus setelah resubmit, history ini
+                         * tidak akan hilang.
+                         */
+                        OrderRevisionHistory::query()
+                            ->create([
+                                'order_id' =>
+                                    $lockedOrder->id,
 
-                        'approved_at' =>
-                            null,
+                                'requested_by' =>
+                                    $user?->id,
 
-                        'rejected_at' =>
-                            null,
+                                'revision_note' =>
+                                    $revisionNote,
 
-                        'completed_at' =>
-                            null,
-                    ]);
+                                'requested_at' =>
+                                    $requestedAt,
 
-                    return $lockedOrder
-                        ->fresh([
-                            'user',
-                            'items.product.category',
+                                'resubmitted_at' =>
+                                    null,
+                            ]);
+
+                        $lockedOrder->update([
+                            'status' =>
+                                'revision',
+
+                            'admin_note' =>
+                                $revisionNote,
+
+                            'revision_requested_at' =>
+                                $requestedAt,
+
+                            'resubmitted_at' =>
+                                null,
+
+                            'approved_at' =>
+                                null,
+
+                            'rejected_at' =>
+                                null,
+
+                            'completed_at' =>
+                                null,
                         ]);
-                }
-            );
+
+                        return $lockedOrder
+                            ->fresh([
+                                'user',
+                                'items.product.category',
+                                'revisionHistories.requestedBy',
+                            ]);
+                    }
+                );
 
             return response()->json([
                 'success' => true,
                 'message' => 'Pengajuan merchandise dikembalikan kepada pemohon untuk direvisi.',
                 'data' => $order,
             ]);
-        } catch (HttpResponseException $error) {
+        } catch (
+            HttpResponseException $error
+        ) {
             throw $error;
-        } catch (Throwable $error) {
-            report($error);
+        } catch (
+            Throwable $error
+        ) {
+            report(
+                $error
+            );
 
             return response()->json([
                 'success' => false,
@@ -389,7 +480,8 @@ class OrderController extends Controller
     }
 
     /**
-     * User memperbaiki dan mengirim ulang pengajuan revisi.
+     * User memperbaiki dan mengirim ulang
+     * pengajuan yang berstatus revision.
      */
     public function resubmit(
         Request $request,
@@ -410,9 +502,15 @@ class OrderController extends Controller
             );
         }
 
-        $order = Order::query()
-            ->with('items')
-            ->findOrFail($id);
+        $order =
+            Order::query()
+                ->with([
+                    'items',
+                    'revisionHistories',
+                ])
+                ->findOrFail(
+                    $id
+                );
 
         if (
             (int) $order->user_id !==
@@ -440,7 +538,9 @@ class OrderController extends Controller
                 false
             );
 
-        $newProofFilePath = null;
+        $newProofFilePath =
+            null;
+
         $oldProofFilePath =
             $order->proof_file_path;
 
@@ -450,129 +550,197 @@ class OrderController extends Controller
                     'proof_file'
                 );
 
-            if ($newProofFile) {
+            if (
+                $newProofFile
+            ) {
                 $newProofFilePath =
-                    $newProofFile->store(
-                        'merchandise-proofs',
-                        'public'
-                    );
+                    $newProofFile
+                        ->store(
+                            'merchandise-proofs',
+                            'public'
+                        );
             }
 
-            $updatedOrder = DB::transaction(
-                function () use (
-                    $order,
-                    $validated,
-                    $newProofFile,
-                    $newProofFilePath
-                ): Order {
-                    $lockedOrder =
-                        Order::query()
-                            ->lockForUpdate()
-                            ->findOrFail(
-                                $order->id
+            $updatedOrder =
+                DB::transaction(
+                    function () use (
+                        $order,
+                        $validated,
+                        $newProofFile,
+                        $newProofFilePath
+                    ): Order {
+                        $lockedOrder =
+                            Order::query()
+                                ->lockForUpdate()
+                                ->findOrFail(
+                                    $order->id
+                                );
+
+                        if (
+                            $lockedOrder->status !==
+                            'revision'
+                        ) {
+                            $this->abortJson(
+                                'Status pengajuan sudah berubah dan tidak dapat dikirim ulang.',
+                                422
                             );
+                        }
 
-                    if (
-                        $lockedOrder->status !==
-                        'revision'
-                    ) {
-                        $this->abortJson(
-                            'Status pengajuan sudah berubah dan tidak dapat dikirim ulang.',
-                            422
+                        $this->validateOrderItems(
+                            $validated[
+                                'items'
+                            ]
                         );
-                    }
 
-                    $this->validateOrderItems(
-                        $validated['items']
-                    );
-
-                    $payload = [
-                        'event_name' =>
-                            trim(
-                                $validated['event_name']
-                            ),
-
-                        'institution_name' =>
-                            trim(
-                                $validated['institution_name']
-                            ),
-
-                        'guest_name' =>
-                            trim(
-                                $validated['guest_name']
-                            ),
-
-                        'guest_position' =>
-                            trim(
-                                $validated['guest_position']
-                            ),
-
-                        'activity_date' =>
-                            $validated['activity_date'],
-
-                        'user_note' =>
-                            trim(
-                                $validated['user_note']
-                            ),
-
-                        'status' =>
-                            'pending',
+                        $resubmittedAt =
+                            now();
 
                         /*
-                         * Catatan revisi lama dibersihkan setelah user
-                         * berhasil mengirim ulang.
+                         * Cari history revisi terbaru
+                         * yang belum memiliki waktu resubmit.
                          */
-                        'admin_note' =>
-                            null,
+                        $revisionHistory =
+                            OrderRevisionHistory::query()
+                                ->where(
+                                    'order_id',
+                                    $lockedOrder->id
+                                )
+                                ->whereNull(
+                                    'resubmitted_at'
+                                )
+                                ->latest(
+                                    'requested_at'
+                                )
+                                ->latest(
+                                    'id'
+                                )
+                                ->lockForUpdate()
+                                ->first();
 
-                        'submitted_at' =>
-                            now(),
+                        if (
+                            $revisionHistory
+                        ) {
+                            $revisionHistory
+                                ->update([
+                                    'resubmitted_at' =>
+                                        $resubmittedAt,
+                                ]);
+                        }
 
-                        'resubmitted_at' =>
-                            now(),
+                        $payload = [
+                            'event_name' =>
+                                trim(
+                                    $validated[
+                                        'event_name'
+                                    ]
+                                ),
 
-                        'approved_at' =>
-                            null,
+                            'institution_name' =>
+                                trim(
+                                    $validated[
+                                        'institution_name'
+                                    ]
+                                ),
 
-                        'rejected_at' =>
-                            null,
+                            'guest_name' =>
+                                trim(
+                                    $validated[
+                                        'guest_name'
+                                    ]
+                                ),
 
-                        'completed_at' =>
-                            null,
-                    ];
+                            'guest_position' =>
+                                trim(
+                                    $validated[
+                                        'guest_position'
+                                    ]
+                                ),
 
-                    if (
-                        $newProofFile &&
-                        $newProofFilePath
-                    ) {
-                        $payload['proof_file_path'] =
-                            $newProofFilePath;
+                            'activity_date' =>
+                                $validated[
+                                    'activity_date'
+                                ],
 
-                        $payload['proof_file_name'] =
-                            $newProofFile
-                                ->getClientOriginalName();
+                            'user_note' =>
+                                trim(
+                                    $validated[
+                                        'user_note'
+                                    ]
+                                ),
 
-                        $payload['proof_file_mime'] =
-                            $newProofFile
-                                ->getMimeType();
+                            'status' =>
+                                'pending',
+
+                            /*
+                             * Catatan revisi aktif boleh
+                             * dibersihkan karena sudah aman
+                             * tersimpan di history.
+                             */
+                            'admin_note' =>
+                                null,
+
+                            /*
+                             * submitted_at tetap menjadi waktu
+                             * submit terbaru seperti konsep
+                             * project sebelumnya.
+                             */
+                            'submitted_at' =>
+                                $resubmittedAt,
+
+                            'resubmitted_at' =>
+                                $resubmittedAt,
+
+                            'approved_at' =>
+                                null,
+
+                            'rejected_at' =>
+                                null,
+
+                            'completed_at' =>
+                                null,
+                        ];
+
+                        if (
+                            $newProofFile &&
+                            $newProofFilePath
+                        ) {
+                            $payload[
+                                'proof_file_path'
+                            ] =
+                                $newProofFilePath;
+
+                            $payload[
+                                'proof_file_name'
+                            ] =
+                                $newProofFile
+                                    ->getClientOriginalName();
+
+                            $payload[
+                                'proof_file_mime'
+                            ] =
+                                $newProofFile
+                                    ->getMimeType();
+                        }
+
+                        $lockedOrder->update(
+                            $payload
+                        );
+
+                        $this->replaceOrderItems(
+                            $lockedOrder,
+                            $validated[
+                                'items'
+                            ]
+                        );
+
+                        return $lockedOrder
+                            ->fresh([
+                                'user',
+                                'items.product.category',
+                                'revisionHistories.requestedBy',
+                            ]);
                     }
-
-                    $lockedOrder->update(
-                        $payload
-                    );
-
-                    $this->replaceOrderItems(
-                        $lockedOrder,
-                        $validated['items']
-                    );
-
-                    return $lockedOrder
-                        ->fresh([
-                            'user',
-                            'items.product.category',
-                        ]);
-                }
-            );
+                );
 
             if (
                 $newProofFilePath &&
@@ -590,18 +758,24 @@ class OrderController extends Controller
                 'message' => 'Perbaikan pengajuan berhasil dikirim ulang.',
                 'data' => $updatedOrder,
             ]);
-        } catch (HttpResponseException $error) {
+        } catch (
+            HttpResponseException $error
+        ) {
             $this->deleteFileIfExists(
                 $newProofFilePath
             );
 
             throw $error;
-        } catch (Throwable $error) {
+        } catch (
+            Throwable $error
+        ) {
             $this->deleteFileIfExists(
                 $newProofFilePath
             );
 
-            report($error);
+            report(
+                $error
+            );
 
             return response()->json([
                 'success' => false,
@@ -626,134 +800,148 @@ class OrderController extends Controller
         }
 
         try {
-            $order = DB::transaction(
-                function () use (
-                    $id
-                ): Order {
-                    $lockedOrder =
-                        Order::query()
-                            ->lockForUpdate()
-                            ->findOrFail($id);
-
-                    if (
-                        $lockedOrder->status !==
-                        'pending'
-                    ) {
-                        $this->abortJson(
-                            'Pengajuan hanya dapat disetujui saat status menunggu.',
-                            422
-                        );
-                    }
-
-                    $lockedOrder->load([
-                        'items.product',
-                    ]);
-
-                    if (
-                        $lockedOrder
-                            ->items
-                            ->isEmpty()
-                    ) {
-                        $this->abortJson(
-                            'Pengajuan tidak memiliki item merchandise.',
-                            422
-                        );
-                    }
-
-                    foreach (
-                        $lockedOrder->items
-                        as $item
-                    ) {
-                        $product =
-                            Product::query()
+            $order =
+                DB::transaction(
+                    function () use (
+                        $id
+                    ): Order {
+                        $lockedOrder =
+                            Order::query()
                                 ->lockForUpdate()
-                                ->find(
-                                    $item->product_id
+                                ->findOrFail(
+                                    $id
                                 );
 
-                        if (!$product) {
-                            $this->abortJson(
-                                'Salah satu produk tidak ditemukan.',
-                                422
-                            );
-                        }
-
                         if (
-                            $product->status !==
-                            'active'
+                            $lockedOrder->status !==
+                            'pending'
                         ) {
                             $this->abortJson(
-                                "Produk {$product->name} sedang tidak aktif.",
+                                'Pengajuan hanya dapat disetujui saat status menunggu.',
                                 422
                             );
                         }
+
+                        $lockedOrder
+                            ->load([
+                                'items.product',
+                            ]);
 
                         if (
-                            !in_array(
-                                $product->type,
-                                [
-                                    'checkout',
-                                    'both',
-                                ],
-                                true
-                            )
+                            $lockedOrder
+                                ->items
+                                ->isEmpty()
                         ) {
                             $this->abortJson(
-                                "Produk {$product->name} tidak tersedia untuk merchandise.",
+                                'Pengajuan tidak memiliki item merchandise.',
                                 422
                             );
                         }
 
-                        if (
-                            (int) $product->stock <
-                            (int) $item->quantity
+                        foreach (
+                            $lockedOrder->items
+                            as $item
                         ) {
-                            $this->abortJson(
-                                "Stok {$product->name} tidak mencukupi.",
-                                422
+                            $product =
+                                Product::query()
+                                    ->lockForUpdate()
+                                    ->find(
+                                        $item->product_id
+                                    );
+
+                            if (
+                                !$product
+                            ) {
+                                $this->abortJson(
+                                    'Salah satu produk tidak ditemukan.',
+                                    422
+                                );
+                            }
+
+                            if (
+                                $product->status !==
+                                'active'
+                            ) {
+                                $this->abortJson(
+                                    "Produk {$product->name} sedang tidak aktif.",
+                                    422
+                                );
+                            }
+
+                            if (
+                                !in_array(
+                                    $product->type,
+                                    [
+                                        'checkout',
+                                        'both',
+                                    ],
+                                    true
+                                )
+                            ) {
+                                $this->abortJson(
+                                    "Produk {$product->name} tidak tersedia untuk merchandise.",
+                                    422
+                                );
+                            }
+
+                            if (
+                                (int) $product->stock <
+                                (int) $item->quantity
+                            ) {
+                                $this->abortJson(
+                                    "Stok {$product->name} tidak mencukupi.",
+                                    422
+                                );
+                            }
+
+                            $product->decrement(
+                                'stock',
+                                (int) $item->quantity
                             );
                         }
 
-                        $product->decrement(
-                            'stock',
-                            (int) $item->quantity
-                        );
+                        $lockedOrder
+                            ->update([
+                                'status' =>
+                                    'approved',
+
+                                'admin_note' =>
+                                    null,
+
+                                'approved_at' =>
+                                    now(),
+
+                                'rejected_at' =>
+                                    null,
+
+                                'completed_at' =>
+                                    null,
+                            ]);
+
+                        return $lockedOrder
+                            ->fresh([
+                                'user',
+                                'items.product.category',
+                                'revisionHistories.requestedBy',
+                            ]);
                     }
-
-                    $lockedOrder->update([
-                        'status' =>
-                            'approved',
-
-                        'admin_note' =>
-                            null,
-
-                        'approved_at' =>
-                            now(),
-
-                        'rejected_at' =>
-                            null,
-
-                        'completed_at' =>
-                            null,
-                    ]);
-
-                    return $lockedOrder
-                        ->fresh([
-                            'user',
-                            'items.product.category',
-                        ]);
-                }
-            );
+                );
 
             return response()->json([
                 'success' => true,
                 'message' => 'Pengajuan merchandise berhasil disetujui.',
                 'data' => $order,
             ]);
-        } catch (HttpResponseException $error) {
+        } catch (
+            HttpResponseException $error
+        ) {
             throw $error;
-        } catch (Throwable $error) {
-            report($error);
+        } catch (
+            Throwable $error
+        ) {
+            report(
+                $error
+            );
 
             return response()->json([
                 'success' => false,
@@ -785,65 +973,87 @@ class OrderController extends Controller
                     'min:5',
                     'max:2000',
                 ],
+            ], [
+                'admin_note.required' =>
+                    'Alasan penolakan wajib diisi.',
+
+                'admin_note.min' =>
+                    'Alasan penolakan minimal lima karakter.',
+
+                'admin_note.max' =>
+                    'Alasan penolakan maksimal 2.000 karakter.',
             ]);
 
         try {
-            $order = DB::transaction(
-                function () use (
-                    $id,
-                    $validated
-                ): Order {
-                    $lockedOrder =
-                        Order::query()
-                            ->lockForUpdate()
-                            ->findOrFail($id);
+            $order =
+                DB::transaction(
+                    function () use (
+                        $id,
+                        $validated
+                    ): Order {
+                        $lockedOrder =
+                            Order::query()
+                                ->lockForUpdate()
+                                ->findOrFail(
+                                    $id
+                                );
 
-                    if (
-                        $lockedOrder->status !==
-                        'pending'
-                    ) {
-                        $this->abortJson(
-                            'Pengajuan hanya dapat ditolak saat status menunggu.',
-                            422
-                        );
+                        if (
+                            $lockedOrder->status !==
+                            'pending'
+                        ) {
+                            $this->abortJson(
+                                'Pengajuan hanya dapat ditolak saat status menunggu.',
+                                422
+                            );
+                        }
+
+                        $lockedOrder
+                            ->update([
+                                'status' =>
+                                    'rejected',
+
+                                'admin_note' =>
+                                    trim(
+                                        $validated[
+                                            'admin_note'
+                                        ]
+                                    ),
+
+                                'rejected_at' =>
+                                    now(),
+
+                                'approved_at' =>
+                                    null,
+
+                                'completed_at' =>
+                                    null,
+                            ]);
+
+                        return $lockedOrder
+                            ->fresh([
+                                'user',
+                                'items.product.category',
+                                'revisionHistories.requestedBy',
+                            ]);
                     }
-
-                    $lockedOrder->update([
-                        'status' =>
-                            'rejected',
-
-                        'admin_note' =>
-                            trim(
-                                $validated['admin_note']
-                            ),
-
-                        'rejected_at' =>
-                            now(),
-
-                        'approved_at' =>
-                            null,
-
-                        'completed_at' =>
-                            null,
-                    ]);
-
-                    return $lockedOrder
-                        ->fresh([
-                            'user',
-                            'items.product.category',
-                        ]);
-                }
-            );
+                );
 
             return response()->json([
                 'success' => true,
                 'message' => 'Pengajuan merchandise berhasil ditolak.',
                 'data' => $order,
             ]);
-        } catch (HttpResponseException $error) {
+        } catch (
+            HttpResponseException $error
+        ) {
             throw $error;
-        } catch (Throwable $error) {
-            report($error);
+        } catch (
+            Throwable $error
+        ) {
+            report(
+                $error
+            );
 
             return response()->json([
                 'success' => false,
@@ -877,64 +1087,80 @@ class OrderController extends Controller
             ]);
 
         try {
-            $order = DB::transaction(
-                function () use (
-                    $id,
-                    $validated
-                ): Order {
-                    $lockedOrder =
-                        Order::query()
-                            ->lockForUpdate()
-                            ->findOrFail($id);
+            $order =
+                DB::transaction(
+                    function () use (
+                        $id,
+                        $validated
+                    ): Order {
+                        $lockedOrder =
+                            Order::query()
+                                ->lockForUpdate()
+                                ->findOrFail(
+                                    $id
+                                );
 
-                    if (
-                        $lockedOrder->status !==
-                        'approved'
-                    ) {
-                        $this->abortJson(
-                            'Pengajuan hanya dapat diselesaikan setelah disetujui.',
-                            422
-                        );
-                    }
+                        if (
+                            $lockedOrder->status !==
+                            'approved'
+                        ) {
+                            $this->abortJson(
+                                'Pengajuan hanya dapat diselesaikan setelah disetujui.',
+                                422
+                            );
+                        }
 
-                    $adminNote =
-                        isset(
-                            $validated['admin_note']
-                        )
-                            ? trim(
-                                $validated['admin_note']
+                        $adminNote =
+                            isset(
+                                $validated[
+                                    'admin_note'
+                                ]
                             )
-                            : $lockedOrder
-                                ->admin_note;
+                                ? trim(
+                                    $validated[
+                                        'admin_note'
+                                    ]
+                                )
+                                : $lockedOrder
+                                    ->admin_note;
 
-                    $lockedOrder->update([
-                        'status' =>
-                            'completed',
+                        $lockedOrder
+                            ->update([
+                                'status' =>
+                                    'completed',
 
-                        'admin_note' =>
-                            $adminNote ?: null,
+                                'admin_note' =>
+                                    $adminNote
+                                        ?: null,
 
-                        'completed_at' =>
-                            now(),
-                    ]);
+                                'completed_at' =>
+                                    now(),
+                            ]);
 
-                    return $lockedOrder
-                        ->fresh([
-                            'user',
-                            'items.product.category',
-                        ]);
-                }
-            );
+                        return $lockedOrder
+                            ->fresh([
+                                'user',
+                                'items.product.category',
+                                'revisionHistories.requestedBy',
+                            ]);
+                    }
+                );
 
             return response()->json([
                 'success' => true,
                 'message' => 'Pengajuan merchandise berhasil ditandai selesai.',
                 'data' => $order,
             ]);
-        } catch (HttpResponseException $error) {
+        } catch (
+            HttpResponseException $error
+        ) {
             throw $error;
-        } catch (Throwable $error) {
-            report($error);
+        } catch (
+            Throwable $error
+        ) {
+            report(
+                $error
+            );
 
             return response()->json([
                 'success' => false,
@@ -1039,19 +1265,29 @@ class OrderController extends Controller
         Order $order,
         array $items
     ): void {
-        $order->items()->delete();
+        $order
+            ->items()
+            ->delete();
 
-        foreach ($items as $item) {
-            OrderItem::query()->create([
-                'order_id' =>
-                    $order->id,
+        foreach (
+            $items as
+            $item
+        ) {
+            OrderItem::query()
+                ->create([
+                    'order_id' =>
+                        $order->id,
 
-                'product_id' =>
-                    $item['product_id'],
+                    'product_id' =>
+                        $item[
+                            'product_id'
+                        ],
 
-                'quantity' =>
-                    $item['quantity'],
-            ]);
+                    'quantity' =>
+                        $item[
+                            'quantity'
+                        ],
+                ]);
         }
     }
 
@@ -1062,7 +1298,9 @@ class OrderController extends Controller
         $user =
             $request->user();
 
-        if (!$user) {
+        if (
+            !$user
+        ) {
             return false;
         }
 
@@ -1122,9 +1360,10 @@ class OrderController extends Controller
                 'hasPermission'
             )
         ) {
-            return $user->hasPermission(
-                $permission
-            );
+            return $user
+                ->hasPermission(
+                    $permission
+                );
         }
 
         $permissions =
@@ -1144,14 +1383,21 @@ class OrderController extends Controller
     private function validateOrderItems(
         array $items
     ): void {
-        foreach ($items as $item) {
+        foreach (
+            $items as
+            $item
+        ) {
             $product =
                 Product::query()
                     ->find(
-                        $item['product_id']
+                        $item[
+                            'product_id'
+                        ]
                     );
 
-            if (!$product) {
+            if (
+                !$product
+            ) {
                 $this->abortJson(
                     'Salah satu produk merchandise tidak ditemukan.',
                     422
@@ -1186,7 +1432,9 @@ class OrderController extends Controller
 
             if (
                 (int) $product->stock <
-                (int) $item['quantity']
+                (int) $item[
+                    'quantity'
+                ]
             ) {
                 $this->abortJson(
                     "Stok {$product->name} tidak mencukupi. Stok tersedia {$product->stock}.",
@@ -1206,7 +1454,9 @@ class OrderController extends Controller
                         'YmdHis'
                     ),
                     strtoupper(
-                        Str::random(5)
+                        Str::random(
+                            5
+                        )
                     )
                 );
         } while (
@@ -1224,18 +1474,24 @@ class OrderController extends Controller
     private function deleteFileIfExists(
         ?string $filePath
     ): void {
-        if (!$filePath) {
+        if (
+            !$filePath
+        ) {
             return;
         }
 
         if (
-            Storage::disk('public')
-                ->exists($filePath)
+            Storage::disk(
+                'public'
+            )->exists(
+                $filePath
+            )
         ) {
-            Storage::disk('public')
-                ->delete(
-                    $filePath
-                );
+            Storage::disk(
+                'public'
+            )->delete(
+                $filePath
+            );
         }
     }
 

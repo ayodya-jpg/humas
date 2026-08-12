@@ -45,19 +45,16 @@ class HumasServiceRequestController extends Controller
         'SOCIAL MEDIA',
         'DOKUMENTASI',
         'PUBLIKASI WEBSITE',
+        'PUBLIKASI MEDIA MASSA',
         'YOUTUBE',
         'VIDEO REELS',
     ];
 
-    /**
-     * Menampilkan seluruh request liputan Humas.
-     *
-     * Endpoint ini hanya boleh diakses oleh akun yang memiliki
-     * permission approval.humas.view.
-     */
-    public function index(Request $request): JsonResponse
-    {
-        $user = $request->user();
+    public function index(
+        Request $request
+    ): JsonResponse {
+        $user =
+            $request->user();
 
         if (
             !$user ||
@@ -71,26 +68,27 @@ class HumasServiceRequestController extends Controller
             );
         }
 
-        $requests = HumasServiceRequest::query()
-            ->with('user')
-            ->latest('submitted_at')
-            ->latest('created_at')
-            ->get();
+        $requests =
+            HumasServiceRequest::query()
+                ->with('user')
+                ->latest('submitted_at')
+                ->latest('created_at')
+                ->get();
 
         return response()->json([
             'success' => true,
-            'message' => 'Data request liputan Humas berhasil diambil.',
-            'data' => $requests,
+            'message' =>
+                'Data request liputan Humas berhasil diambil.',
+            'data' =>
+                $requests,
         ]);
     }
 
-    /**
-     * Menampilkan request liputan milik user login.
-     */
     public function myHumasServiceRequests(
         Request $request
     ): JsonResponse {
-        $user = $request->user();
+        $user =
+            $request->user();
 
         if (
             !$user ||
@@ -104,39 +102,34 @@ class HumasServiceRequestController extends Controller
             );
         }
 
-        $requests = HumasServiceRequest::query()
-            ->with('user')
-            ->where(
-                'user_id',
-                $user->id
-            )
-            ->latest('submitted_at')
-            ->latest('created_at')
-            ->get();
+        $requests =
+            HumasServiceRequest::query()
+                ->with('user')
+                ->where(
+                    'user_id',
+                    $user->id
+                )
+                ->latest('submitted_at')
+                ->latest('created_at')
+                ->get();
 
         return response()->json([
             'success' => true,
-            'message' => 'Riwayat request liputan Humas berhasil diambil.',
-            'data' => $requests,
+            'message' =>
+                'Riwayat request liputan Humas berhasil diambil.',
+            'data' =>
+                $requests,
         ]);
     }
 
-    /**
-     * Menampilkan detail request liputan.
-     *
-     * Aturan:
-     * - superadmin dapat melihat seluruh request;
-     * - approval.humas.view dapat melihat seluruh request;
-     * - request.history.view hanya dapat melihat request miliknya;
-     * - akun lain mendapatkan response 403.
-     */
     public function show(
         Request $request,
         int $id
     ): JsonResponse {
-        $serviceRequest = HumasServiceRequest::query()
-            ->with('user')
-            ->findOrFail($id);
+        $serviceRequest =
+            HumasServiceRequest::query()
+                ->with('user')
+                ->findOrFail($id);
 
         if (
             !$this->canAccessServiceRequest(
@@ -151,17 +144,18 @@ class HumasServiceRequestController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Detail request liputan Humas berhasil diambil.',
-            'data' => $serviceRequest,
+            'message' =>
+                'Detail request liputan Humas berhasil diambil.',
+            'data' =>
+                $serviceRequest,
         ]);
     }
 
-    /**
-     * Menyimpan request liputan Humas baru.
-     */
-    public function store(Request $request): JsonResponse
-    {
-        $user = $request->user();
+    public function store(
+        Request $request
+    ): JsonResponse {
+        $user =
+            $request->user();
 
         if (
             !$user ||
@@ -175,220 +169,309 @@ class HumasServiceRequestController extends Controller
             );
         }
 
-        $validated = $request->validate([
-            'applicant_name' => [
-                'required',
-                'string',
-                'min:3',
-                'max:255',
-            ],
+        $validated =
+            $request->validate([
+                'applicant_name' => [
+                    'required',
+                    'string',
+                    'min:3',
+                    'max:255',
+                ],
 
-            'unit_name' => [
-                'required',
-                Rule::in(self::UNIT_NAMES),
-            ],
+                'unit_name' => [
+                    'required',
+                    Rule::in(
+                        self::UNIT_NAMES
+                    ),
+                ],
 
-            'other_unit_name' => [
-                'nullable',
-                'required_if:unit_name,Lainnya',
-                'string',
-                'max:255',
-            ],
+                'other_unit_name' => [
+                    'nullable',
+                    'required_if:unit_name,Lainnya',
+                    'string',
+                    'max:255',
+                ],
 
-            'pic_whatsapp' => [
-                'required',
-                'string',
-                'min:9',
-                'max:30',
-                'regex:/^[0-9+\-\s()]+$/',
-            ],
+                'pic_whatsapp' => [
+                    'required',
+                    'string',
+                    'min:9',
+                    'max:30',
+                    'regex:/^[0-9+\-\s()]+$/',
+                ],
 
-            'activity_detail' => [
-                'required',
-                'string',
-                'min:10',
-                'max:10000',
-            ],
+                'activity_detail' => [
+                    'required',
+                    'string',
+                    'min:10',
+                    'max:10000',
+                ],
 
-            'coverage_type' => [
-                'required',
-                Rule::in(self::COVERAGE_TYPES),
-            ],
+                'coverage_type' => [
+                    'required',
+                    Rule::in(
+                        self::COVERAGE_TYPES
+                    ),
+                ],
 
-            'event_location' => [
-                'required',
-                'string',
-                'min:3',
-                'max:255',
-            ],
+                'event_location' => [
+                    'required',
+                    'string',
+                    'min:3',
+                    'max:255',
+                ],
 
-            'event_date' => [
-                'required',
-                'date',
-            ],
+                'event_date' => [
+                    'required',
+                    'date',
+                ],
 
-            'reference_link' => [
-                'nullable',
-                'url',
-                'max:2000',
-            ],
+                'reference_link' => [
+                    'nullable',
+                    'url',
+                    'max:2000',
+                ],
 
-            'article_draft' => [
-                'required',
-                'file',
-                'mimes:pdf,doc,docx',
-                'max:10240',
-            ],
-        ], [
-            'applicant_name.required' => 'Nama lengkap pemohon wajib diisi.',
-            'applicant_name.min' => 'Nama lengkap pemohon minimal tiga karakter.',
-            'applicant_name.max' => 'Nama lengkap pemohon maksimal 255 karakter.',
+                'article_draft' => [
+                    'required',
+                    'file',
+                    'mimes:pdf,doc,docx',
+                    'max:10240',
+                ],
+            ], [
+                'applicant_name.required' =>
+                    'Nama lengkap pemohon wajib diisi.',
 
-            'unit_name.required' => 'Nama unit atau program studi wajib dipilih.',
-            'unit_name.in' => 'Nama unit atau program studi tidak valid.',
+                'applicant_name.min' =>
+                    'Nama lengkap pemohon minimal tiga karakter.',
 
-            'other_unit_name.required_if' => 'Nama unit lainnya wajib diisi.',
-            'other_unit_name.max' => 'Nama unit lainnya maksimal 255 karakter.',
+                'unit_name.required' =>
+                    'Nama unit atau program studi wajib dipilih.',
 
-            'pic_whatsapp.required' => 'Kontak WhatsApp PIC acara wajib diisi.',
-            'pic_whatsapp.min' => 'Nomor WhatsApp PIC terlalu pendek.',
-            'pic_whatsapp.max' => 'Nomor WhatsApp PIC terlalu panjang.',
-            'pic_whatsapp.regex' => 'Format nomor WhatsApp PIC tidak valid.',
+                'unit_name.in' =>
+                    'Nama unit atau program studi tidak valid.',
 
-            'activity_detail.required' => 'Detail kegiatan wajib diisi.',
-            'activity_detail.min' => 'Detail kegiatan minimal sepuluh karakter.',
-            'activity_detail.max' => 'Detail kegiatan maksimal 10.000 karakter.',
+                'other_unit_name.required_if' =>
+                    'Nama unit lainnya wajib diisi.',
 
-            'coverage_type.required' => 'Jenis liputan wajib dipilih.',
-            'coverage_type.in' => 'Jenis liputan tidak valid.',
+                'pic_whatsapp.required' =>
+                    'Kontak WhatsApp PIC acara wajib diisi.',
 
-            'event_location.required' => 'Lokasi acara wajib diisi.',
-            'event_location.min' => 'Lokasi acara minimal tiga karakter.',
-            'event_location.max' => 'Lokasi acara maksimal 255 karakter.',
+                'activity_detail.required' =>
+                    'Detail kegiatan wajib diisi.',
 
-            'event_date.required' => 'Tanggal pelaksanaan kegiatan wajib diisi.',
-            'event_date.date' => 'Format tanggal pelaksanaan tidak valid.',
+                'coverage_type.required' =>
+                    'Jenis liputan wajib dipilih.',
 
-            'reference_link.url' => 'Link bahan atau referensi harus berupa URL yang valid.',
-            'reference_link.max' => 'Link bahan atau referensi maksimal 2.000 karakter.',
+                'coverage_type.in' =>
+                    'Jenis liputan tidak valid.',
 
-            'article_draft.required' => 'Draft artikel kegiatan wajib diunggah.',
-            'article_draft.file' => 'Draft artikel harus berupa file.',
-            'article_draft.mimes' => 'Draft artikel harus berformat PDF, DOC, atau DOCX.',
-            'article_draft.max' => 'Ukuran draft artikel maksimal 10 MB.',
-        ]);
+                'event_location.required' =>
+                    'Lokasi acara wajib diisi.',
 
-        $articleDraftPath = null;
+                'event_date.required' =>
+                    'Tanggal pelaksanaan kegiatan wajib diisi.',
+
+                'reference_link.url' =>
+                    'Link bahan atau referensi harus berupa URL yang valid.',
+
+                'article_draft.required' =>
+                    'Draft artikel kegiatan wajib diunggah.',
+
+                'article_draft.mimes' =>
+                    'Draft artikel harus berformat PDF, DOC, atau DOCX.',
+
+                'article_draft.max' =>
+                    'Ukuran draft artikel maksimal 10 MB.',
+            ]);
+
+        $articleDraftPath =
+            null;
 
         try {
-            $articleDraft = $request->file(
-                'article_draft'
-            );
+            $articleDraft =
+                $request->file(
+                    'article_draft'
+                );
 
-            $articleDraftPath = $articleDraft->store(
-                'humas-article-drafts',
-                'public'
-            );
+            $articleDraftPath =
+                $articleDraft->store(
+                    'humas-article-drafts',
+                    'public'
+                );
 
-            $serviceRequest = DB::transaction(
-                function () use (
-                    $user,
-                    $validated,
-                    $articleDraft,
-                    $articleDraftPath
-                ): HumasServiceRequest {
-                    return HumasServiceRequest::query()->create([
-                        'user_id' => $user->id,
-                        'service_code' => $this->generateServiceCode(),
+            $serviceRequest =
+                DB::transaction(
+                    function () use (
+                        $user,
+                        $validated,
+                        $articleDraft,
+                        $articleDraftPath
+                    ): HumasServiceRequest {
+                        return HumasServiceRequest::query()
+                            ->create([
+                                'user_id' =>
+                                    $user->id,
 
-                        'applicant_name' => trim(
-                            $validated['applicant_name']
-                        ),
+                                'service_code' =>
+                                    $this->generateServiceCode(),
 
-                        'unit_name' => $validated['unit_name'],
+                                'applicant_name' =>
+                                    trim(
+                                        $validated[
+                                            'applicant_name'
+                                        ]
+                                    ),
 
-                        'other_unit_name' =>
-                            $validated['unit_name'] === 'Lainnya'
-                                ? trim(
-                                    $validated['other_unit_name']
-                                )
-                                : null,
+                                'unit_name' =>
+                                    $validated[
+                                        'unit_name'
+                                    ],
 
-                        'pic_whatsapp' => trim(
-                            $validated['pic_whatsapp']
-                        ),
+                                'other_unit_name' =>
+                                    $validated[
+                                        'unit_name'
+                                    ] ===
+                                    'Lainnya'
+                                        ? trim(
+                                            $validated[
+                                                'other_unit_name'
+                                            ]
+                                        )
+                                        : null,
 
-                        'activity_detail' => trim(
-                            $validated['activity_detail']
-                        ),
+                                'pic_whatsapp' =>
+                                    trim(
+                                        $validated[
+                                            'pic_whatsapp'
+                                        ]
+                                    ),
 
-                        'coverage_type' => $validated['coverage_type'],
+                                'activity_detail' =>
+                                    trim(
+                                        $validated[
+                                            'activity_detail'
+                                        ]
+                                    ),
 
-                        'event_location' => trim(
-                            $validated['event_location']
-                        ),
+                                'coverage_type' =>
+                                    $validated[
+                                        'coverage_type'
+                                    ],
 
-                        'event_date' => $validated['event_date'],
+                                'event_location' =>
+                                    trim(
+                                        $validated[
+                                            'event_location'
+                                        ]
+                                    ),
 
-                        'reference_link' =>
-                            isset($validated['reference_link']) &&
-                            trim($validated['reference_link']) !== ''
-                                ? trim(
-                                    $validated['reference_link']
-                                )
-                                : null,
+                                'event_date' =>
+                                    $validated[
+                                        'event_date'
+                                    ],
 
-                        'article_draft_path' => $articleDraftPath,
-                        'article_draft_name' => $articleDraft->getClientOriginalName(),
-                        'article_draft_mime' => $articleDraft->getMimeType(),
+                                'reference_link' =>
+                                    !empty(
+                                        $validated[
+                                            'reference_link'
+                                        ] ?? null
+                                    )
+                                        ? trim(
+                                            $validated[
+                                                'reference_link'
+                                            ]
+                                        )
+                                        : null,
 
-                        'result_link' => null,
-                        'result_note' => null,
+                                'article_draft_path' =>
+                                    $articleDraftPath,
 
-                        'status' => 'pending',
-                        'admin_note' => null,
+                                'article_draft_name' =>
+                                    $articleDraft
+                                        ->getClientOriginalName(),
 
-                        'submitted_at' => now(),
-                        'approved_at' => null,
-                        'rejected_at' => null,
-                        'completed_at' => null,
-                    ]);
-                }
-            );
+                                'article_draft_mime' =>
+                                    $articleDraft
+                                        ->getMimeType(),
 
-            $serviceRequest->load('user');
+                                'result_link' =>
+                                    null,
+
+                                'result_file_path' =>
+                                    null,
+
+                                'result_file_name' =>
+                                    null,
+
+                                'result_file_mime' =>
+                                    null,
+
+                                'result_note' =>
+                                    null,
+
+                                'status' =>
+                                    'pending',
+
+                                'admin_note' =>
+                                    null,
+
+                                'submitted_at' =>
+                                    now(),
+
+                                'approved_at' =>
+                                    null,
+
+                                'rejected_at' =>
+                                    null,
+
+                                'completed_at' =>
+                                    null,
+                            ]);
+                    }
+                );
+
+            $serviceRequest
+                ->load('user');
 
             return response()->json([
                 'success' => true,
-                'message' => 'Request liputan Humas berhasil dikirim.',
-                'data' => $serviceRequest,
+                'message' =>
+                    'Request liputan Humas berhasil dikirim.',
+                'data' =>
+                    $serviceRequest,
             ], 201);
-        } catch (HttpResponseException $error) {
+        } catch (
+            HttpResponseException $error
+        ) {
             $this->deleteFileIfExists(
                 $articleDraftPath
             );
 
             throw $error;
-        } catch (Throwable $error) {
+        } catch (
+            Throwable $error
+        ) {
             $this->deleteFileIfExists(
                 $articleDraftPath
             );
 
-            report($error);
+            report(
+                $error
+            );
 
             return response()->json([
                 'success' => false,
-                'message' => app()->isLocal()
-                    ? $error->getMessage()
-                    : 'Request liputan Humas gagal dikirim.',
-                'data' => null,
+                'message' =>
+                    app()->isLocal()
+                        ? $error->getMessage()
+                        : 'Request liputan Humas gagal dikirim.',
+                'data' =>
+                    null,
             ], 500);
         }
     }
 
-    /**
-     * Menyetujui request liputan.
-     */
     public function approve(
         Request $request,
         int $id
@@ -404,61 +487,97 @@ class HumasServiceRequestController extends Controller
         }
 
         try {
-            $serviceRequest = DB::transaction(
-                function () use ($id): HumasServiceRequest {
-                    $lockedRequest = HumasServiceRequest::query()
-                        ->lockForUpdate()
-                        ->findOrFail($id);
+            $serviceRequest =
+                DB::transaction(
+                    function () use (
+                        $id
+                    ): HumasServiceRequest {
+                        $lockedRequest =
+                            HumasServiceRequest::query()
+                                ->lockForUpdate()
+                                ->findOrFail(
+                                    $id
+                                );
 
-                    if (
-                        $lockedRequest->status !==
-                        'pending'
-                    ) {
-                        $this->abortJson(
-                            'Request hanya bisa disetujui saat status masih menunggu.',
-                            422
-                        );
+                        if (
+                            $lockedRequest
+                                ->status !==
+                            'pending'
+                        ) {
+                            $this->abortJson(
+                                'Request hanya bisa disetujui saat status masih menunggu.',
+                                422
+                            );
+                        }
+
+                        $lockedRequest
+                            ->update([
+                                'status' =>
+                                    'approved',
+
+                                'admin_note' =>
+                                    null,
+
+                                'approved_at' =>
+                                    now(),
+
+                                'rejected_at' =>
+                                    null,
+
+                                'completed_at' =>
+                                    null,
+
+                                'result_link' =>
+                                    null,
+
+                                'result_file_path' =>
+                                    null,
+
+                                'result_file_name' =>
+                                    null,
+
+                                'result_file_mime' =>
+                                    null,
+
+                                'result_note' =>
+                                    null,
+                            ]);
+
+                        return $lockedRequest
+                            ->fresh(
+                                'user'
+                            );
                     }
-
-                    $lockedRequest->update([
-                        'status' => 'approved',
-                        'admin_note' => null,
-
-                        'approved_at' => now(),
-                        'rejected_at' => null,
-                        'completed_at' => null,
-
-                        'result_link' => null,
-                        'result_note' => null,
-                    ]);
-
-                    return $lockedRequest->fresh(
-                        'user'
-                    );
-                }
-            );
+                );
 
             return response()->json([
                 'success' => true,
-                'message' => 'Request liputan Humas berhasil disetujui.',
-                'data' => $serviceRequest,
+                'message' =>
+                    'Request liputan Humas berhasil disetujui.',
+                'data' =>
+                    $serviceRequest,
             ]);
-        } catch (HttpResponseException $error) {
+        } catch (
+            HttpResponseException $error
+        ) {
             throw $error;
-        } catch (Throwable $error) {
-            report($error);
+        } catch (
+            Throwable $error
+        ) {
+            report(
+                $error
+            );
 
             return response()->json([
                 'success' => false,
-                'message' => 'Approval request liputan gagal diproses.',
-                'data' => null,
+                'message' =>
+                    'Approval request liputan gagal diproses.',
+                'data' =>
+                    null,
             ], 500);
         }
     }
 
-    /**
-     * Menolak request liputan.
-     */
     public function reject(
         Request $request,
         int $id
@@ -473,80 +592,131 @@ class HumasServiceRequestController extends Controller
             );
         }
 
-        $validated = $request->validate([
-            'admin_note' => [
-                'required',
-                'string',
-                'min:5',
-                'max:2000',
-            ],
-        ], [
-            'admin_note.required' => 'Alasan penolakan wajib diisi.',
-            'admin_note.min' => 'Alasan penolakan minimal lima karakter.',
-            'admin_note.max' => 'Alasan penolakan maksimal 2.000 karakter.',
-        ]);
+        $validated =
+            $request->validate([
+                'admin_note' => [
+                    'required',
+                    'string',
+                    'min:5',
+                    'max:2000',
+                ],
+            ], [
+                'admin_note.required' =>
+                    'Alasan penolakan wajib diisi.',
+
+                'admin_note.min' =>
+                    'Alasan penolakan minimal lima karakter.',
+
+                'admin_note.max' =>
+                    'Alasan penolakan maksimal 2.000 karakter.',
+            ]);
 
         try {
-            $serviceRequest = DB::transaction(
-                function () use (
-                    $id,
-                    $validated
-                ): HumasServiceRequest {
-                    $lockedRequest = HumasServiceRequest::query()
-                        ->lockForUpdate()
-                        ->findOrFail($id);
+            $serviceRequest =
+                DB::transaction(
+                    function () use (
+                        $id,
+                        $validated
+                    ): HumasServiceRequest {
+                        $lockedRequest =
+                            HumasServiceRequest::query()
+                                ->lockForUpdate()
+                                ->findOrFail(
+                                    $id
+                                );
 
-                    if (
-                        $lockedRequest->status !==
-                        'pending'
-                    ) {
-                        $this->abortJson(
-                            'Request hanya bisa ditolak saat status masih menunggu.',
-                            422
-                        );
+                        if (
+                            $lockedRequest
+                                ->status !==
+                            'pending'
+                        ) {
+                            $this->abortJson(
+                                'Request hanya bisa ditolak saat status masih menunggu.',
+                                422
+                            );
+                        }
+
+                        $lockedRequest
+                            ->update([
+                                'status' =>
+                                    'rejected',
+
+                                'admin_note' =>
+                                    trim(
+                                        $validated[
+                                            'admin_note'
+                                        ]
+                                    ),
+
+                                'rejected_at' =>
+                                    now(),
+
+                                'approved_at' =>
+                                    null,
+
+                                'completed_at' =>
+                                    null,
+
+                                'result_link' =>
+                                    null,
+
+                                'result_file_path' =>
+                                    null,
+
+                                'result_file_name' =>
+                                    null,
+
+                                'result_file_mime' =>
+                                    null,
+
+                                'result_note' =>
+                                    null,
+                            ]);
+
+                        return $lockedRequest
+                            ->fresh(
+                                'user'
+                            );
                     }
-
-                    $lockedRequest->update([
-                        'status' => 'rejected',
-
-                        'admin_note' => trim(
-                            $validated['admin_note']
-                        ),
-
-                        'rejected_at' => now(),
-                        'approved_at' => null,
-                        'completed_at' => null,
-
-                        'result_link' => null,
-                        'result_note' => null,
-                    ]);
-
-                    return $lockedRequest->fresh(
-                        'user'
-                    );
-                }
-            );
+                );
 
             return response()->json([
                 'success' => true,
-                'message' => 'Request liputan Humas berhasil ditolak.',
-                'data' => $serviceRequest,
+                'message' =>
+                    'Request liputan Humas berhasil ditolak.',
+                'data' =>
+                    $serviceRequest,
             ]);
-        } catch (HttpResponseException $error) {
+        } catch (
+            HttpResponseException $error
+        ) {
             throw $error;
-        } catch (Throwable $error) {
-            report($error);
+        } catch (
+            Throwable $error
+        ) {
+            report(
+                $error
+            );
 
             return response()->json([
                 'success' => false,
-                'message' => 'Penolakan request liputan gagal diproses.',
-                'data' => null,
+                'message' =>
+                    'Penolakan request liputan gagal diproses.',
+                'data' =>
+                    null,
             ], 500);
         }
     }
 
     /**
-     * Menyelesaikan request dan menyimpan link hasil pekerjaan.
+     * Menyelesaikan request Humas.
+     *
+     * Admin dapat mengirim:
+     * - link hasil;
+     * - file hasil;
+     * - atau keduanya.
+     *
+     * Minimal salah satu wajib tersedia.
      */
     public function complete(
         Request $request,
@@ -562,99 +732,210 @@ class HumasServiceRequestController extends Controller
             );
         }
 
-        $validated = $request->validate([
-            'result_link' => [
-                'required',
-                'url',
-                'max:2000',
-            ],
+        $validated =
+            $request->validate([
+                'result_link' => [
+                    'nullable',
+                    'url',
+                    'max:2000',
+                    'required_without:result_file',
+                ],
 
-            'result_note' => [
-                'nullable',
-                'string',
-                'max:3000',
-            ],
-        ], [
-            'result_link.required' => 'Link hasil pekerjaan wajib diisi.',
-            'result_link.url' => 'Link hasil pekerjaan harus berupa URL yang valid.',
-            'result_link.max' => 'Link hasil pekerjaan maksimal 2.000 karakter.',
+                'result_file' => [
+                    'nullable',
+                    'file',
+                    'mimes:pdf,doc,docx,jpg,jpeg,png,zip',
+                    'max:20480',
+                    'required_without:result_link',
+                ],
 
-            'result_note.string' => 'Catatan hasil harus berupa teks.',
-            'result_note.max' => 'Catatan hasil maksimal 3.000 karakter.',
-        ]);
+                'result_note' => [
+                    'nullable',
+                    'string',
+                    'max:3000',
+                ],
+            ], [
+                'result_link.required_without' =>
+                    'Masukkan link hasil atau unggah file hasil pekerjaan.',
+
+                'result_link.url' =>
+                    'Link hasil pekerjaan harus berupa URL yang valid.',
+
+                'result_link.max' =>
+                    'Link hasil pekerjaan maksimal 2.000 karakter.',
+
+                'result_file.required_without' =>
+                    'Unggah file hasil atau masukkan link hasil pekerjaan.',
+
+                'result_file.file' =>
+                    'File hasil tidak valid.',
+
+                'result_file.mimes' =>
+                    'File hasil harus berformat PDF, DOC, DOCX, JPG, JPEG, PNG, atau ZIP.',
+
+                'result_file.max' =>
+                    'Ukuran file hasil maksimal 20 MB.',
+
+                'result_note.max' =>
+                    'Catatan hasil maksimal 3.000 karakter.',
+            ]);
+
+        $resultFilePath =
+            null;
 
         try {
-            $serviceRequest = DB::transaction(
-                function () use (
-                    $id,
-                    $validated
-                ): HumasServiceRequest {
-                    $lockedRequest = HumasServiceRequest::query()
-                        ->lockForUpdate()
-                        ->findOrFail($id);
+            $resultFile =
+                $request->file(
+                    'result_file'
+                );
 
-                    if (
-                        $lockedRequest->status !==
-                        'approved'
-                    ) {
-                        $this->abortJson(
-                            'Request hanya bisa diselesaikan setelah disetujui.',
-                            422
-                        );
-                    }
-
-                    $lockedRequest->update([
-                        'status' => 'completed',
-
-                        'result_link' => trim(
-                            $validated['result_link']
-                        ),
-
-                        'result_note' =>
-                            isset($validated['result_note']) &&
-                            trim($validated['result_note']) !== ''
-                                ? trim(
-                                    $validated['result_note']
-                                )
-                                : null,
-
-                        'completed_at' => now(),
-                    ]);
-
-                    return $lockedRequest->fresh(
-                        'user'
+            if (
+                $resultFile
+            ) {
+                $resultFilePath =
+                    $resultFile->store(
+                        'humas-results',
+                        'public'
                     );
-                }
-            );
+            }
+
+            $serviceRequest =
+                DB::transaction(
+                    function () use (
+                        $id,
+                        $validated,
+                        $resultFile,
+                        $resultFilePath
+                    ): HumasServiceRequest {
+                        $lockedRequest =
+                            HumasServiceRequest::query()
+                                ->lockForUpdate()
+                                ->findOrFail(
+                                    $id
+                                );
+
+                        if (
+                            $lockedRequest
+                                ->status !==
+                            'approved'
+                        ) {
+                            $this->abortJson(
+                                'Request hanya bisa diselesaikan setelah disetujui.',
+                                422
+                            );
+                        }
+
+                        $resultLink =
+                            !empty(
+                                $validated[
+                                    'result_link'
+                                ] ?? null
+                            )
+                                ? trim(
+                                    $validated[
+                                        'result_link'
+                                    ]
+                                )
+                                : null;
+
+                        $resultNote =
+                            !empty(
+                                $validated[
+                                    'result_note'
+                                ] ?? null
+                            )
+                                ? trim(
+                                    $validated[
+                                        'result_note'
+                                    ]
+                                )
+                                : null;
+
+                        $lockedRequest
+                            ->update([
+                                'status' =>
+                                    'completed',
+
+                                'result_link' =>
+                                    $resultLink,
+
+                                'result_file_path' =>
+                                    $resultFilePath,
+
+                                'result_file_name' =>
+                                    $resultFile
+                                        ? $resultFile
+                                            ->getClientOriginalName()
+                                        : null,
+
+                                'result_file_mime' =>
+                                    $resultFile
+                                        ? $resultFile
+                                            ->getMimeType()
+                                        : null,
+
+                                'result_note' =>
+                                    $resultNote,
+
+                                'completed_at' =>
+                                    now(),
+                            ]);
+
+                        return $lockedRequest
+                            ->fresh(
+                                'user'
+                            );
+                    }
+                );
 
             return response()->json([
                 'success' => true,
-                'message' => 'Request liputan berhasil diselesaikan dan link hasil telah disimpan.',
-                'data' => $serviceRequest,
+                'message' =>
+                    'Request liputan berhasil diselesaikan dan hasil pekerjaan telah disimpan.',
+                'data' =>
+                    $serviceRequest,
             ]);
-        } catch (HttpResponseException $error) {
+        } catch (
+            HttpResponseException $error
+        ) {
+            $this->deleteFileIfExists(
+                $resultFilePath
+            );
+
             throw $error;
-        } catch (Throwable $error) {
-            report($error);
+        } catch (
+            Throwable $error
+        ) {
+            $this->deleteFileIfExists(
+                $resultFilePath
+            );
+
+            report(
+                $error
+            );
 
             return response()->json([
                 'success' => false,
-                'message' => 'Penyelesaian request liputan gagal diproses.',
-                'data' => null,
+                'message' =>
+                    app()->isLocal()
+                        ? $error->getMessage()
+                        : 'Penyelesaian request liputan gagal diproses.',
+                'data' =>
+                    null,
             ], 500);
         }
     }
 
-    /**
-     * Memeriksa akses detail request.
-     */
     private function canAccessServiceRequest(
         Request $request,
         HumasServiceRequest $serviceRequest
     ): bool {
-        $user = $request->user();
+        $user =
+            $request->user();
 
-        if (!$user) {
+        if (
+            !$user
+        ) {
             return false;
         }
 
@@ -677,21 +958,23 @@ class HumasServiceRequestController extends Controller
         }
 
         return (
-            (int) $serviceRequest->user_id ===
-            (int) $user->id
+            (int)
+                $serviceRequest
+                    ->user_id ===
+            (int)
+                $user->id
         );
     }
 
-    /**
-     * Memeriksa permission proses approval Humas.
-     */
     private function canProcessServiceRequest(
         Request $request
     ): bool {
-        $user = $request->user();
+        $user =
+            $request->user();
 
         return (
-            $user !== null &&
+            $user !==
+                null &&
             $this->userHasPermission(
                 $user,
                 'approval.humas.process'
@@ -699,9 +982,6 @@ class HumasServiceRequestController extends Controller
         );
     }
 
-    /**
-     * Memeriksa permission user.
-     */
     private function userHasPermission(
         User $user,
         string $permission
@@ -719,13 +999,16 @@ class HumasServiceRequestController extends Controller
                 'hasPermission'
             )
         ) {
-            return $user->hasPermission(
-                $permission
-            );
+            return $user
+                ->hasPermission(
+                    $permission
+                );
         }
 
         $permissions =
-            is_array($user->permissions)
+            is_array(
+                $user->permissions
+            )
                 ? $user->permissions
                 : [];
 
@@ -736,21 +1019,21 @@ class HumasServiceRequestController extends Controller
         );
     }
 
-    /**
-     * Membuat kode request unik.
-     */
     private function generateServiceCode(): string
     {
         do {
-            $code = sprintf(
-                'LIP-%s-%s',
-                now()->format(
-                    'YmdHis'
-                ),
-                strtoupper(
-                    Str::random(5)
-                )
-            );
+            $code =
+                sprintf(
+                    'LIP-%s-%s',
+                    now()->format(
+                        'YmdHis'
+                    ),
+                    strtoupper(
+                        Str::random(
+                            5
+                        )
+                    )
+                );
         } while (
             HumasServiceRequest::query()
                 ->where(
@@ -763,50 +1046,56 @@ class HumasServiceRequestController extends Controller
         return $code;
     }
 
-    /**
-     * Menghapus file apabila penyimpanan database gagal.
-     */
     private function deleteFileIfExists(
         ?string $filePath
     ): void {
-        if (!$filePath) {
+        if (
+            !$filePath
+        ) {
             return;
         }
 
         if (
-            Storage::disk('public')
-                ->exists($filePath)
+            Storage::disk(
+                'public'
+            )->exists(
+                $filePath
+            )
         ) {
-            Storage::disk('public')
-                ->delete($filePath);
+            Storage::disk(
+                'public'
+            )->delete(
+                $filePath
+            );
         }
     }
 
-    /**
-     * Response akses ditolak.
-     */
     private function forbiddenResponse(
         string $message
     ): JsonResponse {
         return response()->json([
             'success' => false,
-            'message' => $message,
-            'data' => null,
+            'message' =>
+                $message,
+            'data' =>
+                null,
         ], 403);
     }
 
-    /**
-     * Menghentikan proses dengan response JSON konsisten.
-     */
     private function abortJson(
         string $message,
         int $statusCode
     ): never {
         throw new HttpResponseException(
             response()->json([
-                'success' => false,
-                'message' => $message,
-                'data' => null,
+                'success' =>
+                    false,
+
+                'message' =>
+                    $message,
+
+                'data' =>
+                    null,
             ], $statusCode)
         );
     }

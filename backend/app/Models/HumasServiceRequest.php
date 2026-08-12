@@ -21,6 +21,7 @@ class HumasServiceRequest extends Model
         'coverage_type',
         'event_location',
         'event_date',
+
         'reference_link',
 
         'article_draft_path',
@@ -28,6 +29,9 @@ class HumasServiceRequest extends Model
         'article_draft_mime',
 
         'result_link',
+        'result_file_path',
+        'result_file_name',
+        'result_file_mime',
         'result_note',
 
         'status',
@@ -39,45 +43,71 @@ class HumasServiceRequest extends Model
         'completed_at',
     ];
 
+    protected $casts = [
+        'id' => 'integer',
+        'user_id' => 'integer',
+
+        'event_date' => 'date:Y-m-d',
+
+        'submitted_at' => 'datetime',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
+        'completed_at' => 'datetime',
+    ];
+
     protected $appends = [
         'article_draft_url',
+        'result_file_url',
         'resolved_unit_name',
     ];
 
-    protected function casts(): array
+    public function user(): BelongsTo
     {
-        return [
-            'event_date' => 'date',
-
-            'submitted_at' => 'datetime',
-            'approved_at' => 'datetime',
-            'rejected_at' => 'datetime',
-            'completed_at' => 'datetime',
-        ];
+        return $this->belongsTo(
+            User::class
+        );
     }
 
     public function getArticleDraftUrlAttribute(): ?string
     {
-        if (!$this->article_draft_path) {
+        if (
+            !$this->article_draft_path
+        ) {
             return null;
         }
 
         return asset(
-            Storage::url($this->article_draft_path)
+            Storage::url(
+                $this->article_draft_path
+            )
+        );
+    }
+
+    public function getResultFileUrlAttribute(): ?string
+    {
+        if (
+            !$this->result_file_path
+        ) {
+            return null;
+        }
+
+        return asset(
+            Storage::url(
+                $this->result_file_path
+            )
         );
     }
 
     public function getResolvedUnitNameAttribute(): ?string
     {
-        if ($this->unit_name === 'Lainnya') {
-            return $this->other_unit_name;
+        if (
+            $this->unit_name ===
+            'Lainnya'
+        ) {
+            return $this->other_unit_name
+                ?: 'Lainnya';
         }
 
         return $this->unit_name;
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
     }
 }

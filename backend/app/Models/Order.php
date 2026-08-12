@@ -17,13 +17,17 @@ class Order extends Model
         'guest_name',
         'guest_position',
         'activity_date',
+
         'proof_link',
         'proof_file_path',
         'proof_file_name',
         'proof_file_mime',
+
         'status',
+
         'user_note',
         'admin_note',
+
         'submitted_at',
         'revision_requested_at',
         'resubmitted_at',
@@ -39,7 +43,9 @@ class Order extends Model
     protected $casts = [
         'id' => 'integer',
         'user_id' => 'integer',
+
         'activity_date' => 'date:Y-m-d',
+
         'submitted_at' => 'datetime',
         'revision_requested_at' => 'datetime',
         'resubmitted_at' => 'datetime',
@@ -50,7 +56,9 @@ class Order extends Model
 
     public function getProofFileUrlAttribute(): ?string
     {
-        if (!$this->proof_file_path) {
+        if (
+            !$this->proof_file_path
+        ) {
             return null;
         }
 
@@ -73,5 +81,42 @@ class Order extends Model
         return $this->hasMany(
             OrderItem::class
         );
+    }
+
+    /**
+     * Seluruh riwayat revisi merchandise.
+     */
+    public function revisionHistories(): HasMany
+    {
+        return $this
+            ->hasMany(
+                OrderRevisionHistory::class
+            )
+            ->orderByDesc(
+                'requested_at'
+            )
+            ->orderByDesc(
+                'id'
+            );
+    }
+
+    /**
+     * Riwayat revisi paling baru.
+     *
+     * Untuk penggunaan query biasa, sebaiknya
+     * tetap eager-load revisionHistories.
+     */
+    public function latestRevisionHistory(): HasMany
+    {
+        return $this
+            ->hasMany(
+                OrderRevisionHistory::class
+            )
+            ->latest(
+                'requested_at'
+            )
+            ->latest(
+                'id'
+            );
     }
 }
