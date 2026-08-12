@@ -10,6 +10,22 @@ import {
     Navigate,
 } from 'react-router-dom';
 
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Legend,
+    Line,
+    LineChart,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
+
 import api from '../api/axios';
 
 import {
@@ -19,13 +35,10 @@ import {
     normalizePermissions,
 } from '../components/ProtectedRoute';
 
-const EMPTY_DATA = {
-    orders: [],
-    humasRequests: [],
-    borrowRequests: [],
-    products: [],
-    users: [],
-};
+import {
+    showErrorAlert,
+    showWarningAlert,
+} from '../utils/sweetAlert';
 
 const ROLE_LABELS = {
     user: 'User',
@@ -35,47 +48,231 @@ const ROLE_LABELS = {
     superadmin: 'Super Admin',
 };
 
-const extractArray = (
-    response
+const SERVICE_CONFIG = {
+    merchandise: {
+        label: 'Merchandise',
+        icon: 'bi-gift-fill',
+        color: 'primary',
+    },
+
+    humas: {
+        label: 'Liputan Humas',
+        icon: 'bi-camera-reels-fill',
+        color: 'danger',
+    },
+
+    borrowing: {
+        label: 'Peminjaman SEKPiM',
+        icon: 'bi-box-seam-fill',
+        color: 'success',
+    },
+};
+
+const STATUS_CONFIG = {
+    pending: {
+        label: 'Menunggu',
+        badgeClass:
+            'bg-warning-subtle text-warning-emphasis',
+    },
+
+    revision: {
+        label: 'Perlu Revisi',
+        badgeClass:
+            'bg-info-subtle text-info-emphasis',
+    },
+
+    approved: {
+        label: 'Disetujui',
+        badgeClass:
+            'bg-primary-subtle text-primary',
+    },
+
+    rejected: {
+        label: 'Ditolak',
+        badgeClass:
+            'bg-danger-subtle text-danger',
+    },
+
+    borrowed: {
+        label: 'Dipinjam',
+        badgeClass:
+            'bg-info-subtle text-info-emphasis',
+    },
+
+    returned: {
+        label: 'Dikembalikan',
+        badgeClass:
+            'bg-secondary-subtle text-secondary',
+    },
+
+    completed: {
+        label: 'Selesai',
+        badgeClass:
+            'bg-success-subtle text-success',
+    },
+};
+
+const EMPTY_ANALYTICS = {
+    filters: {
+        service: 'all',
+        status: 'all',
+        start_date: '',
+        end_date: '',
+        group_by: 'day',
+        available_services: [],
+    },
+
+    summary: {
+        total: 0,
+        pending: 0,
+        revision: 0,
+        approved: 0,
+        rejected: 0,
+        borrowed: 0,
+        returned: 0,
+        completed: 0,
+        finished: 0,
+    },
+
+    service_distribution: [],
+    status_distribution: [],
+    trend: [],
+    recent_requests: [],
+};
+
+const PIE_COLORS = [
+    '#f59e0b',
+    '#0ea5e9',
+    '#2563eb',
+    '#dc2626',
+    '#8b5cf6',
+    '#64748b',
+    '#16a34a',
+];
+
+const padNumber = (
+    value
 ) => {
-    const payload =
-        response?.data?.data;
+    return String(
+        value
+    ).padStart(
+        2,
+        '0'
+    );
+};
 
-    if (Array.isArray(payload)) {
-        return payload;
-    }
+const toLocalDateString = (
+    date
+) => {
+    return [
+        date.getFullYear(),
+        padNumber(
+            date.getMonth() + 1
+        ),
+        padNumber(
+            date.getDate()
+        ),
+    ].join('-');
+};
 
-    if (
-        payload &&
-        Array.isArray(
-            payload.data
-        )
+const getDateRangeByPreset = (
+    preset
+) => {
+    const today =
+        new Date();
+
+    const endDate =
+        new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate()
+        );
+
+    let startDate =
+        new Date(
+            endDate
+        );
+
+    switch (
+        preset
     ) {
-        return payload.data;
+        case 'today':
+            break;
+
+        case '7days':
+            startDate.setDate(
+                endDate.getDate() -
+                    6
+            );
+            break;
+
+        case '30days':
+            startDate.setDate(
+                endDate.getDate() -
+                    29
+            );
+            break;
+
+        case 'this_month':
+            startDate =
+                new Date(
+                    endDate.getFullYear(),
+                    endDate.getMonth(),
+                    1
+                );
+            break;
+
+        case 'this_year':
+            startDate =
+                new Date(
+                    endDate.getFullYear(),
+                    0,
+                    1
+                );
+            break;
+
+        default:
+            startDate.setDate(
+                endDate.getDate() -
+                    29
+            );
+            break;
     }
 
-    return [];
+    return {
+        startDate:
+            toLocalDateString(
+                startDate
+            ),
+
+        endDate:
+            toLocalDateString(
+                endDate
+            ),
+    };
 };
 
 const formatDate = (
-    date
+    dateValue
 ) => {
-    if (!date) {
+    if (
+        !dateValue
+    ) {
         return '-';
     }
 
     if (
-        typeof date ===
+        typeof dateValue ===
             'string' &&
         /^\d{4}-\d{2}-\d{2}$/.test(
-            date
+            dateValue
         )
     ) {
         const [
             year,
             month,
             day,
-        ] = date
+        ] = dateValue
             .split('-')
             .map(Number);
 
@@ -94,7 +291,9 @@ const formatDate = (
     }
 
     const parsedDate =
-        new Date(date);
+        new Date(
+            dateValue
+        );
 
     if (
         Number.isNaN(
@@ -104,25 +303,30 @@ const formatDate = (
         return '-';
     }
 
-    return parsedDate.toLocaleDateString(
-        'id-ID',
-        {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-        }
-    );
+    return parsedDate
+        .toLocaleDateString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+            }
+        );
 };
 
 const formatDateTime = (
-    date
+    dateValue
 ) => {
-    if (!date) {
+    if (
+        !dateValue
+    ) {
         return '-';
     }
 
     const parsedDate =
-        new Date(date);
+        new Date(
+            dateValue
+        );
 
     if (
         Number.isNaN(
@@ -132,24 +336,27 @@ const formatDateTime = (
         return '-';
     }
 
-    return parsedDate.toLocaleString(
-        'id-ID',
-        {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-        }
-    );
+    return parsedDate
+        .toLocaleString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            }
+        );
 };
 
 const getRoleLabel = (
     role
 ) => {
     return (
-        ROLE_LABELS[role] ||
+        ROLE_LABELS[
+            role
+        ] ||
         role ||
         'Pengguna'
     );
@@ -158,17 +365,10 @@ const getRoleLabel = (
 const getStatusLabel = (
     status
 ) => {
-    const labels = {
-        pending: 'Menunggu',
-        approved: 'Disetujui',
-        rejected: 'Ditolak',
-        completed: 'Selesai',
-        borrowed: 'Dipinjam',
-        returned: 'Dikembalikan',
-    };
-
     return (
-        labels[status] ||
+        STATUS_CONFIG[
+            status
+        ]?.label ||
         status ||
         '-'
     );
@@ -177,56 +377,209 @@ const getStatusLabel = (
 const getStatusClass = (
     status
 ) => {
-    const classes = {
-        pending:
-            'text-bg-warning',
-
-        approved:
-            'text-bg-success',
-
-        rejected:
-            'text-bg-danger',
-
-        completed:
-            'text-bg-primary',
-
-        borrowed:
-            'text-bg-info',
-
-        returned:
-            'text-bg-secondary',
-    };
-
     return (
-        classes[status] ||
-        'text-bg-secondary'
+        STATUS_CONFIG[
+            status
+        ]?.badgeClass ||
+        'bg-secondary-subtle text-secondary'
     );
 };
 
-const getCoverageLabel = (
-    coverageType
+const getServiceConfig = (
+    service
 ) => {
-    const labels = {
-        'SOCIAL MEDIA':
-            'Social Media',
+    return (
+        SERVICE_CONFIG[
+            service
+        ] || {
+            label:
+                service ||
+                'Layanan',
 
-        DOKUMENTASI:
-            'Dokumentasi',
+            icon:
+                'bi-grid-fill',
 
-        'PUBLIKASI WEBSITE':
-            'Publikasi Website',
+            color:
+                'secondary',
+        }
+    );
+};
 
-        YOUTUBE:
-            'YouTube',
+const getBackendErrorMessage = (
+    error,
+    fallbackMessage
+) => {
+    const responseData =
+        error?.response
+            ?.data;
 
-        'VIDEO REELS':
-            'Video Reels',
-    };
+    if (
+        responseData
+            ?.errors
+    ) {
+        const firstError =
+            Object.values(
+                responseData
+                    .errors
+            )?.[0]?.[0];
+
+        if (
+            firstError
+        ) {
+            return firstError;
+        }
+    }
 
     return (
-        labels[coverageType] ||
-        coverageType ||
-        'Liputan Humas'
+        responseData
+            ?.message ||
+        fallbackMessage
+    );
+};
+
+const getDownloadFilename = (
+    contentDisposition,
+    fallbackFilename
+) => {
+    if (
+        !contentDisposition
+    ) {
+        return fallbackFilename;
+    }
+
+    const utf8Match =
+        contentDisposition.match(
+            /filename\*=UTF-8''([^;]+)/i
+        );
+
+    if (
+        utf8Match &&
+        utf8Match[1]
+    ) {
+        try {
+            return decodeURIComponent(
+                utf8Match[1]
+                    .replace(
+                        /["']/g,
+                        ''
+                    )
+                    .trim()
+            );
+        } catch {
+            return fallbackFilename;
+        }
+    }
+
+    const normalMatch =
+        contentDisposition.match(
+            /filename="?([^";]+)"?/i
+        );
+
+    if (
+        normalMatch &&
+        normalMatch[1]
+    ) {
+        return normalMatch[1]
+            .replace(
+                /["']/g,
+                ''
+            )
+            .trim();
+    }
+
+    return fallbackFilename;
+};
+
+const getBlobErrorMessage =
+    async (
+        error,
+        fallbackMessage
+    ) => {
+        const blob =
+            error?.response
+                ?.data;
+
+        if (
+            blob instanceof
+            Blob
+        ) {
+            try {
+                const text =
+                    await blob.text();
+
+                const parsed =
+                    JSON.parse(
+                        text
+                    );
+
+                if (
+                    parsed?.message
+                ) {
+                    return parsed.message;
+                }
+
+                if (
+                    parsed?.errors
+                ) {
+                    const firstError =
+                        Object.values(
+                            parsed.errors
+                        )?.[0]?.[0];
+
+                    if (
+                        firstError
+                    ) {
+                        return firstError;
+                    }
+                }
+            } catch {
+                //
+            }
+        }
+
+        return (
+            error?.response
+                ?.data
+                ?.message ||
+            error?.message ||
+            fallbackMessage
+        );
+    };
+
+const ChartEmptyState = ({
+    title,
+}) => {
+    return (
+        <div
+            className="d-flex flex-column align-items-center justify-content-center text-center p-4"
+            style={{
+                minHeight:
+                    320,
+            }}
+        >
+            <div
+                className="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center mb-3"
+                style={{
+                    width:
+                        72,
+
+                    height:
+                        72,
+                }}
+            >
+                <i className="bi bi-bar-chart-line-fill fs-2" />
+            </div>
+
+            <h6 className="fw-black mb-1">
+                Belum ada data grafik
+            </h6>
+
+            <p className="small text-muted mb-0">
+                {
+                    title
+                }
+            </p>
+        </div>
     );
 };
 
@@ -300,406 +653,731 @@ export default function Dashboard() {
             'approval.borrowing.view'
         );
 
-    const canViewProducts =
-        hasPermission(
-            currentUser,
-            'products.view'
-        );
-
-    const canManageProducts =
-        hasPermission(
-            currentUser,
-            'products.manage'
-        );
-
-    const canViewUsers =
-        hasPermission(
-            currentUser,
-            [
-                'users.view',
-                'users.manage',
-            ]
+    const initialRange =
+        useMemo(
+            () =>
+                getDateRangeByPreset(
+                    '30days'
+                ),
+            []
         );
 
     const [
-        dashboardData,
-        setDashboardData,
+        analytics,
+        setAnalytics,
     ] = useState(
-        EMPTY_DATA
+        EMPTY_ANALYTICS
     );
+
+    const [
+        serviceFilter,
+        setServiceFilter,
+    ] = useState(
+        'all'
+    );
+
+    const [
+        statusFilter,
+        setStatusFilter,
+    ] = useState(
+        'all'
+    );
+
+    const [
+        rangePreset,
+        setRangePreset,
+    ] = useState(
+        '30days'
+    );
+
+    const [
+        startDate,
+        setStartDate,
+    ] = useState(
+        initialRange.startDate
+    );
+
+    const [
+        endDate,
+        setEndDate,
+    ] = useState(
+        initialRange.endDate
+    );
+
+    const [
+        appliedFilters,
+        setAppliedFilters,
+    ] = useState({
+        service:
+            'all',
+
+        status:
+            'all',
+
+        startDate:
+            initialRange
+                .startDate,
+
+        endDate:
+            initialRange
+                .endDate,
+    });
 
     const [
         loading,
         setLoading,
-    ] = useState(true);
+    ] = useState(
+        true
+    );
 
     const [
         refreshing,
         setRefreshing,
-    ] = useState(false);
+    ] = useState(
+        false
+    );
 
     const [
-        endpointErrors,
-        setEndpointErrors,
-    ] = useState([]);
+        exporting,
+        setExporting,
+    ] = useState(
+        false
+    );
 
-    const fetchDashboardData =
+    const [
+        errorMessage,
+        setErrorMessage,
+    ] = useState(
+        ''
+    );
+
+    const availableServices =
+        analytics
+            .filters
+            ?.available_services ||
+        [];
+
+    const fetchAnalytics =
         useCallback(
             async (
+                filters,
                 refresh = false
             ) => {
                 if (
                     !canViewDashboard
                 ) {
-                    setDashboardData(
-                        EMPTY_DATA
+                    setLoading(
+                        false
                     );
 
-                    setLoading(false);
-                    setRefreshing(false);
+                    setRefreshing(
+                        false
+                    );
 
                     return;
                 }
 
-                if (refresh) {
-                    setRefreshing(true);
+                if (
+                    refresh
+                ) {
+                    setRefreshing(
+                        true
+                    );
                 } else {
-                    setLoading(true);
+                    setLoading(
+                        true
+                    );
                 }
 
-                setEndpointErrors([]);
+                setErrorMessage(
+                    ''
+                );
 
                 try {
-                    const requests =
-                        [];
+                    const response =
+                        await api.get(
+                            '/dashboard/analytics',
+                            {
+                                params: {
+                                    service:
+                                        filters.service,
 
-                    const requestKeys =
-                        [];
+                                    status:
+                                        filters.status,
 
-                    if (
-                        canViewHistory
-                    ) {
-                        requests.push(
-                            api.get(
-                                '/my-orders'
-                            )
-                        );
+                                    start_date:
+                                        filters.startDate,
 
-                        requestKeys.push(
-                            'myOrders'
-                        );
-
-                        requests.push(
-                            api.get(
-                                '/my-humas-service-requests'
-                            )
-                        );
-
-                        requestKeys.push(
-                            'myHumas'
-                        );
-
-                        requests.push(
-                            api.get(
-                                '/my-borrow-requests'
-                            )
-                        );
-
-                        requestKeys.push(
-                            'myBorrowing'
-                        );
-                    }
-
-                    if (
-                        canViewMerchandiseApproval
-                    ) {
-                        requests.push(
-                            api.get(
-                                '/orders'
-                            )
-                        );
-
-                        requestKeys.push(
-                            'approvalOrders'
-                        );
-                    }
-
-                    if (
-                        canViewHumasApproval
-                    ) {
-                        requests.push(
-                            api.get(
-                                '/humas-service-requests'
-                            )
-                        );
-
-                        requestKeys.push(
-                            'approvalHumas'
-                        );
-                    }
-
-                    if (
-                        canViewBorrowingApproval
-                    ) {
-                        requests.push(
-                            api.get(
-                                '/borrow-requests'
-                            )
-                        );
-
-                        requestKeys.push(
-                            'approvalBorrowing'
-                        );
-                    }
-
-                    if (
-                        canViewProducts
-                    ) {
-                        requests.push(
-                            api.get(
-                                '/products'
-                            )
-                        );
-
-                        requestKeys.push(
-                            'products'
-                        );
-                    }
-
-                    if (
-                        canViewUsers
-                    ) {
-                        requests.push(
-                            api.get(
-                                '/admin/users'
-                            )
-                        );
-
-                        requestKeys.push(
-                            'users'
-                        );
-                    }
-
-                    if (
-                        requests.length ===
-                        0
-                    ) {
-                        setDashboardData(
-                            EMPTY_DATA
-                        );
-
-                        return;
-                    }
-
-                    const responses =
-                        await Promise.allSettled(
-                            requests
-                        );
-
-                    const resultMap =
-                        {};
-
-                    const errors = [];
-
-                    responses.forEach(
-                        (
-                            result,
-                            index
-                        ) => {
-                            const key =
-                                requestKeys[
-                                    index
-                                ];
-
-                            if (
-                                result.status ===
-                                'fulfilled'
-                            ) {
-                                resultMap[key] =
-                                    extractArray(
-                                        result.value
-                                    );
-
-                                return;
+                                    end_date:
+                                        filters.endDate,
+                                },
                             }
+                        );
 
-                            resultMap[key] =
-                                [];
-
-                            errors.push({
-                                key,
-
-                                message:
-                                    result.reason
-                                        ?.response
-                                        ?.data
-                                        ?.message ||
-                                    'Data tidak dapat dimuat.',
-                            });
-
-                            console.error(
-                                `Fetch dashboard ${key} error:`,
-                                result.reason
-                                    ?.response
-                                    ?.data ||
-                                    result.reason
-                            );
-                        }
+                    setAnalytics(
+                        response
+                            ?.data
+                            ?.data ||
+                            EMPTY_ANALYTICS
                     );
-
-                    setDashboardData({
-                        orders:
-                            canViewMerchandiseApproval
-                                ? resultMap
-                                      .approvalOrders ||
-                                  []
-                                : resultMap
-                                      .myOrders ||
-                                  [],
-
-                        humasRequests:
-                            canViewHumasApproval
-                                ? resultMap
-                                      .approvalHumas ||
-                                  []
-                                : resultMap
-                                      .myHumas ||
-                                  [],
-
-                        borrowRequests:
-                            canViewBorrowingApproval
-                                ? resultMap
-                                      .approvalBorrowing ||
-                                  []
-                                : resultMap
-                                      .myBorrowing ||
-                                  [],
-
-                        products:
-                            resultMap.products ||
-                            [],
-
-                        users:
-                            resultMap.users ||
-                            [],
-                    });
-
-                    setEndpointErrors(
-                        errors
-                    );
-                } catch (error) {
+                } catch (
+                    error
+                ) {
                     console.error(
-                        'Fetch dashboard error:',
-                        error?.response
+                        'Fetch dashboard analytics error:',
+                        error
+                            ?.response
                             ?.data ||
                             error
                     );
 
-                    setDashboardData(
-                        EMPTY_DATA
+                    setAnalytics(
+                        EMPTY_ANALYTICS
                     );
 
-                    setEndpointErrors([
-                        {
-                            key:
-                                'dashboard',
-
-                            message:
-                                error?.response
-                                    ?.data
-                                    ?.message ||
-                                'Data dashboard gagal dimuat.',
-                        },
-                    ]);
+                    setErrorMessage(
+                        getBackendErrorMessage(
+                            error,
+                            'Data dashboard gagal dimuat.'
+                        )
+                    );
                 } finally {
-                    setLoading(false);
-                    setRefreshing(false);
+                    setLoading(
+                        false
+                    );
+
+                    setRefreshing(
+                        false
+                    );
                 }
             },
             [
                 canViewDashboard,
-                canViewHistory,
-                canViewMerchandiseApproval,
-                canViewHumasApproval,
-                canViewBorrowingApproval,
-                canViewProducts,
-                canViewUsers,
             ]
         );
 
-    useEffect(() => {
-        fetchDashboardData();
-    }, [
-        fetchDashboardData,
-    ]);
+    useEffect(
+        () => {
+            fetchAnalytics(
+                appliedFilters
+            );
+        },
+        [
+            appliedFilters,
+            fetchAnalytics,
+        ]
+    );
 
-    const {
-        orders,
-        humasRequests,
-        borrowRequests,
-        products,
-        users,
-    } = dashboardData;
+    const handlePresetChange = (
+        event
+    ) => {
+        const selectedPreset =
+            event.target
+                .value;
 
-    const histories =
-        useMemo(() => {
-            const merchandise =
-                orders.map(
-                    (item) => ({
-                        ...item,
+        setRangePreset(
+            selectedPreset
+        );
 
-                        type:
-                            'merchandise',
+        if (
+            selectedPreset ===
+            'custom'
+        ) {
+            return;
+        }
 
-                        typeLabel:
-                            'Merchandise',
+        const range =
+            getDateRangeByPreset(
+                selectedPreset
+            );
+
+        setStartDate(
+            range.startDate
+        );
+
+        setEndDate(
+            range.endDate
+        );
+    };
+
+    const handleApplyFilter = async () => {
+        if (
+            !startDate ||
+            !endDate
+        ) {
+            await showWarningAlert(
+                'Tanggal Belum Lengkap',
+                'Tanggal mulai dan tanggal selesai wajib diisi.'
+            );
+
+            return;
+        }
+
+        if (
+            new Date(
+                startDate
+            ).getTime() >
+            new Date(
+                endDate
+            ).getTime()
+        ) {
+            await showWarningAlert(
+                'Rentang Tanggal Tidak Valid',
+                'Tanggal mulai tidak boleh melebihi tanggal selesai.'
+            );
+
+            return;
+        }
+
+        setAppliedFilters({
+            service:
+                serviceFilter,
+
+            status:
+                statusFilter,
+
+            startDate,
+
+            endDate,
+        });
+    };
+
+    const handleResetFilter = () => {
+        const range =
+            getDateRangeByPreset(
+                '30days'
+            );
+
+        setServiceFilter(
+            'all'
+        );
+
+        setStatusFilter(
+            'all'
+        );
+
+        setRangePreset(
+            '30days'
+        );
+
+        setStartDate(
+            range.startDate
+        );
+
+        setEndDate(
+            range.endDate
+        );
+
+        setAppliedFilters({
+            service:
+                'all',
+
+            status:
+                'all',
+
+            startDate:
+                range.startDate,
+
+            endDate:
+                range.endDate,
+        });
+    };
+
+    const handleRefresh = () => {
+        fetchAnalytics(
+            appliedFilters,
+            true
+        );
+    };
+
+    const handleExport =
+        async () => {
+            if (
+                exporting
+            ) {
+                return;
+            }
+
+            if (
+                !appliedFilters
+                    .startDate ||
+                !appliedFilters
+                    .endDate
+            ) {
+                await showWarningAlert(
+                    'Periode Belum Lengkap',
+                    'Tanggal mulai dan tanggal selesai wajib tersedia sebelum export.'
+                );
+
+                return;
+            }
+
+            setExporting(
+                true
+            );
+
+            try {
+                const response =
+                    await api.get(
+                        '/dashboard/export',
+                        {
+                            params: {
+                                service:
+                                    appliedFilters
+                                        .service,
+
+                                status:
+                                    appliedFilters
+                                        .status,
+
+                                start_date:
+                                    appliedFilters
+                                        .startDate,
+
+                                end_date:
+                                    appliedFilters
+                                        .endDate,
+                            },
+
+                            responseType:
+                                'blob',
+
+                            timeout:
+                                120000,
+                        }
+                    );
+
+                const contentType =
+                    response
+                        .headers[
+                        'content-type'
+                    ] || '';
+
+                if (
+                    contentType.includes(
+                        'application/json'
+                    )
+                ) {
+                    const responseText =
+                        await response
+                            .data
+                            .text();
+
+                    let parsedResponse =
+                        null;
+
+                    try {
+                        parsedResponse =
+                            JSON.parse(
+                                responseText
+                            );
+                    } catch {
+                        parsedResponse =
+                            null;
+                    }
+
+                    throw new Error(
+                        parsedResponse
+                            ?.message ||
+                            'Export gagal diproses.'
+                    );
+                }
+
+                const blob =
+                    new Blob(
+                        [
+                            response.data,
+                        ],
+                        {
+                            type:
+                                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        }
+                    );
+
+                const blobUrl =
+                    window.URL
+                        .createObjectURL(
+                            blob
+                        );
+
+                const fallbackFilename =
+                    `Laporan_Dashboard_HUMAS_SEKPIM_${appliedFilters.startDate}_sd_${appliedFilters.endDate}.xlsx`;
+
+                const filename =
+                    getDownloadFilename(
+                        response
+                            .headers[
+                            'content-disposition'
+                        ],
+                        fallbackFilename
+                    );
+
+                const link =
+                    document.createElement(
+                        'a'
+                    );
+
+                link.href =
+                    blobUrl;
+
+                link.download =
+                    filename;
+
+                document
+                    .body
+                    .appendChild(
+                        link
+                    );
+
+                link.click();
+
+                link.remove();
+
+                window.URL
+                    .revokeObjectURL(
+                        blobUrl
+                    );
+            } catch (
+                error
+            ) {
+                console.error(
+                    'Export dashboard error:',
+                    error
+                );
+
+                const message =
+                    error instanceof
+                        Error &&
+                    !error?.response
+                        ? error.message
+                        : await getBlobErrorMessage(
+                            error,
+                            'File Excel gagal dibuat.'
+                        );
+
+                await showErrorAlert(
+                    'Export Gagal',
+                    message
+                );
+            } finally {
+                setExporting(
+                    false
+                );
+            }
+        };
+
+    const resolveDetailUrl =
+        useCallback(
+            (
+                item
+            ) => {
+                if (
+                    item.service ===
+                    'merchandise'
+                ) {
+                    return canViewMerchandiseApproval
+                        ? `/admin/orders/${item.id}`
+                        : `${basePath}/my-requests/merchandise/${item.id}/detail`;
+                }
+
+                if (
+                    item.service ===
+                    'humas'
+                ) {
+                    return canViewHumasApproval
+                        ? `/admin/humas-services/${item.id}`
+                        : `${basePath}/my-requests/humas/${item.id}/detail`;
+                }
+
+                if (
+                    item.service ===
+                    'borrowing'
+                ) {
+                    return canViewBorrowingApproval
+                        ? `/admin/borrow-requests/${item.id}`
+                        : `${basePath}/my-requests/borrowing/${item.id}/detail`;
+                }
+
+                return defaultPath;
+            },
+            [
+                basePath,
+                defaultPath,
+                canViewMerchandiseApproval,
+                canViewHumasApproval,
+                canViewBorrowingApproval,
+            ]
+        );
+
+    const summaryCards =
+        useMemo(
+            () => [
+                {
+                    title:
+                        'Total Pengajuan',
+
+                    value:
+                        analytics
+                            .summary
+                            ?.total ||
+                        0,
+
+                    icon:
+                        'bi-files',
+
+                    color:
+                        'primary',
+                },
+
+                {
+                    title:
+                        'Menunggu',
+
+                    value:
+                        analytics
+                            .summary
+                            ?.pending ||
+                        0,
+
+                    icon:
+                        'bi-hourglass-split',
+
+                    color:
+                        'warning',
+                },
+
+                {
+                    title:
+                        'Perlu Revisi',
+
+                    value:
+                        analytics
+                            .summary
+                            ?.revision ||
+                        0,
+
+                    icon:
+                        'bi-pencil-square',
+
+                    color:
+                        'info',
+                },
+
+                {
+                    title:
+                        'Disetujui',
+
+                    value:
+                        analytics
+                            .summary
+                            ?.approved ||
+                        0,
+
+                    icon:
+                        'bi-check-circle-fill',
+
+                    color:
+                        'primary',
+                },
+
+                {
+                    title:
+                        'Ditolak',
+
+                    value:
+                        analytics
+                            .summary
+                            ?.rejected ||
+                        0,
+
+                    icon:
+                        'bi-x-circle-fill',
+
+                    color:
+                        'danger',
+                },
+
+                {
+                    title:
+                        'Selesai',
+
+                    value:
+                        analytics
+                            .summary
+                            ?.finished ||
+                        0,
+
+                    icon:
+                        'bi-check2-all',
+
+                    color:
+                        'success',
+                },
+            ],
+            [
+                analytics
+                    .summary,
+            ]
+        );
+
+    const filteredStatusDistribution =
+        useMemo(
+            () =>
+                (
+                    analytics
+                        .status_distribution ||
+                    []
+                ).filter(
+                    (
+                        item
+                    ) =>
+                        Number(
+                            item.total ||
+                                0
+                        ) > 0
+                ),
+            [
+                analytics
+                    .status_distribution,
+            ]
+        );
+
+    const quickActions =
+        useMemo(
+            () => {
+                const actions =
+                    [];
+
+                if (
+                    canCreateMerchandise
+                ) {
+                    actions.push({
+                        title:
+                            'Ajukan Merchandise',
+
+                        description:
+                            'Buat pengajuan paket merchandise.',
 
                         icon:
-                            'bi-gift-fill',
+                            'bi-cart-plus-fill',
 
                         color:
                             'primary',
 
-                        code:
-                            item.order_code ||
-                            `MER-${item.id}`,
+                        path:
+                            `${basePath}/request/merchandise`,
+                    });
+                }
 
+                if (
+                    canCreateHumas
+                ) {
+                    actions.push({
                         title:
-                            item.event_name ||
-                            item.activity_name ||
-                            'Pengajuan Merchandise',
+                            'Request Liputan Humas',
 
-                        requester:
-                            item.user?.name ||
-                            item.applicant_name ||
-                            currentUser?.name ||
-                            '-',
-
-                        mainDate:
-                            item.activity_date ||
-                            item.created_at,
-
-                        submittedDate:
-                            item.submitted_at ||
-                            item.created_at,
-
-                        detailUrl:
-                            canViewMerchandiseApproval
-                                ? `/admin/orders/${item.id}`
-                                : `${basePath}/my-requests/merchandise/${item.id}/detail`,
-                    })
-                );
-
-            const humas =
-                humasRequests.map(
-                    (item) => ({
-                        ...item,
-
-                        type:
-                            'humas',
-
-                        typeLabel:
-                            'Liputan Humas',
+                        description:
+                            'Ajukan kebutuhan liputan dan publikasi.',
 
                         icon:
                             'bi-camera-reels-fill',
@@ -707,46 +1385,20 @@ export default function Dashboard() {
                         color:
                             'danger',
 
-                        code:
-                            item.service_code ||
-                            `HMS-${item.id}`,
+                        path:
+                            `${basePath}/request/humas-service`,
+                    });
+                }
 
+                if (
+                    canCreateBorrowing
+                ) {
+                    actions.push({
                         title:
-                            getCoverageLabel(
-                                item.coverage_type
-                            ),
+                            'Peminjaman SEKPiM',
 
-                        requester:
-                            item.user?.name ||
-                            item.applicant_name ||
-                            currentUser?.name ||
-                            '-',
-
-                        mainDate:
-                            item.event_date ||
-                            item.created_at,
-
-                        submittedDate:
-                            item.submitted_at ||
-                            item.created_at,
-
-                        detailUrl:
-                            canViewHumasApproval
-                                ? `/admin/humas-services/${item.id}`
-                                : `${basePath}/my-requests/humas/${item.id}/detail`,
-                    })
-                );
-
-            const borrowing =
-                borrowRequests.map(
-                    (item) => ({
-                        ...item,
-
-                        type:
-                            'borrowing',
-
-                        typeLabel:
-                            'Peminjaman',
+                        description:
+                            'Ajukan peminjaman perlengkapan.',
 
                         icon:
                             'bi-box-seam-fill',
@@ -754,370 +1406,111 @@ export default function Dashboard() {
                         color:
                             'success',
 
-                        code:
-                            item.borrow_code ||
-                            `BRW-${item.id}`,
+                        path:
+                            `${basePath}/request/sekpim-borrowing`,
+                    });
+                }
 
+                if (
+                    canViewHistory
+                ) {
+                    actions.push({
                         title:
-                            item.event_name ||
-                            item.purpose ||
-                            'Peminjaman SEKPiM',
+                            'Riwayat Pengajuan',
 
-                        requester:
-                            item.user?.name ||
-                            item.applicant_name ||
-                            currentUser?.name ||
-                            '-',
+                        description:
+                            'Pantau seluruh pengajuan pribadi.',
 
-                        mainDate:
-                            item.borrow_date ||
-                            item.borrow_at ||
-                            item.created_at,
+                        icon:
+                            'bi-clock-history',
 
-                        submittedDate:
-                            item.submitted_at ||
-                            item.created_at,
+                        color:
+                            'info',
 
-                        detailUrl:
-                            canViewBorrowingApproval
-                                ? `/admin/borrow-requests/${item.id}`
-                                : `${basePath}/my-requests/borrowing/${item.id}/detail`,
-                    })
+                        path:
+                            `${basePath}/my-requests`,
+                    });
+                }
+
+                if (
+                    canViewMerchandiseApproval
+                ) {
+                    actions.push({
+                        title:
+                            'Approval Merchandise',
+
+                        description:
+                            'Periksa pengajuan merchandise.',
+
+                        icon:
+                            'bi-gift-fill',
+
+                        color:
+                            'primary',
+
+                        path:
+                            '/admin/orders',
+                    });
+                }
+
+                if (
+                    canViewHumasApproval
+                ) {
+                    actions.push({
+                        title:
+                            'Approval Liputan',
+
+                        description:
+                            'Periksa request Liputan Humas.',
+
+                        icon:
+                            'bi-camera-reels-fill',
+
+                        color:
+                            'danger',
+
+                        path:
+                            '/admin/humas-services',
+                    });
+                }
+
+                if (
+                    canViewBorrowingApproval
+                ) {
+                    actions.push({
+                        title:
+                            'Approval Peminjaman',
+
+                        description:
+                            'Periksa peminjaman SEKPiM.',
+
+                        icon:
+                            'bi-clipboard-check-fill',
+
+                        color:
+                            'success',
+
+                        path:
+                            '/admin/borrow-requests',
+                    });
+                }
+
+                return actions.slice(
+                    0,
+                    7
                 );
-
-            return [
-                ...merchandise,
-                ...humas,
-                ...borrowing,
-            ].sort(
-                (
-                    first,
-                    second
-                ) =>
-                    new Date(
-                        second.submittedDate ||
-                            0
-                    ).getTime() -
-                    new Date(
-                        first.submittedDate ||
-                            0
-                    ).getTime()
-            );
-        }, [
-            orders,
-            humasRequests,
-            borrowRequests,
-            currentUser?.name,
-            basePath,
-            canViewMerchandiseApproval,
-            canViewHumasApproval,
-            canViewBorrowingApproval,
-        ]);
-
-    const summary =
-        useMemo(
-            () => ({
-                total:
-                    histories.length,
-
-                pending:
-                    histories.filter(
-                        (item) =>
-                            item.status ===
-                            'pending'
-                    ).length,
-
-                approved:
-                    histories.filter(
-                        (item) =>
-                            item.status ===
-                            'approved'
-                    ).length,
-
-                completed:
-                    histories.filter(
-                        (item) =>
-                            [
-                                'completed',
-                                'returned',
-                            ].includes(
-                                item.status
-                            )
-                    ).length,
-
-                lowStock:
-                    products.filter(
-                        (item) =>
-                            Number(
-                                item.stock ||
-                                    0
-                            ) <= 5
-                    ).length,
-
-                users:
-                    users.length,
-            }),
+            },
             [
-                histories,
-                products,
-                users,
+                basePath,
+                canCreateMerchandise,
+                canCreateHumas,
+                canCreateBorrowing,
+                canViewHistory,
+                canViewMerchandiseApproval,
+                canViewHumasApproval,
+                canViewBorrowingApproval,
             ]
         );
-
-    const recentHistories =
-        histories.slice(
-            0,
-            6
-        );
-
-    const lowStockProducts =
-        useMemo(
-            () =>
-                products
-                    .filter(
-                        (item) =>
-                            Number(
-                                item.stock ||
-                                    0
-                            ) <= 5
-                    )
-                    .sort(
-                        (
-                            first,
-                            second
-                        ) =>
-                            Number(
-                                first.stock ||
-                                    0
-                            ) -
-                            Number(
-                                second.stock ||
-                                    0
-                            )
-                    )
-                    .slice(
-                        0,
-                        6
-                    ),
-            [products]
-        );
-
-    const quickActions =
-        useMemo(() => {
-            const actions = [];
-
-            if (
-                canCreateMerchandise
-            ) {
-                actions.push({
-                    title:
-                        'Ajukan Merchandise',
-
-                    description:
-                        'Buat pengajuan paket merchandise.',
-
-                    icon:
-                        'bi-cart-plus-fill',
-
-                    color:
-                        'primary',
-
-                    path:
-                        `${basePath}/request/merchandise`,
-                });
-            }
-
-            if (
-                canCreateHumas
-            ) {
-                actions.push({
-                    title:
-                        'Request Liputan Humas',
-
-                    description:
-                        'Ajukan kebutuhan liputan dan publikasi.',
-
-                    icon:
-                        'bi-camera-reels-fill',
-
-                    color:
-                        'danger',
-
-                    path:
-                        `${basePath}/request/humas-service`,
-                });
-            }
-
-            if (
-                canCreateBorrowing
-            ) {
-                actions.push({
-                    title:
-                        'Peminjaman SEKPiM',
-
-                    description:
-                        'Ajukan peminjaman perlengkapan.',
-
-                    icon:
-                        'bi-box-seam-fill',
-
-                    color:
-                        'success',
-
-                    path:
-                        `${basePath}/request/sekpim-borrowing`,
-                });
-            }
-
-            if (
-                canViewHistory
-            ) {
-                actions.push({
-                    title:
-                        'Riwayat Pengajuan',
-
-                    description:
-                        'Pantau pengajuan pribadi.',
-
-                    icon:
-                        'bi-clock-history',
-
-                    color:
-                        'info',
-
-                    path:
-                        `${basePath}/my-requests`,
-                });
-            }
-
-            if (
-                canViewMerchandiseApproval
-            ) {
-                actions.push({
-                    title:
-                        'Approval Merchandise',
-
-                    description:
-                        'Periksa pengajuan merchandise.',
-
-                    icon:
-                        'bi-gift-fill',
-
-                    color:
-                        'primary',
-
-                    path:
-                        '/admin/orders',
-                });
-            }
-
-            if (
-                canViewHumasApproval
-            ) {
-                actions.push({
-                    title:
-                        'Approval Liputan',
-
-                    description:
-                        'Periksa request liputan Humas.',
-
-                    icon:
-                        'bi-camera-reels-fill',
-
-                    color:
-                        'danger',
-
-                    path:
-                        '/admin/humas-services',
-                });
-            }
-
-            if (
-                canViewBorrowingApproval
-            ) {
-                actions.push({
-                    title:
-                        'Approval Peminjaman',
-
-                    description:
-                        'Periksa peminjaman SEKPiM.',
-
-                    icon:
-                        'bi-clipboard-check-fill',
-
-                    color:
-                        'success',
-
-                    path:
-                        '/admin/borrow-requests',
-                });
-            }
-
-            if (
-                canViewProducts
-            ) {
-                actions.push({
-                    title:
-                        'Data Produk',
-
-                    description:
-                        canManageProducts
-                            ? 'Kelola produk dan stok.'
-                            : 'Lihat produk dan stok.',
-
-                    icon:
-                        'bi-boxes',
-
-                    color:
-                        'warning',
-
-                    path:
-                        '/admin/products',
-                });
-            }
-
-            if (
-                canViewUsers
-            ) {
-                actions.push({
-                    title:
-                        'Data User',
-
-                    description:
-                        role ===
-                        'superadmin'
-                            ? 'Kelola akun dan hak akses.'
-                            : 'Lihat daftar akun.',
-
-                    icon:
-                        'bi-people-fill',
-
-                    color:
-                        'dark',
-
-                    path:
-                        '/admin/users',
-                });
-            }
-
-            return actions.slice(
-                0,
-                8
-            );
-        }, [
-            basePath,
-            role,
-            canCreateMerchandise,
-            canCreateHumas,
-            canCreateBorrowing,
-            canViewHistory,
-            canViewMerchandiseApproval,
-            canViewHumasApproval,
-            canViewBorrowingApproval,
-            canViewProducts,
-            canManageProducts,
-            canViewUsers,
-        ]);
 
     if (
         !canViewDashboard
@@ -1132,14 +1525,16 @@ export default function Dashboard() {
         );
     }
 
-    if (loading) {
+    if (
+        loading
+    ) {
         return (
             <div className="card border-0 shadow-sm rounded-5">
                 <div className="card-body p-5 text-center">
                     <div className="spinner-border text-danger mb-3" />
 
                     <h5 className="fw-bold mb-1">
-                        Memuat dashboard
+                        Memuat dashboard analytics
                     </h5>
 
                     <p className="text-muted mb-0">
@@ -1156,19 +1551,21 @@ export default function Dashboard() {
                 className="card border-0 shadow-sm rounded-5 overflow-hidden mb-4"
                 style={{
                     background:
-                        'linear-gradient(135deg, rgba(220,38,38,0.95), rgba(15,23,42,0.98))',
+                        'linear-gradient(135deg, rgba(220,38,38,0.96), rgba(15,23,42,0.98))',
                 }}
             >
                 <div className="card-body p-4 p-lg-5 text-white">
                     <div className="row align-items-center g-4">
                         <div className="col-lg-8">
                             <span className="badge rounded-pill text-bg-light text-danger px-3 py-2 mb-3">
-                                Dashboard HUMAS &amp; SEKPiM
+                                Dashboard Analytics HUMAS &amp; SEKPiM
                             </span>
 
                             <h1 className="display-6 fw-black mb-3">
                                 Halo,{' '}
-                                {currentUser?.name ||
+
+                                {currentUser
+                                    ?.name ||
                                     'Pengguna'}
                                 .
                             </h1>
@@ -1177,17 +1574,17 @@ export default function Dashboard() {
                                 className="mb-0 text-white-50"
                                 style={{
                                     maxWidth:
-                                        780,
+                                        760,
 
                                     lineHeight:
                                         1.8,
                                 }}
                             >
-                                Pantau pengajuan,
-                                layanan Humas,
-                                peminjaman SEKPiM,
-                                dan menu administrasi
-                                sesuai hak akses akun.
+                                Pantau statistik pengajuan,
+                                tren layanan, distribusi
+                                status, dan aktivitas terbaru
+                                berdasarkan rentang waktu yang
+                                dipilih.
                             </p>
                         </div>
 
@@ -1196,16 +1593,20 @@ export default function Dashboard() {
                                 <div className="d-flex align-items-center gap-3">
                                     <div className="profile-avatar bg-white text-danger">
                                         {(
-                                            currentUser?.name ||
+                                            currentUser
+                                                ?.name ||
                                             'U'
                                         )
-                                            .charAt(0)
+                                            .charAt(
+                                                0
+                                            )
                                             .toUpperCase()}
                                     </div>
 
                                     <div className="min-w-0">
                                         <div className="fw-black fs-5 text-truncate">
-                                            {currentUser?.name ||
+                                            {currentUser
+                                                ?.name ||
                                                 'Pengguna'}
                                         </div>
 
@@ -1222,10 +1623,12 @@ export default function Dashboard() {
                                 <div className="small text-white-50">
                                     {
                                         normalizePermissions(
-                                            currentUser?.permissions
-                                        ).length
+                                            currentUser
+                                                ?.permissions
+                                        )
+                                            .length
                                     }{' '}
-                                    hak akses aktif.
+                                    hak akses aktif
                                 </div>
                             </div>
                         </div>
@@ -1233,35 +1636,340 @@ export default function Dashboard() {
                 </div>
             </section>
 
-            {endpointErrors.length >
-                0 && (
-                <div className="alert alert-warning border-0 shadow-sm rounded-4 mb-4">
-                    <div className="d-flex flex-wrap align-items-start gap-3">
+            <section className="card border-0 shadow-sm rounded-5 mb-4">
+                <div className="card-body p-4">
+                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+                        <div>
+                            <h4 className="fw-black mb-1">
+                                Filter Analytics
+                            </h4>
+
+                            <p className="text-muted mb-0">
+                                Grafik dan statistik
+                                menyesuaikan layanan, status,
+                                serta rentang waktu.
+                            </p>
+                        </div>
+
+                        <div className="d-flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                className="btn btn-outline-secondary rounded-pill"
+                                onClick={
+                                    handleRefresh
+                                }
+                                disabled={
+                                    refreshing ||
+                                    exporting
+                                }
+                            >
+                                {refreshing ? (
+                                    <span className="spinner-border spinner-border-sm me-2" />
+                                ) : (
+                                    <i className="bi bi-arrow-clockwise me-2" />
+                                )}
+
+                                Perbarui
+                            </button>
+
+                            <button
+                                type="button"
+                                className="btn btn-success rounded-pill"
+                                onClick={
+                                    handleExport
+                                }
+                                disabled={
+                                    exporting ||
+                                    refreshing
+                                }
+                            >
+                                {exporting ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2" />
+
+                                        Membuat Excel...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="bi bi-file-earmark-excel-fill me-2" />
+
+                                        Export Excel
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="row g-3 align-items-end">
+                        <div className="col-md-6 col-xl-3">
+                            <label className="form-label fw-bold">
+                                Jenis Layanan
+                            </label>
+
+                            <select
+                                className="form-select rounded-4"
+                                value={
+                                    serviceFilter
+                                }
+                                onChange={(
+                                    event
+                                ) =>
+                                    setServiceFilter(
+                                        event
+                                            .target
+                                            .value
+                                    )
+                                }
+                            >
+                                <option value="all">
+                                    Semua Layanan
+                                </option>
+
+                                {availableServices.includes(
+                                    'merchandise'
+                                ) && (
+                                    <option value="merchandise">
+                                        Merchandise
+                                    </option>
+                                )}
+
+                                {availableServices.includes(
+                                    'humas'
+                                ) && (
+                                    <option value="humas">
+                                        Liputan Humas
+                                    </option>
+                                )}
+
+                                {availableServices.includes(
+                                    'borrowing'
+                                ) && (
+                                    <option value="borrowing">
+                                        Peminjaman SEKPiM
+                                    </option>
+                                )}
+                            </select>
+                        </div>
+
+                        <div className="col-md-6 col-xl-2">
+                            <label className="form-label fw-bold">
+                                Status
+                            </label>
+
+                            <select
+                                className="form-select rounded-4"
+                                value={
+                                    statusFilter
+                                }
+                                onChange={(
+                                    event
+                                ) =>
+                                    setStatusFilter(
+                                        event
+                                            .target
+                                            .value
+                                    )
+                                }
+                            >
+                                <option value="all">
+                                    Semua Status
+                                </option>
+
+                                <option value="pending">
+                                    Menunggu
+                                </option>
+
+                                <option value="revision">
+                                    Perlu Revisi
+                                </option>
+
+                                <option value="approved">
+                                    Disetujui
+                                </option>
+
+                                <option value="rejected">
+                                    Ditolak
+                                </option>
+
+                                <option value="borrowed">
+                                    Dipinjam
+                                </option>
+
+                                <option value="returned">
+                                    Dikembalikan
+                                </option>
+
+                                <option value="completed">
+                                    Selesai
+                                </option>
+                            </select>
+                        </div>
+
+                        <div className="col-md-6 col-xl-2">
+                            <label className="form-label fw-bold">
+                                Rentang Cepat
+                            </label>
+
+                            <select
+                                className="form-select rounded-4"
+                                value={
+                                    rangePreset
+                                }
+                                onChange={
+                                    handlePresetChange
+                                }
+                            >
+                                <option value="today">
+                                    Hari Ini
+                                </option>
+
+                                <option value="7days">
+                                    7 Hari Terakhir
+                                </option>
+
+                                <option value="30days">
+                                    30 Hari Terakhir
+                                </option>
+
+                                <option value="this_month">
+                                    Bulan Ini
+                                </option>
+
+                                <option value="this_year">
+                                    Tahun Ini
+                                </option>
+
+                                <option value="custom">
+                                    Custom
+                                </option>
+                            </select>
+                        </div>
+
+                        <div className="col-md-6 col-xl-2">
+                            <label className="form-label fw-bold">
+                                Tanggal Mulai
+                            </label>
+
+                            <input
+                                type="date"
+                                className="form-control rounded-4"
+                                value={
+                                    startDate
+                                }
+                                max={
+                                    endDate
+                                }
+                                onChange={(
+                                    event
+                                ) => {
+                                    setStartDate(
+                                        event
+                                            .target
+                                            .value
+                                    );
+
+                                    setRangePreset(
+                                        'custom'
+                                    );
+                                }}
+                            />
+                        </div>
+
+                        <div className="col-md-6 col-xl-2">
+                            <label className="form-label fw-bold">
+                                Tanggal Selesai
+                            </label>
+
+                            <input
+                                type="date"
+                                className="form-control rounded-4"
+                                value={
+                                    endDate
+                                }
+                                min={
+                                    startDate
+                                }
+                                onChange={(
+                                    event
+                                ) => {
+                                    setEndDate(
+                                        event
+                                            .target
+                                            .value
+                                    );
+
+                                    setRangePreset(
+                                        'custom'
+                                    );
+                                }}
+                            />
+                        </div>
+
+                        <div className="col-md-6 col-xl-1">
+                            <button
+                                type="button"
+                                className="btn btn-primary rounded-pill w-100"
+                                onClick={
+                                    handleApplyFilter
+                                }
+                                disabled={
+                                    refreshing ||
+                                    exporting
+                                }
+                                title="Terapkan Filter"
+                            >
+                                <i className="bi bi-funnel-fill" />
+                            </button>
+                        </div>
+
+                        <div className="col-12">
+                            <button
+                                type="button"
+                                className="btn btn-link text-muted p-0"
+                                onClick={
+                                    handleResetFilter
+                                }
+                                disabled={
+                                    refreshing ||
+                                    exporting
+                                }
+                            >
+                                <i className="bi bi-arrow-counterclockwise me-2" />
+
+                                Reset filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {errorMessage && (
+                <div className="alert alert-danger border-0 shadow-sm rounded-4 mb-4">
+                    <div className="d-flex align-items-start gap-3">
                         <i className="bi bi-exclamation-triangle-fill fs-4" />
 
                         <div className="flex-grow-1">
                             <div className="fw-black mb-1">
-                                Sebagian data belum dapat dimuat
+                                Dashboard gagal dimuat
                             </div>
 
                             <div className="small">
-                                Dashboard tetap menampilkan data yang berhasil diterima.
+                                {
+                                    errorMessage
+                                }
                             </div>
                         </div>
 
                         <button
                             type="button"
-                            className="btn btn-sm btn-outline-warning rounded-pill"
-                            onClick={() =>
-                                fetchDashboardData(
-                                    true
-                                )
+                            className="btn btn-sm btn-outline-danger rounded-pill"
+                            onClick={
+                                handleRefresh
                             }
                             disabled={
                                 refreshing
                             }
                         >
-                            <i className="bi bi-arrow-clockwise me-1" />
                             Coba Lagi
                         </button>
                     </div>
@@ -1269,72 +1977,12 @@ export default function Dashboard() {
             )}
 
             <div className="row g-4 mb-4">
-                {[
-                    {
-                        title:
-                            'Total Pengajuan',
-
-                        value:
-                            summary.total,
-
-                        icon:
-                            'bi-files',
-
-                        color:
-                            'primary',
-                    },
-
-                    {
-                        title:
-                            'Menunggu',
-
-                        value:
-                            summary.pending,
-
-                        icon:
-                            'bi-hourglass-split',
-
-                        color:
-                            'warning',
-                    },
-
-                    {
-                        title:
-                            'Disetujui',
-
-                        value:
-                            summary.approved,
-
-                        icon:
-                            'bi-check-circle-fill',
-
-                        color:
-                            'success',
-                    },
-
-                    {
-                        title:
-                            canViewProducts
-                                ? 'Stok Rendah'
-                                : 'Selesai',
-
-                        value:
-                            canViewProducts
-                                ? summary.lowStock
-                                : summary.completed,
-
-                        icon:
-                            canViewProducts
-                                ? 'bi-boxes'
-                                : 'bi-check2-all',
-
-                        color:
-                            'danger',
-                    },
-                ].map(
-                    (card) => (
+                {summaryCards.map(
+                    (
+                        card
+                    ) => (
                         <div
-                            className="col-md-6 col-xl-3"
+                            className="col-md-6 col-xl-2"
                             key={
                                 card.title
                             }
@@ -1343,7 +1991,7 @@ export default function Dashboard() {
                                 <div className="card-body p-4">
                                     <div className="d-flex align-items-start justify-content-between gap-3">
                                         <div>
-                                            <div className="text-muted fw-bold small mb-2">
+                                            <div className="small fw-bold text-muted mb-2">
                                                 {
                                                     card.title
                                                 }
@@ -1371,6 +2019,401 @@ export default function Dashboard() {
                 )}
             </div>
 
+            <div className="row g-4 mb-4">
+                <div className="col-xl-8">
+                    <section className="card border-0 shadow-sm rounded-5 h-100">
+                        <div className="card-body p-4">
+                            <div className="mb-4">
+                                <h4 className="fw-black mb-1">
+                                    Tren Pengajuan
+                                </h4>
+
+                                <p className="text-muted mb-0">
+                                    Pergerakan jumlah pengajuan
+                                    pada rentang waktu yang
+                                    dipilih.
+                                </p>
+                            </div>
+
+                            {analytics
+                                .trend
+                                ?.length ===
+                            0 ? (
+                                <ChartEmptyState title="Belum ada pengajuan pada rentang waktu yang dipilih." />
+                            ) : (
+                                <div
+                                    style={{
+                                        width:
+                                            '100%',
+
+                                        height:
+                                            360,
+                                    }}
+                                >
+                                    <ResponsiveContainer>
+                                        <LineChart
+                                            data={
+                                                analytics
+                                                    .trend
+                                            }
+                                            margin={{
+                                                top:
+                                                    10,
+
+                                                right:
+                                                    18,
+
+                                                left:
+                                                    -18,
+
+                                                bottom:
+                                                    0,
+                                            }}
+                                        >
+                                            <CartesianGrid
+                                                strokeDasharray="4 4"
+                                                vertical={
+                                                    false
+                                                }
+                                                stroke="#e2e8f0"
+                                            />
+
+                                            <XAxis
+                                                dataKey="label"
+                                                tick={{
+                                                    fontSize:
+                                                        12,
+                                                }}
+                                                axisLine={
+                                                    false
+                                                }
+                                                tickLine={
+                                                    false
+                                                }
+                                            />
+
+                                            <YAxis
+                                                allowDecimals={
+                                                    false
+                                                }
+                                                tick={{
+                                                    fontSize:
+                                                        12,
+                                                }}
+                                                axisLine={
+                                                    false
+                                                }
+                                                tickLine={
+                                                    false
+                                                }
+                                            />
+
+                                            <Tooltip />
+
+                                            <Legend />
+
+                                            <Line
+                                                type="monotone"
+                                                dataKey="merchandise"
+                                                name="Merchandise"
+                                                stroke="#2563eb"
+                                                strokeWidth={
+                                                    3
+                                                }
+                                                dot={{
+                                                    r: 3,
+                                                }}
+                                                activeDot={{
+                                                    r: 6,
+                                                }}
+                                            />
+
+                                            <Line
+                                                type="monotone"
+                                                dataKey="humas"
+                                                name="Liputan Humas"
+                                                stroke="#dc2626"
+                                                strokeWidth={
+                                                    3
+                                                }
+                                                dot={{
+                                                    r: 3,
+                                                }}
+                                                activeDot={{
+                                                    r: 6,
+                                                }}
+                                            />
+
+                                            <Line
+                                                type="monotone"
+                                                dataKey="borrowing"
+                                                name="Peminjaman"
+                                                stroke="#16a34a"
+                                                strokeWidth={
+                                                    3
+                                                }
+                                                dot={{
+                                                    r: 3,
+                                                }}
+                                                activeDot={{
+                                                    r: 6,
+                                                }}
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </div>
+                    </section>
+                </div>
+
+                <div className="col-xl-4">
+                    <section className="card border-0 shadow-sm rounded-5 h-100">
+                        <div className="card-body p-4">
+                            <div className="mb-4">
+                                <h4 className="fw-black mb-1">
+                                    Distribusi Status
+                                </h4>
+
+                                <p className="text-muted mb-0">
+                                    Komposisi pengajuan
+                                    berdasarkan status.
+                                </p>
+                            </div>
+
+                            {filteredStatusDistribution.length ===
+                            0 ? (
+                                <ChartEmptyState title="Belum ada data status pada filter ini." />
+                            ) : (
+                                <div
+                                    style={{
+                                        width:
+                                            '100%',
+
+                                        height:
+                                            320,
+                                    }}
+                                >
+                                    <ResponsiveContainer>
+                                        <PieChart>
+                                            <Pie
+                                                data={
+                                                    filteredStatusDistribution
+                                                }
+                                                dataKey="total"
+                                                nameKey="label"
+                                                cx="50%"
+                                                cy="46%"
+                                                outerRadius={
+                                                    98
+                                                }
+                                                innerRadius={
+                                                    54
+                                                }
+                                                paddingAngle={
+                                                    3
+                                                }
+                                                label={({
+                                                    label,
+                                                    percent,
+                                                }) =>
+                                                    `${label} ${(
+                                                        percent *
+                                                        100
+                                                    ).toFixed(
+                                                        0
+                                                    )}%`
+                                                }
+                                            >
+                                                {filteredStatusDistribution.map(
+                                                    (
+                                                        item,
+                                                        index
+                                                    ) => (
+                                                        <Cell
+                                                            key={
+                                                                item.status
+                                                            }
+                                                            fill={
+                                                                PIE_COLORS[
+                                                                    index %
+                                                                        PIE_COLORS.length
+                                                                ]
+                                                            }
+                                                        />
+                                                    )
+                                                )}
+                                            </Pie>
+
+                                            <Tooltip />
+
+                                            <Legend />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <section className="card border-0 shadow-sm rounded-5 mb-4">
+                <div className="card-body p-4">
+                    <div className="mb-4">
+                        <h4 className="fw-black mb-1">
+                            Perbandingan Setiap Layanan
+                        </h4>
+
+                        <p className="text-muted mb-0">
+                            Perbandingan status pada
+                            Merchandise, Liputan Humas, dan
+                            Peminjaman SEKPiM.
+                        </p>
+                    </div>
+
+                    {analytics
+                        .service_distribution
+                        ?.length ===
+                    0 ? (
+                        <ChartEmptyState title="Belum ada data layanan pada filter ini." />
+                    ) : (
+                        <div
+                            style={{
+                                width:
+                                    '100%',
+
+                                height:
+                                    380,
+                            }}
+                        >
+                            <ResponsiveContainer>
+                                <BarChart
+                                    data={
+                                        analytics
+                                            .service_distribution
+                                    }
+                                    margin={{
+                                        top:
+                                            10,
+
+                                        right:
+                                            12,
+
+                                        left:
+                                            -14,
+
+                                        bottom:
+                                            10,
+                                    }}
+                                >
+                                    <CartesianGrid
+                                        strokeDasharray="4 4"
+                                        vertical={
+                                            false
+                                        }
+                                        stroke="#e2e8f0"
+                                    />
+
+                                    <XAxis
+                                        dataKey="label"
+                                        tick={{
+                                            fontSize:
+                                                12,
+                                        }}
+                                        axisLine={
+                                            false
+                                        }
+                                        tickLine={
+                                            false
+                                        }
+                                    />
+
+                                    <YAxis
+                                        allowDecimals={
+                                            false
+                                        }
+                                        tick={{
+                                            fontSize:
+                                                12,
+                                        }}
+                                        axisLine={
+                                            false
+                                        }
+                                        tickLine={
+                                            false
+                                        }
+                                    />
+
+                                    <Tooltip />
+
+                                    <Legend />
+
+                                    <Bar
+                                        dataKey="pending"
+                                        name="Menunggu"
+                                        fill="#f59e0b"
+                                        radius={[
+                                            8,
+                                            8,
+                                            0,
+                                            0,
+                                        ]}
+                                    />
+
+                                    <Bar
+                                        dataKey="revision"
+                                        name="Revisi"
+                                        fill="#0ea5e9"
+                                        radius={[
+                                            8,
+                                            8,
+                                            0,
+                                            0,
+                                        ]}
+                                    />
+
+                                    <Bar
+                                        dataKey="approved"
+                                        name="Disetujui"
+                                        fill="#2563eb"
+                                        radius={[
+                                            8,
+                                            8,
+                                            0,
+                                            0,
+                                        ]}
+                                    />
+
+                                    <Bar
+                                        dataKey="rejected"
+                                        name="Ditolak"
+                                        fill="#dc2626"
+                                        radius={[
+                                            8,
+                                            8,
+                                            0,
+                                            0,
+                                        ]}
+                                    />
+
+                                    <Bar
+                                        dataKey="finished"
+                                        name="Selesai"
+                                        fill="#16a34a"
+                                        radius={[
+                                            8,
+                                            8,
+                                            0,
+                                            0,
+                                        ]}
+                                    />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+                </div>
+            </section>
+
             <div className="row g-4">
                 <div className="col-xl-8">
                     <section className="card border-0 shadow-sm rounded-5 h-100">
@@ -1382,31 +2425,27 @@ export default function Dashboard() {
                                     </h4>
 
                                     <p className="text-muted mb-0">
-                                        Data terbaru yang dapat dilihat akun ini.
+                                        Delapan pengajuan terbaru
+                                        berdasarkan filter.
                                     </p>
                                 </div>
 
-                                <button
-                                    type="button"
-                                    className="btn btn-outline-secondary rounded-pill"
-                                    onClick={() =>
-                                        fetchDashboardData(
-                                            true
-                                        )
-                                    }
-                                    disabled={
-                                        refreshing
-                                    }
-                                >
-                                    {refreshing ? (
-                                        <span className="spinner-border spinner-border-sm" />
-                                    ) : (
-                                        <i className="bi bi-arrow-clockwise" />
+                                <span className="badge rounded-pill text-bg-light px-3 py-2">
+                                    {formatDate(
+                                        appliedFilters
+                                            .startDate
+                                    )}{' '}
+                                    –{' '}
+                                    {formatDate(
+                                        appliedFilters
+                                            .endDate
                                     )}
-                                </button>
+                                </span>
                             </div>
 
-                            {recentHistories.length ===
+                            {analytics
+                                .recent_requests
+                                ?.length ===
                             0 ? (
                                 <div className="p-5 rounded-5 bg-light text-center">
                                     <i className="bi bi-inbox fs-1 text-muted" />
@@ -1416,100 +2455,105 @@ export default function Dashboard() {
                                     </h5>
 
                                     <p className="text-muted mb-0">
-                                        Aktivitas akan muncul setelah terdapat pengajuan.
+                                        Coba ubah filter layanan,
+                                        status, atau rentang
+                                        waktu.
                                     </p>
                                 </div>
                             ) : (
                                 <div className="d-flex flex-column gap-3">
-                                    {recentHistories.map(
-                                        (item) => (
-                                            <div
-                                                key={`${item.type}-${item.id}`}
-                                                className="p-3 rounded-4 border"
-                                            >
-                                                <div className="row g-3 align-items-center">
-                                                    <div className="col-lg-6">
-                                                        <div className="d-flex align-items-start gap-3">
-                                                            <div
-                                                                className={`icon-box bg-${item.color}-subtle text-${item.color}`}
-                                                            >
-                                                                <i
-                                                                    className={`bi ${item.icon}`}
-                                                                />
+                                    {analytics
+                                        .recent_requests
+                                        .map(
+                                            (
+                                                item
+                                            ) => {
+                                                const serviceConfig =
+                                                    getServiceConfig(
+                                                        item.service
+                                                    );
+
+                                                return (
+                                                    <div
+                                                        key={`${item.service}-${item.id}`}
+                                                        className="p-3 rounded-4 border"
+                                                    >
+                                                        <div className="row g-3 align-items-center">
+                                                            <div className="col-lg-6">
+                                                                <div className="d-flex align-items-start gap-3">
+                                                                    <div
+                                                                        className={`icon-box bg-${serviceConfig.color}-subtle text-${serviceConfig.color}`}
+                                                                    >
+                                                                        <i
+                                                                            className={`bi ${serviceConfig.icon}`}
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="min-w-0">
+                                                                        <div className="d-flex flex-wrap gap-2 mb-2">
+                                                                            <span
+                                                                                className={`badge rounded-pill bg-${serviceConfig.color}-subtle text-${serviceConfig.color}`}
+                                                                            >
+                                                                                {
+                                                                                    serviceConfig.label
+                                                                                }
+                                                                            </span>
+
+                                                                            <span
+                                                                                className={`badge rounded-pill ${getStatusClass(
+                                                                                    item.status
+                                                                                )}`}
+                                                                            >
+                                                                                {getStatusLabel(
+                                                                                    item.status
+                                                                                )}
+                                                                            </span>
+                                                                        </div>
+
+                                                                        <div className="fw-black text-truncate">
+                                                                            {
+                                                                                item.title
+                                                                            }
+                                                                        </div>
+
+                                                                        <div className="small text-muted text-truncate">
+                                                                            {item.code ||
+                                                                                '-'}{' '}
+                                                                            •{' '}
+                                                                            {item.requester ||
+                                                                                '-'}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
                                                             </div>
 
-                                                            <div className="min-w-0">
-                                                                <div className="d-flex flex-wrap gap-2 mb-2">
-                                                                    <span
-                                                                        className={`badge rounded-pill bg-${item.color}-subtle text-${item.color}`}
-                                                                    >
-                                                                        {
-                                                                            item.typeLabel
-                                                                        }
-                                                                    </span>
-
-                                                                    <span
-                                                                        className={`badge rounded-pill ${getStatusClass(
-                                                                            item.status
-                                                                        )}`}
-                                                                    >
-                                                                        {getStatusLabel(
-                                                                            item.status
-                                                                        )}
-                                                                    </span>
+                                                            <div className="col-md-6 col-lg-3">
+                                                                <div className="small text-muted">
+                                                                    Dikirim
                                                                 </div>
 
-                                                                <div className="fw-black text-truncate">
-                                                                    {
-                                                                        item.title
-                                                                    }
+                                                                <div className="fw-bold">
+                                                                    {formatDateTime(
+                                                                        item.submitted_at
+                                                                    )}
                                                                 </div>
+                                                            </div>
 
-                                                                <div className="small text-muted text-truncate">
-                                                                    {
-                                                                        item.code
-                                                                    }{' '}
-                                                                    •{' '}
-                                                                    {
-                                                                        item.requester
-                                                                    }
-                                                                </div>
+                                                            <div className="col-md-6 col-lg-3 text-lg-end">
+                                                                <Link
+                                                                    to={resolveDetailUrl(
+                                                                        item
+                                                                    )}
+                                                                    className={`btn btn-sm btn-${serviceConfig.color} rounded-pill px-3`}
+                                                                >
+                                                                    Detail
+                                                                </Link>
                                                             </div>
                                                         </div>
                                                     </div>
-
-                                                    <div className="col-md-6 col-lg-3">
-                                                        <div className="small text-muted">
-                                                            Tanggal
-                                                        </div>
-
-                                                        <div className="fw-bold">
-                                                            {formatDate(
-                                                                item.mainDate
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="col-md-6 col-lg-3 text-lg-end">
-                                                        <div className="small text-muted mb-2">
-                                                            {formatDateTime(
-                                                                item.submittedDate
-                                                            )}
-                                                        </div>
-
-                                                        <Link
-                                                            to={
-                                                                item.detailUrl
-                                                            }
-                                                            className={`btn btn-sm rounded-pill btn-${item.color}`}
-                                                        >
-                                                            Detail
-                                                        </Link>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )
-                                    )}
+                                                );
+                                            }
+                                        )}
                                 </div>
                             )}
                         </div>
@@ -1530,12 +2574,15 @@ export default function Dashboard() {
                             {quickActions.length ===
                             0 ? (
                                 <div className="alert alert-warning border-0 rounded-4 mb-0">
-                                    Akun belum memiliki menu tambahan.
+                                    Akun belum memiliki menu
+                                    tambahan.
                                 </div>
                             ) : (
                                 <div className="d-flex flex-column gap-3">
                                     {quickActions.map(
-                                        (action) => (
+                                        (
+                                            action
+                                        ) => (
                                             <Link
                                                 key={`${action.title}-${action.path}`}
                                                 to={
@@ -1577,90 +2624,6 @@ export default function Dashboard() {
                     </section>
                 </div>
             </div>
-
-            {canViewProducts && (
-                <section className="card border-0 shadow-sm rounded-5 mt-4">
-                    <div className="card-body p-4">
-                        <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-                            <div>
-                                <h4 className="fw-black mb-1">
-                                    Stok Rendah
-                                </h4>
-
-                                <p className="text-muted mb-0">
-                                    Produk dengan stok lima atau kurang.
-                                </p>
-                            </div>
-
-                            <Link
-                                to="/admin/products"
-                                className="btn btn-outline-warning rounded-pill"
-                            >
-                                {canManageProducts
-                                    ? 'Kelola Produk'
-                                    : 'Lihat Produk'}
-                            </Link>
-                        </div>
-
-                        {lowStockProducts.length ===
-                        0 ? (
-                            <div className="p-4 rounded-4 bg-light text-center">
-                                <i className="bi bi-check-circle-fill fs-1 text-success" />
-
-                                <p className="text-muted mt-2 mb-0">
-                                    Tidak ada produk dengan stok rendah.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="row g-3">
-                                {lowStockProducts.map(
-                                    (product) => (
-                                        <div
-                                            className="col-md-6 col-xl-4"
-                                            key={
-                                                product.id
-                                            }
-                                        >
-                                            <div className="p-3 rounded-4 border h-100">
-                                                <div className="fw-black text-truncate">
-                                                    {product.name ||
-                                                        'Produk'}
-                                                </div>
-
-                                                <div className="small text-muted text-truncate mb-3">
-                                                    {product.category
-                                                        ?.name ||
-                                                        '-'}
-                                                </div>
-
-                                                <span className="badge rounded-pill text-bg-warning">
-                                                    Stok{' '}
-                                                    {Number(
-                                                        product.stock ||
-                                                            0
-                                                    )}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    )
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </section>
-            )}
-
-            {canViewUsers && (
-                <div className="alert alert-light border shadow-sm rounded-4 mt-4 mb-0">
-                    <i className="bi bi-people-fill me-2 text-danger" />
-
-                    Total akun yang dapat dilihat:{' '}
-
-                    <strong>
-                        {summary.users}
-                    </strong>
-                </div>
-            )}
         </div>
     );
 }

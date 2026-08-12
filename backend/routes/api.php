@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BorrowRequestController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\HumasServiceRequestController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
@@ -46,6 +47,32 @@ Route::middleware('auth:sanctum')
 
         /*
         |--------------------------------------------------------------------------
+        | Dashboard
+        |--------------------------------------------------------------------------
+        */
+
+        Route::middleware(
+            'permission:dashboard.view'
+        )->group(function (): void {
+            Route::get(
+                '/dashboard/analytics',
+                [
+                    DashboardController::class,
+                    'analytics',
+                ]
+            );
+
+            Route::get(
+                '/dashboard/export',
+                [
+                    DashboardController::class,
+                    'export',
+                ]
+            );
+        });
+
+        /*
+        |--------------------------------------------------------------------------
         | Kategori - Read
         |--------------------------------------------------------------------------
         */
@@ -55,13 +82,21 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::get(
                 '/categories',
-                [CategoryController::class, 'index']
+                [
+                    CategoryController::class,
+                    'index',
+                ]
             );
 
             Route::get(
                 '/categories/{category}',
-                [CategoryController::class, 'show']
-            )->whereNumber('category');
+                [
+                    CategoryController::class,
+                    'show',
+                ]
+            )->whereNumber(
+                'category'
+            );
         });
 
         /*
@@ -75,13 +110,21 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::get(
                 '/products',
-                [ProductController::class, 'index']
+                [
+                    ProductController::class,
+                    'index',
+                ]
             );
 
             Route::get(
                 '/products/{product}',
-                [ProductController::class, 'show']
-            )->whereNumber('product');
+                [
+                    ProductController::class,
+                    'show',
+                ]
+            )->whereNumber(
+                'product'
+            );
         });
 
         /*
@@ -95,7 +138,10 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::get(
                 '/my-orders',
-                [OrderController::class, 'myOrders']
+                [
+                    OrderController::class,
+                    'myOrders',
+                ]
             );
 
             Route::get(
@@ -126,7 +172,10 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::post(
                 '/orders',
-                [OrderController::class, 'store']
+                [
+                    OrderController::class,
+                    'store',
+                ]
             );
         });
 
@@ -141,8 +190,13 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::get(
                 '/orders/{id}',
-                [OrderController::class, 'show']
-            )->whereNumber('id');
+                [
+                    OrderController::class,
+                    'show',
+                ]
+            )->whereNumber(
+                'id'
+            );
         });
 
         /*
@@ -156,7 +210,10 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::get(
                 '/orders',
-                [OrderController::class, 'index']
+                [
+                    OrderController::class,
+                    'index',
+                ]
             );
         });
 
@@ -171,20 +228,54 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::put(
                 '/orders/{id}/approve',
-                [OrderController::class, 'approve']
-            )->whereNumber('id');
+                [
+                    OrderController::class,
+                    'approve',
+                ]
+            )->whereNumber(
+                'id'
+            );
+
+            Route::put(
+                '/orders/{id}/revision',
+                [
+                    OrderController::class,
+                    'revision',
+                ]
+            )->whereNumber(
+                'id'
+            );
 
             Route::put(
                 '/orders/{id}/reject',
-                [OrderController::class, 'reject']
-            )->whereNumber('id');
+                [
+                    OrderController::class,
+                    'reject',
+                ]
+            )->whereNumber(
+                'id'
+            );
 
             Route::put(
                 '/orders/{id}/complete',
-                [OrderController::class, 'complete']
-            )->whereNumber('id');
-        });
+                [
+                    OrderController::class,
+                    'complete',
+                ]
+            )->whereNumber(
+                'id'
+            );
 
+            Route::post(
+                '/orders/{id}/resubmit',
+                [
+                    OrderController::class,
+                    'resubmit',
+                ]
+            )->whereNumber(
+                'id'
+            );
+        });
         /*
         |--------------------------------------------------------------------------
         | Pengajuan Layanan Humas
@@ -196,7 +287,10 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::post(
                 '/humas-service-requests',
-                [HumasServiceRequestController::class, 'store']
+                [
+                    HumasServiceRequestController::class,
+                    'store',
+                ]
             );
         });
 
@@ -211,8 +305,13 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::get(
                 '/humas-service-requests/{id}',
-                [HumasServiceRequestController::class, 'show']
-            )->whereNumber('id');
+                [
+                    HumasServiceRequestController::class,
+                    'show',
+                ]
+            )->whereNumber(
+                'id'
+            );
         });
 
         /*
@@ -226,7 +325,10 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::get(
                 '/humas-service-requests',
-                [HumasServiceRequestController::class, 'index']
+                [
+                    HumasServiceRequestController::class,
+                    'index',
+                ]
             );
         });
 
@@ -241,18 +343,33 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::put(
                 '/humas-service-requests/{id}/approve',
-                [HumasServiceRequestController::class, 'approve']
-            )->whereNumber('id');
+                [
+                    HumasServiceRequestController::class,
+                    'approve',
+                ]
+            )->whereNumber(
+                'id'
+            );
 
             Route::put(
                 '/humas-service-requests/{id}/reject',
-                [HumasServiceRequestController::class, 'reject']
-            )->whereNumber('id');
+                [
+                    HumasServiceRequestController::class,
+                    'reject',
+                ]
+            )->whereNumber(
+                'id'
+            );
 
             Route::put(
                 '/humas-service-requests/{id}/complete',
-                [HumasServiceRequestController::class, 'complete']
-            )->whereNumber('id');
+                [
+                    HumasServiceRequestController::class,
+                    'complete',
+                ]
+            )->whereNumber(
+                'id'
+            );
         });
 
         /*
@@ -266,7 +383,10 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::post(
                 '/borrow-requests',
-                [BorrowRequestController::class, 'store']
+                [
+                    BorrowRequestController::class,
+                    'store',
+                ]
             );
         });
 
@@ -281,8 +401,13 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::get(
                 '/borrow-requests/{id}',
-                [BorrowRequestController::class, 'show']
-            )->whereNumber('id');
+                [
+                    BorrowRequestController::class,
+                    'show',
+                ]
+            )->whereNumber(
+                'id'
+            );
         });
 
         /*
@@ -296,7 +421,10 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::get(
                 '/borrow-requests',
-                [BorrowRequestController::class, 'index']
+                [
+                    BorrowRequestController::class,
+                    'index',
+                ]
             );
         });
 
@@ -311,23 +439,43 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::put(
                 '/borrow-requests/{id}/approve',
-                [BorrowRequestController::class, 'approve']
-            )->whereNumber('id');
+                [
+                    BorrowRequestController::class,
+                    'approve',
+                ]
+            )->whereNumber(
+                'id'
+            );
 
             Route::put(
                 '/borrow-requests/{id}/reject',
-                [BorrowRequestController::class, 'reject']
-            )->whereNumber('id');
+                [
+                    BorrowRequestController::class,
+                    'reject',
+                ]
+            )->whereNumber(
+                'id'
+            );
 
             Route::put(
                 '/borrow-requests/{id}/borrowed',
-                [BorrowRequestController::class, 'borrowed']
-            )->whereNumber('id');
+                [
+                    BorrowRequestController::class,
+                    'borrowed',
+                ]
+            )->whereNumber(
+                'id'
+            );
 
             Route::put(
                 '/borrow-requests/{id}/returned',
-                [BorrowRequestController::class, 'returned']
-            )->whereNumber('id');
+                [
+                    BorrowRequestController::class,
+                    'returned',
+                ]
+            )->whereNumber(
+                'id'
+            );
         });
 
         /*
@@ -341,23 +489,41 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::post(
                 '/products',
-                [ProductController::class, 'store']
+                [
+                    ProductController::class,
+                    'store',
+                ]
             );
 
             Route::put(
                 '/products/{product}',
-                [ProductController::class, 'update']
-            )->whereNumber('product');
+                [
+                    ProductController::class,
+                    'update',
+                ]
+            )->whereNumber(
+                'product'
+            );
 
             Route::patch(
                 '/products/{product}',
-                [ProductController::class, 'update']
-            )->whereNumber('product');
+                [
+                    ProductController::class,
+                    'update',
+                ]
+            )->whereNumber(
+                'product'
+            );
 
             Route::delete(
                 '/products/{product}',
-                [ProductController::class, 'destroy']
-            )->whereNumber('product');
+                [
+                    ProductController::class,
+                    'destroy',
+                ]
+            )->whereNumber(
+                'product'
+            );
         });
 
         /*
@@ -371,137 +537,136 @@ Route::middleware('auth:sanctum')
         )->group(function (): void {
             Route::post(
                 '/categories',
-                [CategoryController::class, 'store']
+                [
+                    CategoryController::class,
+                    'store',
+                ]
             );
 
             Route::put(
                 '/categories/{category}',
-                [CategoryController::class, 'update']
-            )->whereNumber('category');
+                [
+                    CategoryController::class,
+                    'update',
+                ]
+            )->whereNumber(
+                'category'
+            );
 
             Route::patch(
                 '/categories/{category}',
-                [CategoryController::class, 'update']
-            )->whereNumber('category');
+                [
+                    CategoryController::class,
+                    'update',
+                ]
+            )->whereNumber(
+                'category'
+            );
 
             Route::delete(
                 '/categories/{category}',
-                [CategoryController::class, 'destroy']
-            )->whereNumber('category');
+                [
+                    CategoryController::class,
+                    'destroy',
+                ]
+            )->whereNumber(
+                'category'
+            );
         });
 
         /*
         |--------------------------------------------------------------------------
         | Manajemen User
         |--------------------------------------------------------------------------
-        |
-        | Penting:
-        | Route statis /users/permissions harus ditempatkan sebelum
-        | route dinamis /users/{user}.
-        |
         */
 
-        Route::prefix('admin')
-            ->group(function (): void {
-                /*
-                |--------------------------------------------------------------------------
-                | Konfigurasi Permission
-                |--------------------------------------------------------------------------
-                |
-                | Controller tetap memastikan endpoint ini hanya dapat dipakai
-                | oleh superadmin.
-                |
-                */
+        Route::prefix(
+            'admin'
+        )->group(function (): void {
+            Route::get(
+                '/users/permissions',
+                [
+                    UserController::class,
+                    'permissions',
+                ]
+            )->middleware(
+                'permission:users.manage'
+            );
 
-                Route::get(
-                    '/users/permissions',
-                    [UserController::class, 'permissions']
-                )->middleware(
-                    'permission:users.manage'
-                );
+            Route::get(
+                '/users',
+                [
+                    UserController::class,
+                    'index',
+                ]
+            )->middleware(
+                'permission:users.view,users.manage'
+            );
 
-                /*
-                |--------------------------------------------------------------------------
-                | Daftar User
-                |--------------------------------------------------------------------------
-                */
+            Route::post(
+                '/users',
+                [
+                    UserController::class,
+                    'store',
+                ]
+            )->middleware(
+                'permission:users.manage'
+            );
 
-                Route::get(
-                    '/users',
-                    [UserController::class, 'index']
-                )->middleware(
+            Route::get(
+                '/users/{user}',
+                [
+                    UserController::class,
+                    'show',
+                ]
+            )
+                ->whereNumber(
+                    'user'
+                )
+                ->middleware(
                     'permission:users.view,users.manage'
                 );
 
-                /*
-                |--------------------------------------------------------------------------
-                | Tambah User
-                |--------------------------------------------------------------------------
-                */
-
-                Route::post(
-                    '/users',
-                    [UserController::class, 'store']
-                )->middleware(
+            Route::put(
+                '/users/{user}',
+                [
+                    UserController::class,
+                    'update',
+                ]
+            )
+                ->whereNumber(
+                    'user'
+                )
+                ->middleware(
                     'permission:users.manage'
                 );
 
-                /*
-                |--------------------------------------------------------------------------
-                | Detail User
-                |--------------------------------------------------------------------------
-                |
-                | Route dinamis berada setelah /users/permissions.
-                | whereNumber mencegah kata "permissions" dianggap sebagai ID user.
-                |
-                */
-
-                Route::get(
-                    '/users/{user}',
-                    [UserController::class, 'show']
+            Route::patch(
+                '/users/{user}',
+                [
+                    UserController::class,
+                    'update',
+                ]
+            )
+                ->whereNumber(
+                    'user'
                 )
-                    ->whereNumber('user')
-                    ->middleware(
-                        'permission:users.view,users.manage'
-                    );
+                ->middleware(
+                    'permission:users.manage'
+                );
 
-                /*
-                |--------------------------------------------------------------------------
-                | Update User
-                |--------------------------------------------------------------------------
-                */
-
-                Route::put(
-                    '/users/{user}',
-                    [UserController::class, 'update']
+            Route::delete(
+                '/users/{user}',
+                [
+                    UserController::class,
+                    'destroy',
+                ]
+            )
+                ->whereNumber(
+                    'user'
                 )
-                    ->whereNumber('user')
-                    ->middleware(
-                        'permission:users.manage'
-                    );
-
-                Route::patch(
-                    '/users/{user}',
-                    [UserController::class, 'update']
-                )
-                    ->whereNumber('user')
-                    ->middleware(
-                        'permission:users.manage'
-                    );
-
-                /*
-                |--------------------------------------------------------------------------
-                | Hapus User
-                |--------------------------------------------------------------------------
-                */
-
-                Route::delete(
-                    '/users/{user}',
-                    [UserController::class, 'destroy']
-                )
-                    ->whereNumber('user')
-                    ->middleware(
-                        'permission:users.manage'
-                    );
-            });
+                ->middleware(
+                    'permission:users.manage'
+                );
+        });
     });

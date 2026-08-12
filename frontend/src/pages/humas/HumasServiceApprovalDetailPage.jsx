@@ -15,7 +15,6 @@ import api from '../../api/axios';
 
 import {
     closeAlert,
-    showCompletionAlert,
     showConfirmAlert,
     showErrorAlert,
     showLoadingAlert,
@@ -71,6 +70,11 @@ const COVERAGE_CONFIG = {
     'PUBLIKASI WEBSITE': {
         label: 'Publikasi Website',
         icon: 'bi-globe2',
+    },
+
+    'PUBLIKASI MEDIA MASSA': {
+        label: 'Publikasi Media Massa',
+        icon: 'bi-newspaper',
     },
 
     YOUTUBE: {
@@ -137,7 +141,9 @@ const hasPermission = (
 const formatDate = (
     dateValue
 ) => {
-    if (!dateValue) {
+    if (
+        !dateValue
+    ) {
         return '-';
     }
 
@@ -197,7 +203,9 @@ const formatDate = (
 const formatDateTime = (
     dateValue
 ) => {
-    if (!dateValue) {
+    if (
+        !dateValue
+    ) {
         return '-';
     }
 
@@ -231,7 +239,9 @@ const formatDateTime = (
 const normalizeExternalUrl = (
     value
 ) => {
-    if (!value) {
+    if (
+        !value
+    ) {
         return null;
     }
 
@@ -284,6 +294,119 @@ const extractErrorMessage = (
     );
 };
 
+const getCoverageParts = (
+    coverageType
+) => {
+    if (
+        !coverageType
+    ) {
+        return [];
+    }
+
+    return String(
+        coverageType
+    )
+        .split(
+            /[;,]/
+        )
+        .map(
+            (item) =>
+                item.trim()
+        )
+        .filter(
+            Boolean
+        );
+};
+
+const getCoverageLabel = (
+    coverageType
+) => {
+    const parts =
+        getCoverageParts(
+            coverageType
+        );
+
+    if (
+        parts.length ===
+        0
+    ) {
+        return '-';
+    }
+
+    return parts
+        .map(
+            (item) =>
+                COVERAGE_CONFIG[
+                    item
+                ]?.label ||
+                item
+        )
+        .join(
+            '; '
+        );
+};
+
+const getCoverageIcon = (
+    coverageType
+) => {
+    const firstCoverage =
+        getCoverageParts(
+            coverageType
+        )[0];
+
+    return (
+        COVERAGE_CONFIG[
+            firstCoverage
+        ]?.icon ||
+        'bi-camera-reels-fill'
+    );
+};
+
+const formatFileSize = (
+    bytes
+) => {
+    if (
+        !Number.isFinite(
+            bytes
+        ) ||
+        bytes <= 0
+    ) {
+        return '-';
+    }
+
+    const units = [
+        'B',
+        'KB',
+        'MB',
+        'GB',
+    ];
+
+    const unitIndex =
+        Math.min(
+            Math.floor(
+                Math.log(
+                    bytes
+                ) /
+                    Math.log(
+                        1024
+                    )
+            ),
+            units.length -
+                1
+        );
+
+    const size =
+        bytes /
+        1024 **
+            unitIndex;
+
+    return `${size.toFixed(
+        unitIndex === 0
+            ? 0
+            : 2
+    )} ${units[unitIndex]}`;
+};
+
 const DetailItem = ({
     label,
     value,
@@ -332,12 +455,16 @@ const TimelineItem = ({
     let statusClass =
         'done';
 
-    if (active) {
+    if (
+        active
+    ) {
         statusClass =
             'active';
     }
 
-    if (rejected) {
+    if (
+        rejected
+    ) {
         statusClass =
             'rejected';
     }
@@ -389,22 +516,51 @@ export default function HumasServiceApprovalDetailPage() {
     const [
         requestData,
         setRequestData,
-    ] = useState(null);
+    ] = useState(
+        null
+    );
 
     const [
         loading,
         setLoading,
-    ] = useState(true);
+    ] = useState(
+        true
+    );
 
     const [
         processing,
         setProcessing,
-    ] = useState(false);
+    ] = useState(
+        false
+    );
 
     const [
         errorMessage,
         setErrorMessage,
-    ] = useState('');
+    ] = useState(
+        ''
+    );
+
+    const [
+        resultLink,
+        setResultLink,
+    ] = useState(
+        ''
+    );
+
+    const [
+        resultNote,
+        setResultNote,
+    ] = useState(
+        ''
+    );
+
+    const [
+        resultFile,
+        setResultFile,
+    ] = useState(
+        null
+    );
 
     const loadDetail =
         useCallback(
@@ -423,11 +579,24 @@ export default function HumasServiceApprovalDetailPage() {
                             `/humas-service-requests/${id}`
                         );
 
-                    setRequestData(
+                    const data =
                         response
                             ?.data
                             ?.data ||
-                        null
+                        null;
+
+                    setRequestData(
+                        data
+                    );
+
+                    setResultLink(
+                        data?.result_link ||
+                            ''
+                    );
+
+                    setResultNote(
+                        data?.result_note ||
+                            ''
                     );
                 } catch (
                     error
@@ -456,98 +625,112 @@ export default function HumasServiceApprovalDetailPage() {
             ]
         );
 
-    useEffect(() => {
-        loadDetail();
-    }, [
-        loadDetail,
-    ]);
+    useEffect(
+        () => {
+            loadDetail();
+        },
+        [
+            loadDetail,
+        ]
+    );
 
     const statusConfig =
-        useMemo(() => {
-            return (
-                STATUS_CONFIG[
-                    requestData
-                        ?.status
-                ] || {
-                    label:
+        useMemo(
+            () => {
+                return (
+                    STATUS_CONFIG[
                         requestData
-                            ?.status ||
-                        'Tidak diketahui',
+                            ?.status
+                    ] || {
+                        label:
+                            requestData
+                                ?.status ||
+                            'Tidak diketahui',
 
-                    badgeClass:
-                        'bg-secondary-subtle text-secondary',
+                        badgeClass:
+                            'bg-secondary-subtle text-secondary',
 
-                    icon:
-                        'bi-info-circle-fill',
-                }
-            );
-        }, [
-            requestData
-                ?.status,
-        ]);
+                        icon:
+                            'bi-info-circle-fill',
+                    }
+                );
+            },
+            [
+                requestData
+                    ?.status,
+            ]
+        );
 
-    const coverageConfig =
-        useMemo(() => {
-            return (
-                COVERAGE_CONFIG[
+    const coverageLabel =
+        useMemo(
+            () =>
+                getCoverageLabel(
                     requestData
                         ?.coverage_type
-                ] || {
-                    label:
-                        requestData
-                            ?.coverage_type ||
-                        '-',
+                ),
+            [
+                requestData
+                    ?.coverage_type,
+            ]
+        );
 
-                    icon:
-                        'bi-camera-reels-fill',
-                }
-            );
-        }, [
-            requestData
-                ?.coverage_type,
-        ]);
+    const coverageIcon =
+        useMemo(
+            () =>
+                getCoverageIcon(
+                    requestData
+                        ?.coverage_type
+                ),
+            [
+                requestData
+                    ?.coverage_type,
+            ]
+        );
 
     const resolvedUnitName =
-        useMemo(() => {
-            if (
-                !requestData
-            ) {
-                return '-';
-            }
+        useMemo(
+            () => {
+                if (
+                    !requestData
+                ) {
+                    return '-';
+                }
 
-            if (
-                requestData
-                    .resolved_unit_name
-            ) {
-                return requestData
-                    .resolved_unit_name;
-            }
+                if (
+                    requestData
+                        .resolved_unit_name
+                ) {
+                    return requestData
+                        .resolved_unit_name;
+                }
 
-            if (
-                requestData
-                    .unit_name ===
-                'Lainnya'
-            ) {
+                if (
+                    requestData
+                        .unit_name ===
+                    'Lainnya'
+                ) {
+                    return (
+                        requestData
+                            .other_unit_name ||
+                        'Lainnya'
+                    );
+                }
+
                 return (
                     requestData
-                        .other_unit_name ||
-                    'Lainnya'
+                        .unit_name ||
+                    requestData
+                        .requester_unit ||
+                    requestData
+                        .user
+                        ?.unit_name ||
+                    '-'
                 );
-            }
-
-            return (
-                requestData
-                    .unit_name ||
-                requestData
-                    .requester_unit ||
-                requestData
-                    .user
-                    ?.unit_name ||
-                '-'
-            );
-        }, [
-            requestData,
-        ]);
+            },
+            [
+                requestData,
+            ]
+        );
 
     const referenceUrl =
         useMemo(
@@ -795,6 +978,92 @@ export default function HumasServiceApprovalDetailPage() {
             );
         };
 
+    const handleResultFileChange =
+        async (
+            event
+        ) => {
+            const file =
+                event
+                    .target
+                    .files?.[0] ||
+                null;
+
+            if (
+                !file
+            ) {
+                setResultFile(
+                    null
+                );
+
+                return;
+            }
+
+            const allowedExtensions = [
+                'pdf',
+                'doc',
+                'docx',
+                'jpg',
+                'jpeg',
+                'png',
+                'zip',
+            ];
+
+            const extension =
+                file.name
+                    .split('.')
+                    .pop()
+                    ?.toLowerCase();
+
+            if (
+                !extension ||
+                !allowedExtensions.includes(
+                    extension
+                )
+            ) {
+                event.target.value =
+                    '';
+
+                setResultFile(
+                    null
+                );
+
+                await showErrorAlert(
+                    'Format File Tidak Didukung',
+                    'File hasil harus berformat PDF, DOC, DOCX, JPG, JPEG, PNG, atau ZIP.'
+                );
+
+                return;
+            }
+
+            const maxFileSize =
+                20 *
+                1024 *
+                1024;
+
+            if (
+                file.size >
+                maxFileSize
+            ) {
+                event.target.value =
+                    '';
+
+                setResultFile(
+                    null
+                );
+
+                await showErrorAlert(
+                    'File Terlalu Besar',
+                    'Ukuran file hasil maksimal 20 MB.'
+                );
+
+                return;
+            }
+
+            setResultFile(
+                file
+            );
+        };
+
     const handleComplete =
         async () => {
             if (
@@ -816,44 +1085,164 @@ export default function HumasServiceApprovalDetailPage() {
                 return;
             }
 
-            const result =
-                await showCompletionAlert({
+            const normalizedLink =
+                resultLink
+                    .trim();
+
+            if (
+                !normalizedLink &&
+                !resultFile
+            ) {
+                await showErrorAlert(
+                    'Hasil Belum Lengkap',
+                    'Masukkan link hasil atau unggah file hasil pekerjaan.'
+                );
+
+                return;
+            }
+
+            const confirmation =
+                await showConfirmAlert({
                     title:
                         'Selesaikan Request Liputan?',
 
                     text:
-                        'Masukkan link hasil pekerjaan yang dapat dibuka oleh pemohon.',
+                        'Hasil pekerjaan akan disimpan dan request ditandai selesai.',
 
                     confirmButtonText:
-                        'Simpan dan Selesaikan',
+                        'Ya, selesaikan',
 
                     cancelButtonText:
                         'Batal',
+
+                    icon:
+                        'question',
+
+                    confirmButtonColor:
+                        '#16a34a',
                 });
 
             if (
-                !result
-                    .isConfirmed ||
-                !result.value
+                !confirmation
+                    .isConfirmed
             ) {
                 return;
             }
 
-            await processAction(
-                'complete',
-                {
-                    result_link:
-                        result
-                            .value
-                            .result_link,
+            const formData =
+                new FormData();
 
-                    result_note:
-                        result
-                            .value
-                            .result_note,
-                },
-                'Request Selesai'
+            formData.append(
+                '_method',
+                'PUT'
             );
+
+            if (
+                normalizedLink
+            ) {
+                formData.append(
+                    'result_link',
+                    normalizeExternalUrl(
+                        normalizedLink
+                    )
+                );
+            }
+
+            if (
+                resultNote
+                    .trim()
+            ) {
+                formData.append(
+                    'result_note',
+                    resultNote
+                        .trim()
+                );
+            }
+
+            if (
+                resultFile
+            ) {
+                formData.append(
+                    'result_file',
+                    resultFile
+                );
+            }
+
+            try {
+                setProcessing(
+                    true
+                );
+
+                showLoadingAlert(
+                    'Menyimpan Hasil',
+                    'Hasil pekerjaan sedang disimpan.'
+                );
+
+                const response =
+                    await api.post(
+                        `/humas-service-requests/${id}/complete`,
+                        formData
+                    );
+
+                closeAlert();
+
+                await showSuccessAlert(
+                    'Request Selesai',
+                    response
+                        ?.data
+                        ?.message ||
+                        'Request berhasil diselesaikan.'
+                );
+
+                setResultLink(
+                    ''
+                );
+
+                setResultNote(
+                    ''
+                );
+
+                setResultFile(
+                    null
+                );
+
+                if (
+                    response
+                        ?.data
+                        ?.data
+                ) {
+                    setRequestData(
+                        response
+                            .data
+                            .data
+                    );
+                } else {
+                    await loadDetail();
+                }
+            } catch (
+                error
+            ) {
+                console.error(
+                    'Complete Humas error:',
+                    error
+                        ?.response
+                        ?.data ||
+                        error
+                );
+
+                closeAlert();
+
+                await showErrorAlert(
+                    'Penyelesaian Gagal',
+                    extractErrorMessage(
+                        error
+                    )
+                );
+            } finally {
+                setProcessing(
+                    false
+                );
+            }
         };
 
     if (
@@ -886,8 +1275,11 @@ export default function HumasServiceApprovalDetailPage() {
                     <div
                         className="mx-auto mb-3 rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center"
                         style={{
-                            width: 84,
-                            height: 84,
+                            width:
+                                84,
+
+                            height:
+                                84,
                         }}
                     >
                         <i className="bi bi-exclamation-triangle-fill fs-1" />
@@ -1124,7 +1516,7 @@ export default function HumasServiceApprovalDetailPage() {
 
                                 <div className="icon-box bg-danger-subtle text-danger">
                                     <i
-                                        className={`bi ${coverageConfig.icon}`}
+                                        className={`bi ${coverageIcon}`}
                                     />
                                 </div>
                             </div>
@@ -1134,12 +1526,10 @@ export default function HumasServiceApprovalDetailPage() {
                                     <DetailItem
                                         label="Jenis Liputan"
                                         icon={
-                                            coverageConfig
-                                                .icon
+                                            coverageIcon
                                         }
                                         value={
-                                            coverageConfig
-                                                .label
+                                            coverageLabel
                                         }
                                     />
                                 </div>
@@ -1248,8 +1638,11 @@ export default function HumasServiceApprovalDetailPage() {
                                         <div
                                             className="rounded-4 bg-white text-danger d-flex align-items-center justify-content-center shadow-sm flex-shrink-0"
                                             style={{
-                                                width: 54,
-                                                height: 54,
+                                                width:
+                                                    54,
+
+                                                height:
+                                                    54,
                                             }}
                                         >
                                             <i className="bi bi-file-earmark-text-fill fs-4" />
@@ -1304,7 +1697,7 @@ export default function HumasServiceApprovalDetailPage() {
                                         </h4>
 
                                         <p className="text-muted mb-0">
-                                            Link hasil yang diberikan kepada pemohon.
+                                            Hasil pekerjaan yang diberikan oleh tim Humas.
                                         </p>
                                     </div>
 
@@ -1313,46 +1706,114 @@ export default function HumasServiceApprovalDetailPage() {
                                     </div>
                                 </div>
 
-                                {resultUrl ? (
-                                    <div className="border rounded-4 p-4 bg-success-subtle">
-                                        <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                                            <div className="min-w-0">
-                                                <div className="small text-muted mb-1">
-                                                    Link Hasil
-                                                </div>
+                                {!resultUrl &&
+                                !requestData
+                                    .result_file_url ? (
+                                    <div className="alert alert-warning rounded-4 mb-0">
+                                        Request sudah selesai, tetapi hasil pekerjaan belum tersedia.
+                                    </div>
+                                ) : (
+                                    <div className="d-flex flex-column gap-3">
+                                        {resultUrl && (
+                                            <div className="border rounded-4 p-4 bg-success-subtle">
+                                                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                                    <div className="min-w-0 flex-grow-1">
+                                                        <div className="small text-muted mb-1">
+                                                            Link Hasil
+                                                        </div>
 
-                                                <div
-                                                    className="fw-bold text-truncate"
-                                                    style={{
-                                                        maxWidth:
-                                                            600,
-                                                    }}
-                                                >
-                                                    {
-                                                        requestData
-                                                            .result_link
-                                                    }
+                                                        <div
+                                                            className="fw-bold text-break"
+                                                            style={{
+                                                                maxWidth:
+                                                                    600,
+                                                            }}
+                                                        >
+                                                            {
+                                                                requestData
+                                                                    .result_link
+                                                            }
+                                                        </div>
+                                                    </div>
+
+                                                    <a
+                                                        href={
+                                                            resultUrl
+                                                        }
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="btn btn-success rounded-pill"
+                                                    >
+                                                        <i className="bi bi-box-arrow-up-right me-2" />
+
+                                                        Buka Hasil
+                                                    </a>
                                                 </div>
                                             </div>
+                                        )}
 
-                                            <a
-                                                href={
-                                                    resultUrl
-                                                }
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="btn btn-success rounded-pill"
-                                            >
-                                                <i className="bi bi-box-arrow-up-right me-2" />
+                                        {requestData
+                                            .result_file_url && (
+                                            <div className="border rounded-4 p-4 bg-light">
+                                                <div className="d-flex align-items-center gap-3 flex-wrap">
+                                                    <div
+                                                        className="rounded-4 bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0"
+                                                        style={{
+                                                            width:
+                                                                54,
 
-                                                Buka Hasil
-                                            </a>
-                                        </div>
+                                                            height:
+                                                                54,
+                                                        }}
+                                                    >
+                                                        <i className="bi bi-file-earmark-check-fill fs-4" />
+                                                    </div>
+
+                                                    <div className="flex-grow-1 min-w-0">
+                                                        <div className="small text-muted mb-1">
+                                                            File Hasil
+                                                        </div>
+
+                                                        <div className="fw-black text-break">
+                                                            {requestData
+                                                                .result_file_name ||
+                                                                'File Hasil Humas'}
+                                                        </div>
+
+                                                        {requestData
+                                                            .result_file_mime && (
+                                                            <div className="small text-muted mt-1">
+                                                                {
+                                                                    requestData
+                                                                        .result_file_mime
+                                                                }
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <a
+                                                        href={
+                                                            requestData
+                                                                .result_file_url
+                                                        }
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="btn btn-outline-success rounded-pill"
+                                                    >
+                                                        <i className="bi bi-eye-fill me-2" />
+
+                                                        Buka File
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {requestData
                                             .result_note && (
-                                            <div className="bg-white border rounded-4 p-3 mt-3">
-                                                <div className="small text-muted fw-bold mb-1">
+                                            <div className="bg-white border rounded-4 p-4">
+                                                <div className="small text-muted fw-bold mb-2">
+                                                    <i className="bi bi-chat-left-text-fill me-2" />
+
                                                     Catatan Hasil
                                                 </div>
 
@@ -1373,10 +1834,6 @@ export default function HumasServiceApprovalDetailPage() {
                                             </div>
                                         )}
                                     </div>
-                                ) : (
-                                    <div className="alert alert-warning rounded-4 mb-0">
-                                        Request sudah selesai, tetapi link hasil belum tersedia.
-                                    </div>
                                 )}
                             </div>
                         </section>
@@ -1387,7 +1844,8 @@ export default function HumasServiceApprovalDetailPage() {
                     <div
                         className="position-sticky"
                         style={{
-                            top: 110,
+                            top:
+                                110,
                         }}
                     >
                         <section className="card border-0 shadow-sm rounded-5 mb-4">
@@ -1560,14 +2018,185 @@ export default function HumasServiceApprovalDetailPage() {
                                             .status ===
                                             'approved' && (
                                             <>
-                                                <div className="p-3 rounded-4 bg-primary-subtle mb-3">
-                                                    <div className="fw-black text-primary mb-1">
-                                                        Request Disetujui
+                                                <div className="p-3 rounded-4 bg-primary-subtle mb-4">
+                                                    <div className="d-flex gap-3">
+                                                        <i className="bi bi-info-circle-fill text-primary fs-5" />
+
+                                                        <div>
+                                                            <div className="fw-black text-primary mb-1">
+                                                                Request Sedang Diproses
+                                                            </div>
+
+                                                            <div className="small text-muted">
+                                                                Masukkan link hasil atau unggah file hasil sebelum request ditandai selesai.
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mb-3">
+                                                    <label className="form-label fw-bold">
+                                                        Link Hasil
+                                                    </label>
+
+                                                    <input
+                                                        type="text"
+                                                        className="form-control rounded-4"
+                                                        placeholder="https://drive.google.com/... atau link publikasi"
+                                                        value={
+                                                            resultLink
+                                                        }
+                                                        onChange={(
+                                                            event
+                                                        ) =>
+                                                            setResultLink(
+                                                                event
+                                                                    .target
+                                                                    .value
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            processing
+                                                        }
+                                                    />
+
+                                                    <div className="form-text">
+                                                        Opsional jika file hasil sudah diunggah.
+                                                    </div>
+                                                </div>
+
+                                                <div className="mb-3">
+                                                    <label className="form-label fw-bold">
+                                                        File Hasil
+                                                    </label>
+
+                                                    <input
+                                                        type="file"
+                                                        className="form-control rounded-4"
+                                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip"
+                                                        onChange={
+                                                            handleResultFileChange
+                                                        }
+                                                        disabled={
+                                                            processing
+                                                        }
+                                                    />
+
+                                                    <div className="form-text">
+                                                        PDF, DOC, DOCX, JPG, JPEG, PNG atau ZIP. Maksimal 20 MB.
                                                     </div>
 
-                                                    <div className="small text-muted">
-                                                        Tandai selesai setelah hasil pekerjaan tersedia.
+                                                    {resultFile && (
+                                                        <div className="mt-3 p-3 border rounded-4 bg-light">
+                                                            <div className="d-flex align-items-start gap-3">
+                                                                <div
+                                                                    className="rounded-circle bg-white text-danger d-flex align-items-center justify-content-center flex-shrink-0"
+                                                                    style={{
+                                                                        width:
+                                                                            42,
+
+                                                                        height:
+                                                                            42,
+                                                                    }}
+                                                                >
+                                                                    <i className="bi bi-paperclip" />
+                                                                </div>
+
+                                                                <div className="min-w-0 flex-grow-1">
+                                                                    <div className="small text-muted">
+                                                                        File dipilih
+                                                                    </div>
+
+                                                                    <div className="fw-black text-break">
+                                                                        {
+                                                                            resultFile
+                                                                                .name
+                                                                        }
+                                                                    </div>
+
+                                                                    <div className="small text-muted mt-1">
+                                                                        {formatFileSize(
+                                                                            resultFile
+                                                                                .size
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-sm btn-outline-danger rounded-circle flex-shrink-0"
+                                                                    onClick={() =>
+                                                                        setResultFile(
+                                                                            null
+                                                                        )
+                                                                    }
+                                                                    disabled={
+                                                                        processing
+                                                                    }
+                                                                    title="Hapus file"
+                                                                >
+                                                                    <i className="bi bi-x-lg" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="mb-4">
+                                                    <label className="form-label fw-bold">
+                                                        Catatan Hasil
+                                                    </label>
+
+                                                    <textarea
+                                                        className="form-control rounded-4"
+                                                        rows={
+                                                            4
+                                                        }
+                                                        maxLength={
+                                                            3000
+                                                        }
+                                                        placeholder="Tambahkan catatan hasil pekerjaan jika diperlukan..."
+                                                        value={
+                                                            resultNote
+                                                        }
+                                                        onChange={(
+                                                            event
+                                                        ) =>
+                                                            setResultNote(
+                                                                event
+                                                                    .target
+                                                                    .value
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            processing
+                                                        }
+                                                    />
+
+                                                    <div className="form-text text-end">
+                                                        {
+                                                            resultNote
+                                                                .length
+                                                        }
+                                                        /3000
                                                     </div>
+                                                </div>
+
+                                                <div className="alert alert-light border rounded-4 small">
+                                                    <i className="bi bi-info-circle me-2 text-primary" />
+
+                                                    Minimal isi{' '}
+
+                                                    <strong>
+                                                        Link Hasil
+                                                    </strong>{' '}
+
+                                                    atau{' '}
+
+                                                    <strong>
+                                                        File Hasil
+                                                    </strong>
+                                                    .
                                                 </div>
 
                                                 <button
@@ -1580,9 +2209,19 @@ export default function HumasServiceApprovalDetailPage() {
                                                         processing
                                                     }
                                                 >
-                                                    <i className="bi bi-check2-all me-2" />
+                                                    {processing ? (
+                                                        <>
+                                                            <span className="spinner-border spinner-border-sm me-2" />
 
-                                                    Tandai Selesai
+                                                            Menyimpan...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <i className="bi bi-check2-all me-2" />
+
+                                                            Simpan Hasil &amp; Tandai Selesai
+                                                        </>
+                                                    )}
                                                 </button>
                                             </>
                                         )}
