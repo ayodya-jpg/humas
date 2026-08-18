@@ -18,24 +18,100 @@ import {
 
 const INITIAL_FORM = {
     event_name: '',
+
+    pic_name: '',
+    pic_phone: '',
+
     activity_date: '',
+    pickup_date: '',
+
     institution_name: '',
     guest_name: '',
     guest_position: '',
+
     user_note: '',
 };
 
-const extractArray = (response) => {
+const toInputDate = (
+    value
+) => {
+    if (!value) {
+        return '';
+    }
+
+    return String(
+        value
+    ).slice(
+        0,
+        10
+    );
+};
+
+const formatDateInput = (
+    date
+) => {
+    const year =
+        date.getFullYear();
+
+    const month =
+        String(
+            date.getMonth() + 1
+        ).padStart(
+            2,
+            '0'
+        );
+
+    const day =
+        String(
+            date.getDate()
+        ).padStart(
+            2,
+            '0'
+        );
+
+    return `${year}-${month}-${day}`;
+};
+
+const getTodayDate =
+    () => {
+        return formatDateInput(
+            new Date()
+        );
+    };
+
+const getMinimumActivityDate =
+    () => {
+        const date =
+            new Date();
+
+        date.setDate(
+            date.getDate() + 4
+        );
+
+        return formatDateInput(
+            date
+        );
+    };
+
+const extractArray = (
+    response
+) => {
     const payload =
         response?.data?.data;
 
-    if (Array.isArray(payload)) {
+    if (
+        Array.isArray(
+            payload
+        )
+    ) {
         return payload;
     }
 
     if (
         payload &&
-        Array.isArray(payload.data)
+        Array.isArray(
+            payload.data
+        )
     ) {
         return payload.data;
     }
@@ -50,13 +126,17 @@ const getBackendErrorMessage = (
     const responseData =
         error?.response?.data;
 
-    if (responseData?.errors) {
+    if (
+        responseData?.errors
+    ) {
         const firstError =
             Object.values(
                 responseData.errors
             )?.[0]?.[0];
 
-        if (firstError) {
+        if (
+            firstError
+        ) {
             return firstError;
         }
     }
@@ -67,9 +147,13 @@ const getBackendErrorMessage = (
     );
 };
 
-const formatFileSize = (size) => {
+const formatFileSize = (
+    size
+) => {
     const numericSize =
-        Number(size || 0);
+        Number(
+            size || 0
+        );
 
     if (
         numericSize <
@@ -83,14 +167,19 @@ const formatFileSize = (size) => {
         1024 * 1024
     ) {
         return `${(
-            numericSize / 1024
-        ).toFixed(1)} KB`;
+            numericSize /
+            1024
+        ).toFixed(
+            1
+        )} KB`;
     }
 
     return `${(
         numericSize /
         (1024 * 1024)
-    ).toFixed(1)} MB`;
+    ).toFixed(
+        1
+    )} MB`;
 };
 
 export default function MerchandiseRevisionForm({
@@ -110,6 +199,13 @@ export default function MerchandiseRevisionForm({
     );
 
     const [
+        originalForm,
+        setOriginalForm,
+    ] = useState(
+        INITIAL_FORM
+    );
+
+    const [
         cart,
         setCart,
     ] = useState([]);
@@ -117,102 +213,164 @@ export default function MerchandiseRevisionForm({
     const [
         proofFile,
         setProofFile,
-    ] = useState(null);
+    ] = useState(
+        null
+    );
 
     const [
         loading,
         setLoading,
-    ] = useState(true);
+    ] = useState(
+        true
+    );
 
     const [
         submitting,
         setSubmitting,
-    ] = useState(false);
+    ] = useState(
+        false
+    );
 
     const [
         fileInputKey,
         setFileInputKey,
-    ] = useState(0);
+    ] = useState(
+        0
+    );
+
+    const todayDate =
+        useMemo(
+            () =>
+                getTodayDate(),
+            []
+        );
+
+    const minimumActivityDate =
+        useMemo(
+            () =>
+                getMinimumActivityDate(),
+            []
+        );
 
     const initializeForm =
-        useCallback(() => {
-            if (!order) {
-                return;
-            }
+        useCallback(
+            () => {
+                if (
+                    !order
+                ) {
+                    return;
+                }
 
-            setForm({
-                event_name:
-                    order.event_name ||
-                    '',
+                const nextForm = {
+                    event_name:
+                        order.event_name ||
+                        '',
 
-                activity_date:
-                    order.activity_date
-                        ? String(
+                    pic_name:
+                        order.pic_name ||
+                        '',
+
+                    pic_phone:
+                        order.pic_phone ||
+                        '',
+
+                    activity_date:
+                        toInputDate(
                             order.activity_date
-                        ).slice(0, 10)
-                        : '',
+                        ),
 
-                institution_name:
-                    order.institution_name ||
-                    '',
+                    pickup_date:
+                        toInputDate(
+                            order.pickup_date
+                        ),
 
-                guest_name:
-                    order.guest_name ||
-                    '',
+                    institution_name:
+                        order.institution_name ||
+                        '',
 
-                guest_position:
-                    order.guest_position ||
-                    '',
+                    guest_name:
+                        order.guest_name ||
+                        '',
 
-                user_note:
-                    order.user_note ||
-                    '',
-            });
+                    guest_position:
+                        order.guest_position ||
+                        '',
 
-            const initialItems =
-                Array.isArray(
-                    order.items
-                )
-                    ? order.items
-                        .filter(
-                            (item) =>
-                                item.product_id ||
-                                item.product?.id
-                        )
-                        .map(
-                            (item) => ({
-                                product_id:
-                                    Number(
-                                        item.product_id ||
-                                        item.product
-                                            ?.id
-                                    ),
+                    user_note:
+                        order.user_note ||
+                        '',
+                };
 
-                                quantity:
-                                    Number(
-                                        item.quantity ||
-                                        1
-                                    ),
-                            })
-                        )
-                    : [];
+                setForm(
+                    nextForm
+                );
 
-            setCart(
-                initialItems
-            );
+                setOriginalForm(
+                    nextForm
+                );
 
-            setProofFile(null);
-            setFileInputKey(
-                (previousKey) =>
-                    previousKey + 1
-            );
-        }, [order]);
+                const initialItems =
+                    Array.isArray(
+                        order.items
+                    )
+                        ? order.items
+                              .filter(
+                                  (
+                                      item
+                                  ) =>
+                                      item.product_id ||
+                                      item.product
+                                          ?.id
+                              )
+                              .map(
+                                  (
+                                      item
+                                  ) => ({
+                                      product_id:
+                                          Number(
+                                              item.product_id ||
+                                                  item
+                                                      .product
+                                                      ?.id
+                                          ),
+
+                                      quantity:
+                                          Number(
+                                              item.quantity ||
+                                                  1
+                                          ),
+                                  })
+                              )
+                        : [];
+
+                setCart(
+                    initialItems
+                );
+
+                setProofFile(
+                    null
+                );
+
+                setFileInputKey(
+                    (
+                        previousKey
+                    ) =>
+                        previousKey +
+                        1
+                );
+            },
+            [
+                order,
+            ]
+        );
 
     const fetchProducts =
         useCallback(
             async () => {
                 try {
-                    setLoading(true);
+                    setLoading(
+                        true
+                    );
 
                     const response =
                         await api.get(
@@ -226,7 +384,9 @@ export default function MerchandiseRevisionForm({
 
                     setProducts(
                         productData.filter(
-                            (product) =>
+                            (
+                                product
+                            ) =>
                                 product.status ===
                                     'active' &&
                                 [
@@ -237,7 +397,9 @@ export default function MerchandiseRevisionForm({
                                 )
                         )
                     );
-                } catch (error) {
+                } catch (
+                    error
+                ) {
                     console.error(
                         'Fetch revision products error:',
                         error?.response
@@ -245,7 +407,9 @@ export default function MerchandiseRevisionForm({
                             error
                     );
 
-                    setProducts([]);
+                    setProducts(
+                        []
+                    );
 
                     await showErrorAlert(
                         'Gagal Memuat Produk',
@@ -255,437 +419,681 @@ export default function MerchandiseRevisionForm({
                         )
                     );
                 } finally {
-                    setLoading(false);
+                    setLoading(
+                        false
+                    );
                 }
             },
             []
         );
 
-    useEffect(() => {
-        initializeForm();
-    }, [initializeForm]);
+    useEffect(
+        () => {
+            initializeForm();
+        },
+        [
+            initializeForm,
+        ]
+    );
 
-    useEffect(() => {
-        fetchProducts();
-    }, [fetchProducts]);
+    useEffect(
+        () => {
+            fetchProducts();
+        },
+        [
+            fetchProducts,
+        ]
+    );
 
     const selectedItems =
-        useMemo(() => {
-            return cart
-                .map(
-                    (cartItem) => {
-                        const product =
-                            products.find(
-                                (item) =>
-                                    Number(
-                                        item.id
-                                    ) ===
-                                    Number(
-                                        cartItem.product_id
-                                    )
-                            );
+        useMemo(
+            () => {
+                return cart
+                    .map(
+                        (
+                            cartItem
+                        ) => {
+                            const product =
+                                products.find(
+                                    (
+                                        item
+                                    ) =>
+                                        Number(
+                                            item.id
+                                        ) ===
+                                        Number(
+                                            cartItem.product_id
+                                        )
+                                );
 
-                        return {
-                            ...cartItem,
-                            product,
-                        };
-                    }
-                )
-                .filter(
-                    (item) =>
-                        item.product
-                );
-        }, [
-            cart,
-            products,
-        ]);
+                            return {
+                                ...cartItem,
+                                product,
+                            };
+                        }
+                    )
+                    .filter(
+                        (
+                            item
+                        ) =>
+                            item.product
+                    );
+            },
+            [
+                cart,
+                products,
+            ]
+        );
 
     const totalQuantity =
-        useMemo(() => {
-            return selectedItems.reduce(
-                (
-                    total,
-                    item
-                ) =>
-                    total +
-                    Number(
-                        item.quantity ||
-                        0
-                    ),
-                0
-            );
-        }, [selectedItems]);
-
-    const handleChange = (
-        event
-    ) => {
-        const {
-            name,
-            value,
-        } = event.target;
-
-        setForm(
-            (previousForm) => ({
-                ...previousForm,
-                [name]: value,
-            })
-        );
-    };
-
-    const handleAddProduct = (
-        product
-    ) => {
-        const stock =
-            Number(
-                product.stock ||
-                0
-            );
-
-        if (
-            stock <= 0
-        ) {
-            showWarningAlert(
-                'Stok Habis',
-                `${product.name} tidak mempunyai stok tersedia.`
-            );
-
-            return;
-        }
-
-        setCart(
-            (previousCart) => {
-                const existingItem =
-                    previousCart.find(
-                        (item) =>
-                            Number(
-                                item.product_id
-                            ) ===
-                            Number(
-                                product.id
-                            )
-                    );
-
-                if (
-                    existingItem
-                ) {
-                    if (
+        useMemo(
+            () => {
+                return selectedItems.reduce(
+                    (
+                        total,
+                        item
+                    ) =>
+                        total +
                         Number(
-                            existingItem.quantity
-                        ) >= stock
-                    ) {
-                        showWarningAlert(
-                            'Stok Tidak Mencukupi',
-                            `Stok ${product.name} hanya tersedia ${stock}.`
-                        );
+                            item.quantity ||
+                                0
+                        ),
+                    0
+                );
+            },
+            [
+                selectedItems,
+            ]
+        );
 
-                        return previousCart;
+    const activityDateChanged =
+        form.activity_date !==
+        originalForm.activity_date;
+
+    const pickupDateChanged =
+        form.pickup_date !==
+        originalForm.pickup_date;
+
+    const handleChange =
+        (
+            event
+        ) => {
+            const {
+                name,
+                value,
+            } =
+                event.target;
+
+            setForm(
+                (
+                    previousForm
+                ) => {
+                    const nextForm = {
+                        ...previousForm,
+
+                        [name]:
+                            value,
+                    };
+
+                    /*
+                     * Jika tanggal kegiatan diganti
+                     * dan pickup sekarang berada
+                     * sesudah tanggal kegiatan baru,
+                     * kosongkan pickup.
+                     */
+                    if (
+                        name ===
+                            'activity_date' &&
+                        nextForm.pickup_date &&
+                        value &&
+                        nextForm.pickup_date >
+                            value
+                    ) {
+                        nextForm.pickup_date =
+                            '';
                     }
 
-                    return previousCart.map(
-                        (item) =>
-                            Number(
-                                item.product_id
-                            ) ===
-                            Number(
-                                product.id
-                            )
-                                ? {
-                                    ...item,
-                                    quantity:
-                                        Number(
-                                            item.quantity
-                                        ) + 1,
-                                }
-                                : item
-                    );
+                    return nextForm;
                 }
-
-                return [
-                    ...previousCart,
-                    {
-                        product_id:
-                            Number(
-                                product.id
-                            ),
-
-                        quantity:
-                            1,
-                    },
-                ];
-            }
-        );
-    };
-
-    const handleIncrease = (
-        product
-    ) => {
-        const stock =
-            Number(
-                product.stock ||
-                0
             );
+        };
 
-        setCart(
-            (previousCart) =>
-                previousCart.map(
-                    (item) => {
+    const handleAddProduct =
+        (
+            product
+        ) => {
+            const stock =
+                Number(
+                    product.stock ||
+                        0
+                );
+
+            if (
+                stock <=
+                0
+            ) {
+                showWarningAlert(
+                    'Stok Habis',
+                    `${product.name} tidak mempunyai stok tersedia.`
+                );
+
+                return;
+            }
+
+            setCart(
+                (
+                    previousCart
+                ) => {
+                    const existingItem =
+                        previousCart.find(
+                            (
+                                item
+                            ) =>
+                                Number(
+                                    item.product_id
+                                ) ===
+                                Number(
+                                    product.id
+                                )
+                        );
+
+                    if (
+                        existingItem
+                    ) {
                         if (
                             Number(
-                                item.product_id
-                            ) !==
-                            Number(
-                                product.id
-                            )
-                        ) {
-                            return item;
-                        }
-
-                        if (
-                            Number(
-                                item.quantity
-                            ) >= stock
+                                existingItem.quantity
+                            ) >=
+                            stock
                         ) {
                             showWarningAlert(
                                 'Stok Tidak Mencukupi',
                                 `Stok ${product.name} hanya tersedia ${stock}.`
                             );
 
-                            return item;
+                            return previousCart;
                         }
 
-                        return {
-                            ...item,
+                        return previousCart.map(
+                            (
+                                item
+                            ) =>
+                                Number(
+                                    item.product_id
+                                ) ===
+                                Number(
+                                    product.id
+                                )
+                                    ? {
+                                          ...item,
+
+                                          quantity:
+                                              Number(
+                                                  item.quantity
+                                              ) +
+                                              1,
+                                      }
+                                    : item
+                        );
+                    }
+
+                    return [
+                        ...previousCart,
+
+                        {
+                            product_id:
+                                Number(
+                                    product.id
+                                ),
+
                             quantity:
+                                1,
+                        },
+                    ];
+                }
+            );
+        };
+
+    const handleIncrease =
+        (
+            product
+        ) => {
+            const stock =
+                Number(
+                    product.stock ||
+                        0
+                );
+
+            setCart(
+                (
+                    previousCart
+                ) =>
+                    previousCart.map(
+                        (
+                            item
+                        ) => {
+                            if (
+                                Number(
+                                    item.product_id
+                                ) !==
+                                Number(
+                                    product.id
+                                )
+                            ) {
+                                return item;
+                            }
+
+                            if (
                                 Number(
                                     item.quantity
-                                ) + 1,
-                        };
-                    }
-                )
-        );
-    };
+                                ) >=
+                                stock
+                            ) {
+                                showWarningAlert(
+                                    'Stok Tidak Mencukupi',
+                                    `Stok ${product.name} hanya tersedia ${stock}.`
+                                );
 
-    const handleDecrease = (
-        productId
-    ) => {
-        setCart(
-            (previousCart) =>
-                previousCart
-                    .map(
-                        (item) =>
+                                return item;
+                            }
+
+                            return {
+                                ...item,
+
+                                quantity:
+                                    Number(
+                                        item.quantity
+                                    ) +
+                                    1,
+                            };
+                        }
+                    )
+            );
+        };
+
+    const handleDecrease =
+        (
+            productId
+        ) => {
+            setCart(
+                (
+                    previousCart
+                ) =>
+                    previousCart
+                        .map(
+                            (
+                                item
+                            ) =>
+                                Number(
+                                    item.product_id
+                                ) ===
+                                Number(
+                                    productId
+                                )
+                                    ? {
+                                          ...item,
+
+                                          quantity:
+                                              Number(
+                                                  item.quantity
+                                              ) -
+                                              1,
+                                      }
+                                    : item
+                        )
+                        .filter(
+                            (
+                                item
+                            ) =>
+                                Number(
+                                    item.quantity
+                                ) >
+                                0
+                        )
+            );
+        };
+
+    const handleRemove =
+        (
+            productId
+        ) => {
+            setCart(
+                (
+                    previousCart
+                ) =>
+                    previousCart.filter(
+                        (
+                            item
+                        ) =>
                             Number(
                                 item.product_id
-                            ) ===
+                            ) !==
                             Number(
                                 productId
                             )
-                                ? {
-                                    ...item,
-                                    quantity:
-                                        Number(
-                                            item.quantity
-                                        ) - 1,
-                                }
-                                : item
                     )
-                    .filter(
-                        (item) =>
-                            Number(
-                                item.quantity
-                            ) > 0
-                    )
-        );
-    };
+            );
+        };
 
-    const handleRemove = (
-        productId
-    ) => {
-        setCart(
-            (previousCart) =>
-                previousCart.filter(
-                    (item) =>
-                        Number(
-                            item.product_id
-                        ) !==
-                        Number(
-                            productId
-                        )
+    const handleFileChange =
+        (
+            event
+        ) => {
+            const file =
+                event.target
+                    .files?.[0];
+
+            if (
+                !file
+            ) {
+                setProofFile(
+                    null
+                );
+
+                return;
+            }
+
+            const allowedTypes = [
+                'application/pdf',
+                'image/jpeg',
+                'image/png',
+            ];
+
+            const maximumSize =
+                5 *
+                1024 *
+                1024;
+
+            if (
+                !allowedTypes.includes(
+                    file.type
                 )
-        );
-    };
+            ) {
+                showWarningAlert(
+                    'Format File Tidak Sesuai',
+                    'Lampiran hanya boleh PDF, JPG, JPEG, atau PNG.'
+                );
 
-    const handleFileChange = (
-        event
-    ) => {
-        const file =
-            event.target.files?.[0];
+                event.target.value =
+                    '';
 
-        if (!file) {
-            setProofFile(null);
-            return;
-        }
+                setProofFile(
+                    null
+                );
 
-        const allowedTypes = [
-            'application/pdf',
-            'image/jpeg',
-            'image/png',
-        ];
+                return;
+            }
 
-        const maximumSize =
-            5 * 1024 * 1024;
+            if (
+                file.size >
+                maximumSize
+            ) {
+                showWarningAlert(
+                    'Ukuran File Terlalu Besar',
+                    'Ukuran lampiran maksimal 5 MB.'
+                );
 
-        if (
-            !allowedTypes.includes(
-                file.type
-            )
-        ) {
-            showWarningAlert(
-                'Format File Tidak Sesuai',
-                'Lampiran hanya boleh PDF, JPG, JPEG, atau PNG.'
+                event.target.value =
+                    '';
+
+                setProofFile(
+                    null
+                );
+
+                return;
+            }
+
+            setProofFile(
+                file
             );
+        };
 
-            event.target.value =
-                '';
+    const validateForm =
+        async () => {
+            if (
+                !form.event_name.trim()
+            ) {
+                await showWarningAlert(
+                    'Nama Kegiatan Wajib Diisi',
+                    'Isi nama kegiatan terlebih dahulu.'
+                );
 
-            setProofFile(null);
+                return false;
+            }
 
-            return;
-        }
+            if (
+                !form.pic_name.trim()
+            ) {
+                await showWarningAlert(
+                    'Nama PIC Wajib Diisi',
+                    'Isi nama PIC kegiatan terlebih dahulu.'
+                );
 
-        if (
-            file.size >
-            maximumSize
-        ) {
-            showWarningAlert(
-                'Ukuran File Terlalu Besar',
-                'Ukuran lampiran maksimal 5 MB.'
-            );
+                return false;
+            }
 
-            event.target.value =
-                '';
+            if (
+                form.pic_name
+                    .trim()
+                    .length <
+                2
+            ) {
+                await showWarningAlert(
+                    'Nama PIC Tidak Valid',
+                    'Nama PIC minimal dua karakter.'
+                );
 
-            setProofFile(null);
+                return false;
+            }
 
-            return;
-        }
+            if (
+                !form.pic_phone.trim()
+            ) {
+                await showWarningAlert(
+                    'Nomor PIC Wajib Diisi',
+                    'Isi nomor WhatsApp atau telepon PIC.'
+                );
 
-        setProofFile(file);
-    };
+                return false;
+            }
 
-    const validateForm = () => {
-        if (
-            !form.event_name.trim()
-        ) {
-            showWarningAlert(
-                'Nama Kegiatan Wajib Diisi',
-                'Isi nama kegiatan terlebih dahulu.'
-            );
+            if (
+                form.pic_phone
+                    .trim()
+                    .length <
+                8
+            ) {
+                await showWarningAlert(
+                    'Nomor PIC Tidak Valid',
+                    'Nomor PIC minimal delapan karakter.'
+                );
 
-            return false;
-        }
+                return false;
+            }
 
-        if (
-            !form.activity_date
-        ) {
-            showWarningAlert(
-                'Tanggal Wajib Diisi',
-                'Pilih tanggal kegiatan.'
-            );
+            if (
+                !/^[0-9+\-\s().]+$/.test(
+                    form.pic_phone.trim()
+                )
+            ) {
+                await showWarningAlert(
+                    'Nomor PIC Tidak Valid',
+                    'Gunakan format nomor telepon yang benar.'
+                );
 
-            return false;
-        }
+                return false;
+            }
 
-        if (
-            !form.institution_name.trim()
-        ) {
-            showWarningAlert(
-                'Instansi Wajib Diisi',
-                'Isi nama instansi atau pihak eksternal.'
-            );
+            if (
+                !form.activity_date
+            ) {
+                await showWarningAlert(
+                    'Tanggal Wajib Diisi',
+                    'Pilih tanggal kegiatan.'
+                );
 
-            return false;
-        }
+                return false;
+            }
 
-        if (
-            !form.guest_name.trim()
-        ) {
-            showWarningAlert(
-                'Nama Tamu Wajib Diisi',
-                'Isi nama tamu.'
-            );
+            /*
+             * Jika tanggal kegiatan tidak berubah,
+             * H-4 tidak dipaksa ulang.
+             *
+             * Jika user mengganti tanggal kegiatan,
+             * tanggal baru wajib minimal H-4.
+             */
+            if (
+                activityDateChanged &&
+                form.activity_date <
+                    minimumActivityDate
+            ) {
+                await showWarningAlert(
+                    'Tanggal Kegiatan Terlalu Dekat',
+                    'Jika tanggal kegiatan diubah saat revisi, tanggal baru wajib minimal H-4 dari hari ini.'
+                );
 
-            return false;
-        }
+                return false;
+            }
 
-        if (
-            !form.guest_position.trim()
-        ) {
-            showWarningAlert(
-                'Jabatan Wajib Diisi',
-                'Isi jabatan tamu.'
-            );
+            if (
+                !form.pickup_date
+            ) {
+                await showWarningAlert(
+                    'Tanggal Pengambilan Wajib Diisi',
+                    'Pilih tanggal pengambilan merchandise.'
+                );
 
-            return false;
-        }
+                return false;
+            }
 
-        if (
-            form.user_note
-                .trim()
-                .length < 5
-        ) {
-            showWarningAlert(
-                'Catatan Belum Lengkap',
-                'Alasan atau catatan pengajuan minimal lima karakter.'
-            );
+            if (
+                form.pickup_date >
+                form.activity_date
+            ) {
+                await showWarningAlert(
+                    'Tanggal Pengambilan Tidak Valid',
+                    'Tanggal pengambilan merchandise tidak boleh setelah tanggal kegiatan.'
+                );
 
-            return false;
-        }
+                return false;
+            }
 
-        if (
-            selectedItems.length ===
-            0
-        ) {
-            showWarningAlert(
-                'Merchandise Belum Dipilih',
-                'Pilih minimal satu merchandise.'
-            );
+            /*
+             * Pickup lama boleh dipertahankan ketika
+             * hanya melakukan revisi.
+             *
+             * Jika pickup diganti, pickup baru tidak
+             * boleh menggunakan tanggal yang sudah lewat.
+             */
+            if (
+                pickupDateChanged &&
+                form.pickup_date <
+                    todayDate
+            ) {
+                await showWarningAlert(
+                    'Tanggal Pengambilan Tidak Valid',
+                    'Jika tanggal pengambilan diubah, tanggal baru tidak boleh menggunakan tanggal yang sudah lewat.'
+                );
 
-            return false;
-        }
+                return false;
+            }
 
-        const invalidStockItem =
-            selectedItems.find(
-                (item) =>
-                    Number(
-                        item.quantity
-                    ) >
-                    Number(
-                        item.product
-                            ?.stock ||
-                        0
-                    )
-            );
+            if (
+                !form.institution_name.trim()
+            ) {
+                await showWarningAlert(
+                    'Instansi Wajib Diisi',
+                    'Isi nama instansi atau pihak eksternal.'
+                );
 
-        if (
-            invalidStockItem
-        ) {
-            showWarningAlert(
-                'Stok Tidak Mencukupi',
-                `Jumlah ${invalidStockItem.product.name} melebihi stok yang tersedia.`
-            );
+                return false;
+            }
 
-            return false;
-        }
+            if (
+                !form.guest_name.trim()
+            ) {
+                await showWarningAlert(
+                    'Nama Tamu Wajib Diisi',
+                    'Isi nama tamu.'
+                );
 
-        return true;
-    };
+                return false;
+            }
+
+            if (
+                !form.guest_position.trim()
+            ) {
+                await showWarningAlert(
+                    'Jabatan Wajib Diisi',
+                    'Isi jabatan tamu.'
+                );
+
+                return false;
+            }
+
+            if (
+                form.user_note
+                    .trim()
+                    .length <
+                5
+            ) {
+                await showWarningAlert(
+                    'Catatan Belum Lengkap',
+                    'Alasan atau catatan pengajuan minimal lima karakter.'
+                );
+
+                return false;
+            }
+
+            if (
+                selectedItems.length ===
+                0
+            ) {
+                await showWarningAlert(
+                    'Merchandise Belum Dipilih',
+                    'Pilih minimal satu merchandise.'
+                );
+
+                return false;
+            }
+
+            const invalidStockItem =
+                selectedItems.find(
+                    (
+                        item
+                    ) =>
+                        Number(
+                            item.quantity
+                        ) >
+                        Number(
+                            item.product
+                                ?.stock ||
+                                0
+                        )
+                );
+
+            if (
+                invalidStockItem
+            ) {
+                await showWarningAlert(
+                    'Stok Tidak Mencukupi',
+                    `Jumlah ${invalidStockItem.product.name} melebihi stok yang tersedia.`
+                );
+
+                return false;
+            }
+
+            return true;
+        };
 
     const handleSubmit =
-        async (event) => {
+        async (
+            event
+        ) => {
             event.preventDefault();
 
             if (
-                !validateForm()
+                !(await validateForm())
             ) {
                 return;
             }
@@ -712,13 +1120,16 @@ export default function MerchandiseRevisionForm({
                 });
 
             if (
-                !confirmation.isConfirmed
+                !confirmation
+                    .isConfirmed
             ) {
                 return;
             }
 
             try {
-                setSubmitting(true);
+                setSubmitting(
+                    true
+                );
 
                 showLoadingAlert(
                     'Mengirim Perbaikan',
@@ -734,8 +1145,23 @@ export default function MerchandiseRevisionForm({
                 );
 
                 payload.append(
+                    'pic_name',
+                    form.pic_name.trim()
+                );
+
+                payload.append(
+                    'pic_phone',
+                    form.pic_phone.trim()
+                );
+
+                payload.append(
                     'activity_date',
                     form.activity_date
+                );
+
+                payload.append(
+                    'pickup_date',
+                    form.pickup_date
                 );
 
                 payload.append(
@@ -758,7 +1184,9 @@ export default function MerchandiseRevisionForm({
                     form.user_note.trim()
                 );
 
-                if (proofFile) {
+                if (
+                    proofFile
+                ) {
                     payload.append(
                         'proof_file',
                         proofFile
@@ -808,10 +1236,12 @@ export default function MerchandiseRevisionForm({
                     await onSuccess(
                         response?.data
                             ?.data ||
-                        null
+                            null
                     );
                 }
-            } catch (error) {
+            } catch (
+                error
+            ) {
                 console.error(
                     'Resubmit merchandise error:',
                     error?.response
@@ -829,7 +1259,9 @@ export default function MerchandiseRevisionForm({
                     )
                 );
             } finally {
-                setSubmitting(false);
+                setSubmitting(
+                    false
+                );
             }
         };
 
@@ -875,6 +1307,24 @@ export default function MerchandiseRevisionForm({
                     </div>
                 </div>
 
+                <div className="alert alert-info border-0 rounded-4 mb-4">
+                    <div className="d-flex align-items-start gap-3">
+                        <i className="bi bi-info-circle-fill fs-5" />
+
+                        <div>
+                            <div className="fw-black mb-1">
+                                Ketentuan Jadwal
+                            </div>
+
+                            <div className="small">
+                                Jika tanggal kegiatan lama tidak diubah, pengajuan tetap dapat dikirim ulang.
+                                Jika tanggal kegiatan diubah, tanggal baru wajib minimal H-4.
+                                Tanggal pengambilan tidak boleh setelah tanggal kegiatan.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {loading ? (
                     <div className="text-center py-5">
                         <div className="spinner-border text-warning mb-3" />
@@ -917,6 +1367,54 @@ export default function MerchandiseRevisionForm({
 
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">
+                                            Nama PIC
+                                        </label>
+
+                                        <input
+                                            type="text"
+                                            name="pic_name"
+                                            className="form-control rounded-pill"
+                                            value={
+                                                form.pic_name
+                                            }
+                                            onChange={
+                                                handleChange
+                                            }
+                                            disabled={
+                                                submitting
+                                            }
+                                            maxLength="255"
+                                            placeholder="Nama penanggung jawab kegiatan"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-bold">
+                                            Nomor PIC
+                                        </label>
+
+                                        <input
+                                            type="tel"
+                                            name="pic_phone"
+                                            className="form-control rounded-pill"
+                                            value={
+                                                form.pic_phone
+                                            }
+                                            onChange={
+                                                handleChange
+                                            }
+                                            disabled={
+                                                submitting
+                                            }
+                                            maxLength="30"
+                                            placeholder="Contoh: 081234567890"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-bold">
                                             Tanggal Kegiatan
                                         </label>
 
@@ -935,11 +1433,50 @@ export default function MerchandiseRevisionForm({
                                             }
                                             required
                                         />
+
+                                        <div className="form-text">
+                                            {activityDateChanged
+                                                ? `Tanggal baru minimal ${minimumActivityDate}.`
+                                                : 'Tanggal lama dapat dipertahankan saat revisi.'}
+                                        </div>
                                     </div>
 
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">
-                                            Instansi/Pihak Eksternal
+                                            Tanggal Pengambilan Merchandise
+                                        </label>
+
+                                        <input
+                                            type="date"
+                                            name="pickup_date"
+                                            className="form-control rounded-pill"
+                                            value={
+                                                form.pickup_date
+                                            }
+                                            onChange={
+                                                handleChange
+                                            }
+                                            max={
+                                                form.activity_date ||
+                                                undefined
+                                            }
+                                            disabled={
+                                                submitting ||
+                                                !form.activity_date
+                                            }
+                                            required
+                                        />
+
+                                        <div className="form-text">
+                                            {pickupDateChanged
+                                                ? 'Tanggal baru tidak boleh lewat dan tidak boleh setelah kegiatan.'
+                                                : 'Tanggal pengambilan lama dapat dipertahankan.'}
+                                        </div>
+                                    </div>
+
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-bold">
+                                            Instansi / Pihak Eksternal
                                         </label>
 
                                         <input
@@ -1009,6 +1546,7 @@ export default function MerchandiseRevisionForm({
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">
                                             Lampiran Baru
+
                                             <span className="text-muted fw-normal">
                                                 {' '}
                                                 (Opsional)
@@ -1020,7 +1558,7 @@ export default function MerchandiseRevisionForm({
                                                 fileInputKey
                                             }
                                             type="file"
-                                            className="form-control"
+                                            className="form-control rounded-4"
                                             accept=".pdf,.jpg,.jpeg,.png"
                                             onChange={
                                                 handleFileChange
@@ -1037,7 +1575,9 @@ export default function MerchandiseRevisionForm({
                                         {proofFile && (
                                             <div className="small fw-bold text-success mt-2">
                                                 {proofFile.name}
+
                                                 {' • '}
+
                                                 {formatFileSize(
                                                     proofFile.size
                                                 )}
@@ -1047,7 +1587,7 @@ export default function MerchandiseRevisionForm({
 
                                     <div className="col-12">
                                         <label className="form-label fw-bold">
-                                            Alasan/Catatan Pengajuan
+                                            Alasan / Catatan Pengajuan
                                         </label>
 
                                         <textarea
@@ -1112,15 +1652,20 @@ export default function MerchandiseRevisionForm({
                                     style={{
                                         maxHeight:
                                             360,
+
                                         overflowY:
                                             'auto',
                                     }}
                                 >
                                     {products.map(
-                                        (product) => {
+                                        (
+                                            product
+                                        ) => {
                                             const cartItem =
                                                 cart.find(
-                                                    (item) =>
+                                                    (
+                                                        item
+                                                    ) =>
                                                         Number(
                                                             item.product_id
                                                         ) ===
@@ -1165,7 +1710,8 @@ export default function MerchandiseRevisionForm({
                                                                     submitting ||
                                                                     Number(
                                                                         product.stock
-                                                                    ) <= 0
+                                                                    ) <=
+                                                                        0
                                                                 }
                                                             >
                                                                 Tambah

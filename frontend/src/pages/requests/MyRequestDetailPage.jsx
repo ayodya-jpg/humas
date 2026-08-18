@@ -18,51 +18,34 @@ import MerchandiseRevisionForm from '../../components/MerchandiseRevisionForm';
 const TYPE_CONFIG = {
     merchandise: {
         label: 'Merchandise',
-        title:
-            'Detail Pengajuan Merchandise',
+        title: 'Detail Pengajuan Merchandise',
         description:
             'Informasi lengkap pengajuan paket merchandise.',
-        icon:
-            'bi-gift-fill',
-        color:
-            'primary',
-        endpoint: (
-            id
-        ) =>
+        icon: 'bi-gift-fill',
+        color: 'primary',
+        endpoint: (id) =>
             `/orders/${id}`,
     },
 
     humas: {
-        label:
-            'Liputan Humas',
-        title:
-            'Detail Request Liputan Humas',
+        label: 'Layanan Humas',
+        title: 'Detail Request Layanan Humas',
         description:
-            'Informasi lengkap kebutuhan liputan dan publikasi Humas.',
-        icon:
-            'bi-camera-reels-fill',
-        color:
-            'danger',
-        endpoint: (
-            id
-        ) =>
+            'Informasi lengkap kebutuhan layanan Humas.',
+        icon: 'bi-camera-reels-fill',
+        color: 'danger',
+        endpoint: (id) =>
             `/humas-service-requests/${id}`,
     },
 
     borrowing: {
-        label:
-            'Peminjaman SEKPiM',
-        title:
-            'Detail Peminjaman SEKPiM',
+        label: 'Peminjaman SEKPiM',
+        title: 'Detail Peminjaman SEKPiM',
         description:
             'Informasi lengkap pengajuan peminjaman perlengkapan.',
-        icon:
-            'bi-box-seam-fill',
-        color:
-            'success',
-        endpoint: (
-            id
-        ) =>
+        icon: 'bi-box-seam-fill',
+        color: 'success',
+        endpoint: (id) =>
             `/borrow-requests/${id}`,
     },
 };
@@ -71,12 +54,16 @@ const STATUS_CONFIG = {
     pending: {
         label:
             'Menunggu Persetujuan',
+
         shortLabel:
             'Menunggu',
+
         badgeClass:
             'text-bg-warning',
+
         icon:
             'bi-hourglass-split',
+
         description:
             'Pengajuan sedang menunggu pemeriksaan admin.',
     },
@@ -84,12 +71,16 @@ const STATUS_CONFIG = {
     revision: {
         label:
             'Pengajuan Perlu Direvisi',
+
         shortLabel:
             'Perlu Revisi',
+
         badgeClass:
             'text-bg-info',
+
         icon:
             'bi-pencil-square',
+
         description:
             'Admin meminta data pengajuan diperbaiki sebelum dapat diproses kembali.',
     },
@@ -97,12 +88,16 @@ const STATUS_CONFIG = {
     approved: {
         label:
             'Pengajuan Disetujui',
+
         shortLabel:
             'Disetujui',
+
         badgeClass:
             'text-bg-success',
+
         icon:
             'bi-check-circle-fill',
+
         description:
             'Pengajuan telah disetujui dan masuk proses pelayanan.',
     },
@@ -110,12 +105,16 @@ const STATUS_CONFIG = {
     rejected: {
         label:
             'Pengajuan Ditolak',
+
         shortLabel:
             'Ditolak',
+
         badgeClass:
             'text-bg-danger',
+
         icon:
             'bi-x-circle-fill',
+
         description:
             'Pengajuan tidak dapat diproses lebih lanjut.',
     },
@@ -123,12 +122,16 @@ const STATUS_CONFIG = {
     completed: {
         label:
             'Layanan Selesai',
+
         shortLabel:
             'Selesai',
+
         badgeClass:
             'text-bg-primary',
+
         icon:
             'bi-check2-all',
+
         description:
             'Seluruh proses pelayanan telah selesai.',
     },
@@ -136,12 +139,16 @@ const STATUS_CONFIG = {
     borrowed: {
         label:
             'Barang Sedang Dipinjam',
+
         shortLabel:
             'Sedang Dipinjam',
+
         badgeClass:
             'text-bg-info',
+
         icon:
             'bi-box-arrow-up-right',
+
         description:
             'Barang telah diserahkan dan sedang digunakan.',
     },
@@ -149,21 +156,26 @@ const STATUS_CONFIG = {
     returned: {
         label:
             'Barang Dikembalikan',
+
         shortLabel:
             'Dikembalikan',
+
         badgeClass:
             'text-bg-secondary',
+
         icon:
             'bi-box-arrow-in-down-left',
+
         description:
             'Barang telah dikembalikan kepada petugas.',
     },
 };
 
 const COVERAGE_TYPE_CONFIG = {
-    'SOCIAL MEDIA': {
+    'REQUEST DESIGN INSTAGRAM': {
         label:
-            'Social Media',
+            'Request Design Instagram',
+
         icon:
             'bi-instagram',
     },
@@ -171,6 +183,7 @@ const COVERAGE_TYPE_CONFIG = {
     DOKUMENTASI: {
         label:
             'Dokumentasi',
+
         icon:
             'bi-camera-fill',
     },
@@ -178,13 +191,23 @@ const COVERAGE_TYPE_CONFIG = {
     'PUBLIKASI WEBSITE': {
         label:
             'Publikasi Website',
+
         icon:
             'bi-globe2',
+    },
+
+    'PUBLIKASI MEDIA MASSA': {
+        label:
+            'Publikasi Media Massa',
+
+        icon:
+            'bi-newspaper',
     },
 
     YOUTUBE: {
         label:
             'YouTube',
+
         icon:
             'bi-youtube',
     },
@@ -192,8 +215,20 @@ const COVERAGE_TYPE_CONFIG = {
     'VIDEO REELS': {
         label:
             'Video Reels',
+
         icon:
             'bi-play-btn-fill',
+    },
+
+    /*
+     * Data lama.
+     */
+    'SOCIAL MEDIA': {
+        label:
+            'Social Media (Data Lama)',
+
+        icon:
+            'bi-instagram',
     },
 };
 
@@ -231,26 +266,24 @@ const formatDate = (
             .split('-')
             .map(Number);
 
-        const parsedDate =
-            new Date(
-                year,
-                month - 1,
-                day
-            );
-
-        return parsedDate
-            .toLocaleDateString(
-                'id-ID',
-                {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric',
-                }
-            );
+        return new Date(
+            year,
+            month - 1,
+            day
+        ).toLocaleDateString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+            }
+        );
     }
 
     const parsedDate =
-        new Date(date);
+        new Date(
+            date
+        );
 
     if (
         Number.isNaN(
@@ -279,7 +312,9 @@ const formatDateTime = (
     }
 
     const parsedDate =
-        new Date(date);
+        new Date(
+            date
+        );
 
     if (
         Number.isNaN(
@@ -306,15 +341,12 @@ const formatDateTime = (
 const formatNumber = (
     value
 ) => {
-    const numberValue =
-        Number(
-            value || 0
-        );
-
     return new Intl.NumberFormat(
         'id-ID'
     ).format(
-        numberValue
+        Number(
+            value || 0
+        )
     );
 };
 
@@ -428,6 +460,72 @@ const getResolvedUnitName = (
     );
 };
 
+const getCoverageParts = (
+    coverageType
+) => {
+    if (!coverageType) {
+        return [];
+    }
+
+    return String(
+        coverageType
+    )
+        .split(
+            /[;,]/
+        )
+        .map(
+            (item) =>
+                item
+                    .trim()
+                    .toUpperCase()
+        )
+        .filter(Boolean);
+};
+
+const getCoverageLabels = (
+    coverageType
+) => {
+    const parts =
+        getCoverageParts(
+            coverageType
+        );
+
+    if (
+        parts.length ===
+        0
+    ) {
+        return '-';
+    }
+
+    return parts
+        .map(
+            (item) =>
+                COVERAGE_TYPE_CONFIG[
+                    item
+                ]?.label ||
+                item
+        )
+        .join(
+            '; '
+        );
+};
+
+const getCoverageIcon = (
+    coverageType
+) => {
+    const firstPart =
+        getCoverageParts(
+            coverageType
+        )[0];
+
+    return (
+        COVERAGE_TYPE_CONFIG[
+            firstPart
+        ]?.icon ||
+        'bi-camera-reels-fill'
+    );
+};
+
 const InfoItem = ({
     label,
     value,
@@ -441,8 +539,8 @@ const InfoItem = ({
     const linkUrl =
         isLink
             ? normalizeExternalUrl(
-                value
-            )
+                  value
+              )
             : null;
 
     return (
@@ -469,9 +567,7 @@ const InfoItem = ({
 
                     <div className="min-w-0 flex-grow-1">
                         <div className="small text-muted fw-bold mb-1">
-                            {
-                                label
-                            }
+                            {label}
                         </div>
 
                         {linkUrl ? (
@@ -483,19 +579,13 @@ const InfoItem = ({
                                 rel="noreferrer"
                                 className="fw-bold text-danger text-break text-decoration-none"
                             >
-                                {
-                                    value
-                                }
+                                {value}
 
                                 <i className="bi bi-box-arrow-up-right ms-2" />
                             </a>
                         ) : (
                             <div
-                                className={`fw-bold text-dark ${
-                                    fullWidth
-                                        ? 'text-break'
-                                        : ''
-                                }`}
+                                className="fw-bold text-dark text-break"
                                 style={{
                                     whiteSpace:
                                         fullWidth
@@ -520,6 +610,8 @@ const FileCard = ({
     fileUrl,
     icon =
         'bi-file-earmark-text-fill',
+    color =
+        'danger',
 }) => {
     const finalUrl =
         getFileUrl(
@@ -530,7 +622,9 @@ const FileCard = ({
         <div className="col-md-6">
             <div className="p-3 rounded-4 border bg-white h-100">
                 <div className="d-flex align-items-center gap-3">
-                    <div className="icon-box bg-danger-subtle text-danger">
+                    <div
+                        className={`icon-box bg-${color}-subtle text-${color}`}
+                    >
                         <i
                             className={`bi ${icon}`}
                         />
@@ -538,9 +632,7 @@ const FileCard = ({
 
                     <div className="min-w-0 flex-grow-1">
                         <div className="small text-muted fw-bold mb-1">
-                            {
-                                label
-                            }
+                            {label}
                         </div>
 
                         <div className="fw-bold text-truncate">
@@ -556,7 +648,7 @@ const FileCard = ({
                             }
                             target="_blank"
                             rel="noreferrer"
-                            className="btn btn-sm btn-outline-danger rounded-pill"
+                            className={`btn btn-sm btn-outline-${color} rounded-pill`}
                         >
                             <i className="bi bi-eye-fill me-1" />
 
@@ -570,6 +662,119 @@ const FileCard = ({
                 </div>
             </div>
         </div>
+    );
+};
+
+const RevisionHistoryCard = ({
+    histories,
+}) => {
+    if (
+        !Array.isArray(
+            histories
+        ) ||
+        histories.length ===
+            0
+    ) {
+        return null;
+    }
+
+    return (
+        <section className="card border-0 shadow-sm rounded-5 mb-4">
+            <div className="card-body p-4">
+                <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
+                    <div>
+                        <h4 className="fw-black mb-1">
+                            Riwayat Revisi
+                        </h4>
+
+                        <p className="text-muted mb-0">
+                            Seluruh permintaan revisi yang pernah diberikan admin.
+                        </p>
+                    </div>
+
+                    <span className="badge rounded-pill text-bg-info px-3 py-2">
+                        {histories.length}{' '}
+                        revisi
+                    </span>
+                </div>
+
+                <div className="d-flex flex-column gap-3">
+                    {histories.map(
+                        (
+                            history,
+                            index
+                        ) => (
+                            <div
+                                key={
+                                    history.id ||
+                                    index
+                                }
+                                className="p-4 rounded-4 border bg-light"
+                            >
+                                <div className="d-flex flex-wrap justify-content-between gap-3 mb-3">
+                                    <div className="fw-black text-info">
+                                        Revisi #
+                                        {histories.length -
+                                            index}
+                                    </div>
+
+                                    <div className="small text-muted">
+                                        {formatDateTime(
+                                            history.requested_at
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div
+                                    className="text-dark mb-3"
+                                    style={{
+                                        whiteSpace:
+                                            'pre-line',
+                                        lineHeight:
+                                            1.7,
+                                    }}
+                                >
+                                    {history.revision_note ||
+                                        '-'}
+                                </div>
+
+                                <div className="row g-2">
+                                    <div className="col-md-6">
+                                        <div className="small text-muted">
+                                            Diminta oleh
+                                        </div>
+
+                                        <div className="fw-bold">
+                                            {history
+                                                .requested_by
+                                                ?.name ||
+                                                history
+                                                    .requestedBy
+                                                    ?.name ||
+                                                'Admin'}
+                                        </div>
+                                    </div>
+
+                                    <div className="col-md-6">
+                                        <div className="small text-muted">
+                                            Dikirim ulang
+                                        </div>
+
+                                        <div className="fw-bold">
+                                            {history.resubmitted_at
+                                                ? formatDateTime(
+                                                      history.resubmitted_at
+                                                  )
+                                                : 'Belum dikirim ulang'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    )}
+                </div>
+            </div>
+        </section>
     );
 };
 
@@ -659,9 +864,9 @@ export default function MyRequestDetailPage() {
                         response
                             ?.data
                             ?.data ||
-                        response
-                            ?.data ||
-                        null
+                            response
+                                ?.data ||
+                            null
                     );
                 } catch (
                     error
@@ -679,7 +884,7 @@ export default function MyRequestDetailPage() {
                             ?.response
                             ?.data
                             ?.message ||
-                        'Detail pengajuan tidak dapat dimuat.'
+                            'Detail pengajuan tidak dapat dimuat.'
                     );
                 } finally {
                     setLoading(
@@ -693,402 +898,415 @@ export default function MyRequestDetailPage() {
             ]
         );
 
-    useEffect(() => {
-        fetchDetail();
-    }, [fetchDetail]);
+    useEffect(
+        () => {
+            fetchDetail();
+        },
+        [
+            fetchDetail,
+        ]
+    );
 
     const statusConfig =
-        useMemo(() => {
-            return (
-                STATUS_CONFIG[
-                    requestData
-                        ?.status
-                ] || {
-                    label:
+        useMemo(
+            () => {
+                return (
+                    STATUS_CONFIG[
                         requestData
-                            ?.status ||
-                        'Tidak diketahui',
+                            ?.status
+                    ] || {
+                        label:
+                            requestData
+                                ?.status ||
+                            'Tidak diketahui',
 
-                    shortLabel:
-                        requestData
-                            ?.status ||
-                        'Tidak diketahui',
+                        shortLabel:
+                            requestData
+                                ?.status ||
+                            'Tidak diketahui',
 
-                    badgeClass:
-                        'text-bg-secondary',
+                        badgeClass:
+                            'text-bg-secondary',
 
-                    icon:
-                        'bi-info-circle-fill',
+                        icon:
+                            'bi-info-circle-fill',
 
-                    description:
-                        'Status pengajuan tidak diketahui.',
-                }
-            );
-        }, [
-            requestData
-                ?.status,
-        ]);
+                        description:
+                            'Status pengajuan tidak diketahui.',
+                    }
+                );
+            },
+            [
+                requestData
+                    ?.status,
+            ]
+        );
 
     const requestCode =
-        useMemo(() => {
-            if (
-                !requestData
-            ) {
-                return '-';
-            }
+        useMemo(
+            () => {
+                if (
+                    !requestData
+                ) {
+                    return '-';
+                }
 
-            if (
-                type ===
-                'merchandise'
-            ) {
+                if (
+                    type ===
+                    'merchandise'
+                ) {
+                    return (
+                        requestData
+                            .order_code ||
+                        requestData
+                            .code ||
+                        `MER-${String(
+                            requestData.id
+                        ).padStart(
+                            4,
+                            '0'
+                        )}`
+                    );
+                }
+
+                if (
+                    type ===
+                    'humas'
+                ) {
+                    return (
+                        requestData
+                            .service_code ||
+                        requestData
+                            .code ||
+                        `HMS-${String(
+                            requestData.id
+                        ).padStart(
+                            4,
+                            '0'
+                        )}`
+                    );
+                }
+
                 return (
                     requestData
-                        .order_code ||
+                        .borrow_code ||
                     requestData
                         .code ||
-                    `MER-${String(
+                    `BRW-${String(
                         requestData.id
                     ).padStart(
                         4,
                         '0'
                     )}`
                 );
-            }
-
-            if (
-                type ===
-                'humas'
-            ) {
-                return (
-                    requestData
-                        .service_code ||
-                    requestData
-                        .code ||
-                    `HMS-${String(
-                        requestData.id
-                    ).padStart(
-                        4,
-                        '0'
-                    )}`
-                );
-            }
-
-            return (
-                requestData
-                    .borrow_code ||
-                requestData
-                    .code ||
-                `BRW-${String(
-                    requestData.id
-                ).padStart(
-                    4,
-                    '0'
-                )}`
-            );
-        }, [
-            requestData,
-            type,
-        ]);
+            },
+            [
+                requestData,
+                type,
+            ]
+        );
 
     const requestTitle =
-        useMemo(() => {
-            if (
-                !requestData
-            ) {
-                return '-';
-            }
+        useMemo(
+            () => {
+                if (
+                    !requestData
+                ) {
+                    return '-';
+                }
 
-            if (
-                type ===
-                'humas'
-            ) {
+                if (
+                    type ===
+                    'humas'
+                ) {
+                    return (
+                        getCoverageLabels(
+                            requestData
+                                .coverage_type
+                        ) ||
+                        'Layanan Humas'
+                    );
+                }
+
                 return (
-                    COVERAGE_TYPE_CONFIG[
-                        requestData
-                            .coverage_type
-                    ]?.label ||
                     requestData
-                        .coverage_type ||
+                        .title ||
                     requestData
-                        .activity_detail ||
-                    'Request Liputan Humas'
+                        .event_name ||
+                    requestData
+                        .activity_name ||
+                    requestData
+                        .purpose ||
+                    typeConfig
+                        ?.label ||
+                    'Pengajuan'
                 );
-            }
-
-            return (
-                requestData
-                    .title ||
-                requestData
-                    .event_name ||
-                requestData
-                    .activity_name ||
-                requestData
-                    .purpose ||
-                typeConfig
-                    ?.label ||
-                'Pengajuan'
-            );
-        }, [
-            requestData,
-            type,
-            typeConfig,
-        ]);
+            },
+            [
+                requestData,
+                type,
+                typeConfig,
+            ]
+        );
 
     const timelineItems =
-        useMemo(() => {
-            if (
-                !requestData
-            ) {
-                return [];
-            }
+        useMemo(
+            () => {
+                if (
+                    !requestData
+                ) {
+                    return [];
+                }
 
-            const items =
-                [];
+                const items =
+                    [];
 
-            items.push({
-                label:
-                    'Pengajuan Dikirim',
+                items.push({
+                    label:
+                        'Pengajuan Dikirim',
 
-                description:
-                    'Pengajuan berhasil dikirim ke sistem.',
+                    description:
+                        'Pengajuan berhasil dikirim ke sistem.',
 
-                date:
-                    requestData
-                        .submitted_at ||
-                    requestData
-                        .created_at,
+                    date:
+                        requestData
+                            .submitted_at ||
+                        requestData
+                            .created_at,
 
-                icon:
-                    'bi-send-check-fill',
+                    icon:
+                        'bi-send-check-fill',
 
-                status:
-                    'done',
-            });
+                    status:
+                        'done',
+                });
 
-            if (
-                requestData
-                    .status ===
-                'pending'
-            ) {
                 if (
                     requestData
-                        .resubmitted_at
+                        .status ===
+                    'pending'
+                ) {
+                    if (
+                        requestData
+                            .resubmitted_at
+                    ) {
+                        items.push({
+                            label:
+                                'Perbaikan Dikirim Ulang',
+
+                            description:
+                                'Pemohon telah mengirimkan data hasil perbaikan.',
+
+                            date:
+                                requestData
+                                    .resubmitted_at,
+
+                            icon:
+                                'bi-arrow-repeat',
+
+                            status:
+                                'done',
+                        });
+                    }
+
+                    items.push({
+                        label:
+                            'Menunggu Pemeriksaan',
+
+                        description:
+                            'Admin sedang memeriksa data pengajuan.',
+
+                        date:
+                            null,
+
+                        icon:
+                            'bi-hourglass-split',
+
+                        status:
+                            'active',
+                    });
+                }
+
+                if (
+                    requestData
+                        .status ===
+                    'revision'
                 ) {
                     items.push({
                         label:
-                            'Perbaikan Dikirim Ulang',
+                            'Revisi Diminta',
 
                         description:
-                            'Pemohon telah mengirimkan data hasil perbaikan.',
+                            requestData
+                                .admin_note ||
+                            'Admin meminta pengajuan diperbaiki.',
 
                         date:
                             requestData
-                                .resubmitted_at,
+                                .revision_requested_at ||
+                            requestData
+                                .updated_at,
 
                         icon:
-                            'bi-arrow-repeat',
+                            'bi-pencil-square',
+
+                        status:
+                            'active',
+                    });
+                }
+
+                if (
+                    [
+                        'approved',
+                        'completed',
+                        'borrowed',
+                        'returned',
+                    ].includes(
+                        requestData
+                            .status
+                    )
+                ) {
+                    items.push({
+                        label:
+                            'Pengajuan Disetujui',
+
+                        description:
+                            'Admin telah menyetujui pengajuan.',
+
+                        date:
+                            requestData
+                                .approved_at ||
+                            requestData
+                                .updated_at,
+
+                        icon:
+                            'bi-check-circle-fill',
 
                         status:
                             'done',
                     });
                 }
 
-                items.push({
-                    label:
-                        'Menunggu Pemeriksaan',
-
-                    description:
-                        'Admin sedang memeriksa data pengajuan.',
-
-                    date:
-                        null,
-
-                    icon:
-                        'bi-hourglass-split',
-
-                    status:
-                        'active',
-                });
-            }
-
-            if (
-                requestData
-                    .status ===
-                'revision'
-            ) {
-                items.push({
-                    label:
-                        'Revisi Diminta',
-
-                    description:
-                        requestData
-                            .admin_note ||
-                        'Admin meminta pengajuan diperbaiki.',
-
-                    date:
-                        requestData
-                            .revision_requested_at ||
-                        requestData
-                            .updated_at,
-
-                    icon:
-                        'bi-pencil-square',
-
-                    status:
-                        'active',
-                });
-            }
-
-            if (
-                [
-                    'approved',
-                    'completed',
-                    'borrowed',
-                    'returned',
-                ].includes(
+                if (
                     requestData
-                        .status
-                )
-            ) {
-                items.push({
-                    label:
-                        'Pengajuan Disetujui',
+                        .status ===
+                    'rejected'
+                ) {
+                    items.push({
+                        label:
+                            'Pengajuan Ditolak',
 
-                    description:
-                        'Admin telah menyetujui pengajuan.',
+                        description:
+                            requestData
+                                .admin_note ||
+                            'Pengajuan tidak dapat diproses.',
 
-                    date:
+                        date:
+                            requestData
+                                .rejected_at ||
+                            requestData
+                                .updated_at,
+
+                        icon:
+                            'bi-x-circle-fill',
+
+                        status:
+                            'rejected',
+                    });
+                }
+
+                if (
+                    [
+                        'borrowed',
+                        'returned',
+                    ].includes(
                         requestData
-                            .approved_at ||
-                        requestData
-                            .updated_at,
+                            .status
+                    )
+                ) {
+                    items.push({
+                        label:
+                            'Barang Diserahkan',
 
-                    icon:
-                        'bi-check-circle-fill',
+                        description:
+                            'Barang telah diserahkan kepada pemohon.',
 
-                    status:
-                        'done',
-                });
-            }
+                        date:
+                            requestData
+                                .borrowed_at ||
+                            requestData
+                                .updated_at,
 
-            if (
-                requestData
-                    .status ===
-                'rejected'
-            ) {
-                items.push({
-                    label:
-                        'Pengajuan Ditolak',
+                        icon:
+                            'bi-box-arrow-up-right',
 
-                    description:
-                        requestData
-                            .admin_note ||
-                        'Pengajuan tidak dapat diproses.',
+                        status:
+                            'done',
+                    });
+                }
 
-                    date:
-                        requestData
-                            .rejected_at ||
-                        requestData
-                            .updated_at,
-
-                    icon:
-                        'bi-x-circle-fill',
-
-                    status:
-                        'rejected',
-                });
-            }
-
-            if (
-                [
-                    'borrowed',
-                    'returned',
-                ].includes(
+                if (
                     requestData
-                        .status
-                )
-            ) {
-                items.push({
-                    label:
-                        'Barang Diserahkan',
+                        .status ===
+                    'completed'
+                ) {
+                    items.push({
+                        label:
+                            'Layanan Selesai',
 
-                    description:
-                        'Barang telah diserahkan kepada pemohon.',
+                        description:
+                            type ===
+                            'humas'
+                                ? 'Hasil pekerjaan Humas telah tersedia.'
+                                : 'Seluruh proses pelayanan telah diselesaikan.',
 
-                    date:
-                        requestData
-                            .borrowed_at ||
-                        requestData
-                            .updated_at,
+                        date:
+                            requestData
+                                .completed_at ||
+                            requestData
+                                .updated_at,
 
-                    icon:
-                        'bi-box-arrow-up-right',
+                        icon:
+                            'bi-check2-all',
 
-                    status:
-                        'done',
-                });
-            }
+                        status:
+                            'done',
+                    });
+                }
 
-            if (
-                requestData
-                    .status ===
-                'completed'
-            ) {
-                items.push({
-                    label:
-                        'Layanan Selesai',
+                if (
+                    requestData
+                        .status ===
+                    'returned'
+                ) {
+                    items.push({
+                        label:
+                            'Barang Dikembalikan',
 
-                    description:
-                        type ===
-                        'humas'
-                            ? 'Hasil pekerjaan Humas telah tersedia.'
-                            : 'Seluruh proses pelayanan telah diselesaikan.',
+                        description:
+                            'Barang telah dikembalikan kepada petugas.',
 
-                    date:
-                        requestData
-                            .completed_at ||
-                        requestData
-                            .updated_at,
+                        date:
+                            requestData
+                                .returned_at ||
+                            requestData
+                                .updated_at,
 
-                    icon:
-                        'bi-check2-all',
+                        icon:
+                            'bi-box-arrow-in-down-left',
 
-                    status:
-                        'done',
-                });
-            }
+                        status:
+                            'done',
+                    });
+                }
 
-            if (
-                requestData
-                    .status ===
-                'returned'
-            ) {
-                items.push({
-                    label:
-                        'Barang Dikembalikan',
-
-                    description:
-                        'Barang telah dikembalikan kepada petugas.',
-
-                    date:
-                        requestData
-                            .returned_at ||
-                        requestData
-                            .updated_at,
-
-                    icon:
-                        'bi-box-arrow-in-down-left',
-
-                    status:
-                        'done',
-                });
-            }
-
-            return items;
-        }, [
-            requestData,
-            type,
-        ]);
+                return items;
+            },
+            [
+                requestData,
+                type,
+            ]
+        );
 
     if (
         !typeConfig
@@ -1123,7 +1341,9 @@ export default function MyRequestDetailPage() {
         );
     }
 
-    if (loading) {
+    if (
+        loading
+    ) {
         return (
             <div className="container-fluid px-0">
                 <div className="card border-0 shadow-sm rounded-5">
@@ -1219,6 +1439,13 @@ export default function MyRequestDetailPage() {
             .borrow_request_items ||
         [];
 
+    const revisionHistories =
+        requestData
+            .revision_histories ||
+        requestData
+            .revisionHistories ||
+        [];
+
     const resolvedUnitName =
         getResolvedUnitName(
             requestData
@@ -1229,6 +1456,27 @@ export default function MyRequestDetailPage() {
             requestData
                 .result_link
         );
+
+    const resultFileUrl =
+        requestData
+            .result_file_url ||
+        requestData
+            .result_file_path ||
+        null;
+
+    const handoverEvidenceUrl =
+        requestData
+            .handover_evidence_url ||
+        requestData
+            .handover_evidence_path ||
+        null;
+
+    const returnEvidenceUrl =
+        requestData
+            .return_evidence_url ||
+        requestData
+            .return_evidence_path ||
+        null;
 
     return (
         <div className="container-fluid px-0">
@@ -1379,7 +1627,7 @@ export default function MyRequestDetailPage() {
                     'completed' && (
                 <section className="card border-0 shadow-sm rounded-5 mb-4">
                     <div className="card-body p-4">
-                        <div className="d-flex flex-wrap align-items-center justify-content-between gap-4">
+                        <div className="d-flex flex-wrap align-items-center justify-content-between gap-4 mb-4">
                             <div className="d-flex align-items-start gap-3">
                                 <div className="icon-box bg-success-subtle text-success">
                                     <i className="bi bi-cloud-check-fill" />
@@ -1387,11 +1635,11 @@ export default function MyRequestDetailPage() {
 
                                 <div>
                                     <h4 className="fw-black mb-1">
-                                        Hasil Pekerjaan
+                                        Hasil Pekerjaan Humas
                                     </h4>
 
                                     <p className="text-muted mb-0">
-                                        Request liputan telah selesai diproses oleh tim Humas.
+                                        Request layanan Humas telah selesai diproses.
                                     </p>
                                 </div>
                             </div>
@@ -1407,9 +1655,59 @@ export default function MyRequestDetailPage() {
                                 >
                                     <i className="bi bi-box-arrow-up-right me-2" />
 
-                                    Buka Hasil
+                                    Buka Link Hasil
                                 </a>
                             )}
+                        </div>
+
+                        <div className="row g-3">
+                            <FileCard
+                                label="File Hasil Admin"
+                                fileName={
+                                    requestData
+                                        .result_file_name
+                                }
+                                fileUrl={
+                                    resultFileUrl
+                                }
+                                icon="bi-file-earmark-check-fill"
+                                color="success"
+                            />
+
+                            <div className="col-md-6">
+                                <div className="p-3 rounded-4 border bg-white h-100">
+                                    <div className="d-flex align-items-center gap-3">
+                                        <div className="icon-box bg-success-subtle text-success">
+                                            <i className="bi-link-45deg" />
+                                        </div>
+
+                                        <div className="flex-grow-1">
+                                            <div className="small text-muted fw-bold mb-1">
+                                                Link Hasil
+                                            </div>
+
+                                            {resultUrl ? (
+                                                <a
+                                                    href={
+                                                        resultUrl
+                                                    }
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="fw-bold text-success text-decoration-none"
+                                                >
+                                                    Buka hasil
+
+                                                    <i className="bi bi-box-arrow-up-right ms-2" />
+                                                </a>
+                                            ) : (
+                                                <div className="fw-bold">
+                                                    Tidak tersedia
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {requestData
@@ -1433,6 +1731,61 @@ export default function MyRequestDetailPage() {
                                 </div>
                             </div>
                         )}
+                    </div>
+                </section>
+            )}
+
+            {type ===
+                'borrowing' &&
+                (
+                    handoverEvidenceUrl ||
+                    returnEvidenceUrl
+                ) && (
+                <section className="card border-0 shadow-sm rounded-5 mb-4">
+                    <div className="card-body p-4">
+                        <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
+                            <div>
+                                <h4 className="fw-black mb-1">
+                                    Bukti Proses Peminjaman
+                                </h4>
+
+                                <p className="text-muted mb-0">
+                                    Bukti serah terima dan pengembalian yang diunggah admin.
+                                </p>
+                            </div>
+
+                            <div className="icon-box bg-success-subtle text-success">
+                                <i className="bi bi-folder-check" />
+                            </div>
+                        </div>
+
+                        <div className="row g-3">
+                            <FileCard
+                                label="Bukti Serah Terima"
+                                fileName={
+                                    requestData
+                                        .handover_evidence_name
+                                }
+                                fileUrl={
+                                    handoverEvidenceUrl
+                                }
+                                icon="bi-box-arrow-up-right"
+                                color="success"
+                            />
+
+                            <FileCard
+                                label="Bukti Pengembalian"
+                                fileName={
+                                    requestData
+                                        .return_evidence_name
+                                }
+                                fileUrl={
+                                    returnEvidenceUrl
+                                }
+                                icon="bi-box-arrow-in-down-left"
+                                color="success"
+                            />
+                        </div>
                     </div>
                 </section>
             )}
@@ -1476,13 +1829,16 @@ export default function MyRequestDetailPage() {
                                     icon="bi-person-fill"
                                 />
 
-                                <InfoItem
-                                    label="Unit/Bagian"
-                                    value={
-                                        resolvedUnitName
-                                    }
-                                    icon="bi-building-fill"
-                                />
+                                {type !==
+                                    'merchandise' && (
+                                    <InfoItem
+                                        label="Unit / Bagian"
+                                        value={
+                                            resolvedUnitName
+                                        }
+                                        icon="bi-building-fill"
+                                    />
+                                )}
 
                                 {type ===
                                     'merchandise' && (
@@ -1508,25 +1864,30 @@ export default function MyRequestDetailPage() {
                                         />
 
                                         <InfoItem
-                                            label="Lokasi Kegiatan"
-                                            value={
+                                            label="Tanggal Pengambilan Merchandise"
+                                            value={formatDate(
                                                 requestData
-                                                    .event_location ||
-                                                requestData
-                                                    .location
-                                            }
-                                            icon="bi-geo-alt-fill"
+                                                    .pickup_date
+                                            )}
+                                            icon="bi-calendar-check-fill"
                                         />
 
                                         <InfoItem
-                                            label="Jenis Kegiatan"
+                                            label="Nama PIC"
                                             value={
                                                 requestData
-                                                    .event_type ||
-                                                requestData
-                                                    .activity_type
+                                                    .pic_name
                                             }
-                                            icon="bi-tags-fill"
+                                            icon="bi-person-check-fill"
+                                        />
+
+                                        <InfoItem
+                                            label="Nomor PIC"
+                                            value={
+                                                requestData
+                                                    .pic_phone
+                                            }
+                                            icon="bi-whatsapp"
                                         />
 
                                         <InfoItem
@@ -1557,10 +1918,8 @@ export default function MyRequestDetailPage() {
                                         />
 
                                         <InfoItem
-                                            label="Tujuan Penggunaan"
+                                            label="Alasan / Catatan Pengajuan"
                                             value={
-                                                requestData
-                                                    .usage_purpose ||
                                                 requestData
                                                     .user_note
                                             }
@@ -1583,23 +1942,15 @@ export default function MyRequestDetailPage() {
                                         />
 
                                         <InfoItem
-                                            label="Jenis Liputan"
-                                            value={
-                                                COVERAGE_TYPE_CONFIG[
-                                                    requestData
-                                                        .coverage_type
-                                                ]?.label ||
+                                            label="Jenis Layanan Humas"
+                                            value={getCoverageLabels(
                                                 requestData
-                                                    .coverage_type ||
-                                                '-'
-                                            }
-                                            icon={
-                                                COVERAGE_TYPE_CONFIG[
-                                                    requestData
-                                                        .coverage_type
-                                                ]?.icon ||
-                                                'bi-camera-reels-fill'
-                                            }
+                                                    .coverage_type
+                                            )}
+                                            icon={getCoverageIcon(
+                                                requestData
+                                                    .coverage_type
+                                            )}
                                         />
 
                                         <InfoItem
@@ -1647,50 +1998,8 @@ export default function MyRequestDetailPage() {
                                     'borrowing' && (
                                     <>
                                         <InfoItem
-                                            label="Nama Kegiatan"
-                                            value={
-                                                requestData
-                                                    .event_name ||
-                                                requestData
-                                                    .activity_name
-                                            }
-                                            icon="bi-calendar-event-fill"
-                                        />
-
-                                        <InfoItem
-                                            label="Penanggung Jawab"
-                                            value={
-                                                requestData
-                                                    .person_in_charge
-                                            }
-                                            icon="bi-person-check-fill"
-                                        />
-
-                                        <InfoItem
-                                            label="Nomor WhatsApp"
-                                            value={
-                                                requestData
-                                                    .phone_number ||
-                                                requestData
-                                                    .whatsapp_number
-                                            }
-                                            icon="bi-whatsapp"
-                                        />
-
-                                        <InfoItem
-                                            label="Lokasi Kegiatan"
-                                            value={
-                                                requestData
-                                                    .location
-                                            }
-                                            icon="bi-geo-alt-fill"
-                                        />
-
-                                        <InfoItem
                                             label="Tanggal Pengambilan"
-                                            value={formatDateTime(
-                                                requestData
-                                                    .borrow_at ||
+                                            value={formatDate(
                                                 requestData
                                                     .borrow_date
                                             )}
@@ -1699,9 +2008,7 @@ export default function MyRequestDetailPage() {
 
                                         <InfoItem
                                             label="Tanggal Pengembalian"
-                                            value={formatDateTime(
-                                                requestData
-                                                    .return_at ||
+                                            value={formatDate(
                                                 requestData
                                                     .return_date
                                             )}
@@ -1719,22 +2026,20 @@ export default function MyRequestDetailPage() {
                                         />
                                     </>
                                 )}
-
-                                {requestData
-                                    .user_note && (
-                                    <InfoItem
-                                        label="Catatan Pemohon"
-                                        value={
-                                            requestData
-                                                .user_note
-                                        }
-                                        icon="bi-sticky-fill"
-                                        fullWidth
-                                    />
-                                )}
                             </div>
                         </div>
                     </section>
+
+                    {type ===
+                        'merchandise' &&
+                        revisionHistories.length >
+                            0 && (
+                        <RevisionHistoryCard
+                            histories={
+                                revisionHistories
+                            }
+                        />
+                    )}
 
                     {type ===
                         'merchandise' &&
@@ -1742,24 +2047,9 @@ export default function MyRequestDetailPage() {
                             0 && (
                         <section className="card border-0 shadow-sm rounded-5 mb-4">
                             <div className="card-body p-4">
-                                <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
-                                    <div>
-                                        <h4 className="fw-black mb-1">
-                                            Paket Merchandise
-                                        </h4>
-
-                                        <p className="text-muted mb-0">
-                                            Daftar merchandise yang diajukan.
-                                        </p>
-                                    </div>
-
-                                    <span className="badge rounded-pill text-bg-primary px-3 py-2">
-                                        {
-                                            orderItems.length
-                                        }{' '}
-                                        item
-                                    </span>
-                                </div>
+                                <h4 className="fw-black mb-4">
+                                    Paket Merchandise
+                                </h4>
 
                                 <div className="table-responsive">
                                     <table className="table align-middle">
@@ -1798,16 +2088,6 @@ export default function MyRequestDetailPage() {
                                                                         .name ||
                                                                     'Produk'}
                                                             </div>
-
-                                                            <div className="small text-muted">
-                                                                {item
-                                                                    .product
-                                                                    ?.category
-                                                                    ?.name ||
-                                                                    item
-                                                                        .category_name ||
-                                                                    '-'}
-                                                            </div>
                                                         </td>
 
                                                         <td className="text-center fw-black">
@@ -1832,24 +2112,9 @@ export default function MyRequestDetailPage() {
                             0 && (
                         <section className="card border-0 shadow-sm rounded-5 mb-4">
                             <div className="card-body p-4">
-                                <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
-                                    <div>
-                                        <h4 className="fw-black mb-1">
-                                            Perlengkapan Dipinjam
-                                        </h4>
-
-                                        <p className="text-muted mb-0">
-                                            Daftar perlengkapan yang diajukan.
-                                        </p>
-                                    </div>
-
-                                    <span className="badge rounded-pill text-bg-success px-3 py-2">
-                                        {
-                                            borrowItems.length
-                                        }{' '}
-                                        item
-                                    </span>
-                                </div>
+                                <h4 className="fw-black mb-4">
+                                    Perlengkapan Dipinjam
+                                </h4>
 
                                 <div className="table-responsive">
                                     <table className="table align-middle">
@@ -1888,16 +2153,6 @@ export default function MyRequestDetailPage() {
                                                                         .name ||
                                                                     'Perlengkapan'}
                                                             </div>
-
-                                                            <div className="small text-muted">
-                                                                {item
-                                                                    .product
-                                                                    ?.category
-                                                                    ?.name ||
-                                                                    item
-                                                                        .category_name ||
-                                                                    '-'}
-                                                            </div>
                                                         </td>
 
                                                         <td className="text-center fw-black">
@@ -1929,111 +2184,69 @@ export default function MyRequestDetailPage() {
                             <div className="row g-3">
                                 {type ===
                                     'merchandise' && (
-                                    <>
-                                        <FileCard
-                                            label="Bukti Undangan/Dokumen"
-                                            fileName={
-                                                requestData
-                                                    .proof_file_name ||
-                                                requestData
-                                                    .attachment_file_name
-                                            }
-                                            fileUrl={
-                                                requestData
-                                                    .proof_file_url ||
-                                                requestData
-                                                    .proof_file_path ||
-                                                requestData
-                                                    .attachment_file_url ||
-                                                requestData
-                                                    .attachment_file_path
-                                            }
-                                        />
-
-                                        <FileCard
-                                            label="Proposal Kegiatan"
-                                            fileName={
-                                                requestData
-                                                    .proposal_file_name
-                                            }
-                                            fileUrl={
-                                                requestData
-                                                    .proposal_file_url ||
-                                                requestData
-                                                    .proposal_file_path
-                                            }
-                                            icon="bi-file-earmark-pdf-fill"
-                                        />
-                                    </>
+                                    <FileCard
+                                        label="Bukti Undangan / Dokumen"
+                                        fileName={
+                                            requestData
+                                                .proof_file_name
+                                        }
+                                        fileUrl={
+                                            requestData
+                                                .proof_file_url ||
+                                            requestData
+                                                .proof_file_path
+                                        }
+                                        color="primary"
+                                    />
                                 )}
 
                                 {type ===
                                     'humas' && (
-                                    <>
-                                        <FileCard
-                                            label="Draft Artikel"
-                                            fileName={
-                                                requestData
-                                                    .article_draft_name ||
-                                                requestData
-                                                    .article_draft_file_name
-                                            }
-                                            fileUrl={
-                                                requestData
-                                                    .article_draft_url ||
-                                                requestData
-                                                    .article_draft_path ||
-                                                requestData
-                                                    .article_draft
-                                            }
-                                            icon="bi-file-earmark-richtext-fill"
-                                        />
-
-                                        <FileCard
-                                            label="Dokumen Pendukung"
-                                            fileName={
-                                                requestData
-                                                    .attachment_file_name
-                                            }
-                                            fileUrl={
-                                                requestData
-                                                    .attachment_file_url ||
-                                                requestData
-                                                    .attachment_file_path
-                                            }
-                                        />
-                                    </>
+                                    <FileCard
+                                        label="Lampiran / Brief Kegiatan"
+                                        fileName={
+                                            requestData
+                                                .article_draft_name ||
+                                            'Lampiran / Brief Kegiatan'
+                                        }
+                                        fileUrl={
+                                            requestData
+                                                .article_draft_url ||
+                                            requestData
+                                                .article_draft_path
+                                        }
+                                        icon="bi-file-earmark-arrow-up-fill"
+                                        color="danger"
+                                    />
                                 )}
 
                                 {type ===
                                     'borrowing' && (
                                     <>
                                         <FileCard
-                                            label="Surat Tugas"
+                                            label="Bukti Serah Terima"
                                             fileName={
                                                 requestData
-                                                    .assignment_letter_name
+                                                    .handover_evidence_name
                                             }
                                             fileUrl={
-                                                requestData
-                                                    .assignment_letter_url ||
-                                                requestData
-                                                    .assignment_letter_path
+                                                handoverEvidenceUrl
                                             }
+                                            icon="bi-box-arrow-up-right"
+                                            color="success"
                                         />
 
                                         <FileCard
-                                            label="Proposal Kegiatan"
+                                            label="Bukti Pengembalian"
                                             fileName={
                                                 requestData
-                                                    .proposal_file_name
+                                                    .return_evidence_name
                                             }
                                             fileUrl={
-                                                requestData
-                                                    .proposal_file_url ||
-                                                requestData
-                                                    .proposal_file_path
+                                                returnEvidenceUrl
                                             }
+                                            icon="bi-box-arrow-in-down-left"
+                                            color="success"
                                         />
                                     </>
                                 )}
@@ -2079,6 +2292,26 @@ export default function MyRequestDetailPage() {
                                 </p>
                             </div>
 
+                            {type ===
+                                'merchandise' &&
+                                requestData
+                                    .pickup_date && (
+                                <div className="p-3 rounded-4 bg-primary-subtle mb-4">
+                                    <div className="small text-muted mb-1">
+                                        Jadwal Pengambilan Merchandise
+                                    </div>
+
+                                    <div className="fw-black text-primary">
+                                        <i className="bi bi-calendar-check-fill me-2" />
+
+                                        {formatDate(
+                                            requestData
+                                                .pickup_date
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="request-timeline">
                                 {timelineItems.map(
                                     (
@@ -2092,8 +2325,8 @@ export default function MyRequestDetailPage() {
                                                     ? 'active'
                                                     : item.status ===
                                                         'rejected'
-                                                        ? 'rejected'
-                                                        : 'done'
+                                                      ? 'rejected'
+                                                      : 'done'
                                             }`}
                                             key={`${item.label}-${index}`}
                                         >
@@ -2110,13 +2343,7 @@ export default function MyRequestDetailPage() {
                                                     }
                                                 </div>
 
-                                                <div
-                                                    className="small text-muted mb-1"
-                                                    style={{
-                                                        whiteSpace:
-                                                            'pre-line',
-                                                    }}
-                                                >
+                                                <div className="small text-muted mb-1">
                                                     {
                                                         item.description
                                                     }
@@ -2133,87 +2360,6 @@ export default function MyRequestDetailPage() {
                                         </div>
                                     )
                                 )}
-                            </div>
-                        </div>
-                    </section>
-
-                    <section className="card border-0 shadow-sm rounded-5 mb-4">
-                        <div className="card-body p-4">
-                            <h5 className="fw-black mb-3">
-                                Ringkasan
-                            </h5>
-
-                            <div className="d-flex justify-content-between gap-3 py-2 border-bottom">
-                                <span className="text-muted">
-                                    Kode
-                                </span>
-
-                                <strong className="text-end">
-                                    {
-                                        requestCode
-                                    }
-                                </strong>
-                            </div>
-
-                            <div className="d-flex justify-content-between gap-3 py-2 border-bottom">
-                                <span className="text-muted">
-                                    Dibuat
-                                </span>
-
-                                <strong className="text-end">
-                                    {formatDate(
-                                        requestData
-                                            .created_at
-                                    )}
-                                </strong>
-                            </div>
-
-                            {type ===
-                                'merchandise' &&
-                                requestData
-                                    .revision_requested_at && (
-                                <div className="d-flex justify-content-between gap-3 py-2 border-bottom">
-                                    <span className="text-muted">
-                                        Revisi Diminta
-                                    </span>
-
-                                    <strong className="text-end">
-                                        {formatDateTime(
-                                            requestData
-                                                .revision_requested_at
-                                        )}
-                                    </strong>
-                                </div>
-                            )}
-
-                            {type ===
-                                'merchandise' &&
-                                requestData
-                                    .resubmitted_at && (
-                                <div className="d-flex justify-content-between gap-3 py-2 border-bottom">
-                                    <span className="text-muted">
-                                        Dikirim Ulang
-                                    </span>
-
-                                    <strong className="text-end">
-                                        {formatDateTime(
-                                            requestData
-                                                .resubmitted_at
-                                        )}
-                                    </strong>
-                                </div>
-                            )}
-
-                            <div className="d-flex justify-content-between gap-3 py-2">
-                                <span className="text-muted">
-                                    Status
-                                </span>
-
-                                <strong className="text-end">
-                                    {
-                                        statusConfig.shortLabel
-                                    }
-                                </strong>
                             </div>
                         </div>
                     </section>

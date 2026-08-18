@@ -12,11 +12,18 @@ class Order extends Model
     protected $fillable = [
         'user_id',
         'order_code',
+
         'event_name',
+
+        'pic_name',
+        'pic_phone',
+
         'institution_name',
         'guest_name',
         'guest_position',
+
         'activity_date',
+        'pickup_date',
 
         'proof_link',
         'proof_file_path',
@@ -45,6 +52,7 @@ class Order extends Model
         'user_id' => 'integer',
 
         'activity_date' => 'date:Y-m-d',
+        'pickup_date' => 'date:Y-m-d',
 
         'submitted_at' => 'datetime',
         'revision_requested_at' => 'datetime',
@@ -102,9 +110,6 @@ class Order extends Model
 
     /**
      * Riwayat revisi paling baru.
-     *
-     * Untuk penggunaan query biasa, sebaiknya
-     * tetap eager-load revisionHistories.
      */
     public function latestRevisionHistory(): HasMany
     {

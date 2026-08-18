@@ -1,12 +1,12 @@
 import {
     useCallback,
     useEffect,
+    useMemo,
     useState,
 } from 'react';
 
 import {
     Link,
-    Navigate,
     useNavigate,
     useParams,
 } from 'react-router-dom';
@@ -14,76 +14,174 @@ import {
 import api from '../../api/axios';
 
 import {
-    getDefaultPath,
-    getStoredUser,
-    hasPermission,
-} from '../../components/ProtectedRoute';
-
-import {
     closeAlert,
     showConfirmAlert,
     showErrorAlert,
     showLoadingAlert,
     showSuccessAlert,
-    showWarningAlert,
+    showTextareaAlert,
 } from '../../utils/sweetAlert';
 
 const STATUS_CONFIG = {
     pending: {
         label: 'Menunggu',
-        badgeClass: 'bg-warning-subtle text-warning-emphasis',
-        icon: 'bi-hourglass-split',
+        badgeClass:
+            'bg-warning-subtle text-warning-emphasis',
+        icon:
+            'bi-hourglass-split',
     },
-    revision: {
-        label: 'Perlu Revisi',
-        badgeClass: 'bg-info-subtle text-info-emphasis',
-        icon: 'bi-pencil-square',
-    },
+
     approved: {
         label: 'Disetujui',
-        badgeClass: 'bg-primary-subtle text-primary',
-        icon: 'bi-check-circle-fill',
+        badgeClass:
+            'bg-primary-subtle text-primary',
+        icon:
+            'bi-check-circle-fill',
     },
+
     rejected: {
         label: 'Ditolak',
-        badgeClass: 'bg-danger-subtle text-danger',
-        icon: 'bi-x-circle-fill',
+        badgeClass:
+            'bg-danger-subtle text-danger',
+        icon:
+            'bi-x-circle-fill',
     },
+
     completed: {
         label: 'Selesai',
-        badgeClass: 'bg-success-subtle text-success',
-        icon: 'bi-check2-all',
+        badgeClass:
+            'bg-success-subtle text-success',
+        icon:
+            'bi-check2-all',
     },
 };
 
-const getBackendErrorMessage = (
-    error,
-    fallbackMessage
-) => {
-    const responseData = error?.response?.data;
+const COVERAGE_CONFIG = {
+    'REQUEST DESIGN INSTAGRAM': {
+        label:
+            'Request Design Instagram',
+        icon:
+            'bi-instagram',
+    },
 
-    if (responseData?.errors) {
-        const firstError =
-            Object.values(responseData.errors)?.[0]?.[0];
+    DOKUMENTASI: {
+        label:
+            'Dokumentasi',
+        icon:
+            'bi-camera-fill',
+    },
 
-        if (firstError) {
-            return firstError;
-        }
-    }
+    'PUBLIKASI WEBSITE': {
+        label:
+            'Publikasi Website',
+        icon:
+            'bi-globe2',
+    },
 
-    return responseData?.message || fallbackMessage;
+    'PUBLIKASI MEDIA MASSA': {
+        label:
+            'Publikasi Media Massa',
+        icon:
+            'bi-newspaper',
+    },
+
+    YOUTUBE: {
+        label:
+            'YouTube',
+        icon:
+            'bi-youtube',
+    },
+
+    'VIDEO REELS': {
+        label:
+            'Video Reels',
+        icon:
+            'bi-play-btn-fill',
+    },
+
+    /*
+     * Legacy.
+     * Hanya untuk membaca request lama.
+     */
+    'SOCIAL MEDIA': {
+        label:
+            'Social Media (Data Lama)',
+        icon:
+            'bi-instagram',
+    },
 };
 
-const formatDate = (date) => {
-    if (!date) {
+const getCurrentUser = () => {
+    try {
+        return JSON.parse(
+            localStorage.getItem(
+                'admin_user'
+            ) || '{}'
+        );
+    } catch {
+        return {};
+    }
+};
+
+const normalizePermissions = (
+    permissions
+) => {
+    if (
+        !Array.isArray(
+            permissions
+        )
+    ) {
+        return [];
+    }
+
+    return [
+        ...new Set(
+            permissions.filter(
+                Boolean
+            )
+        ),
+    ];
+};
+
+const hasPermission = (
+    currentUser,
+    permission
+) => {
+    if (
+        currentUser?.role ===
+        'superadmin'
+    ) {
+        return true;
+    }
+
+    return normalizePermissions(
+        currentUser?.permissions
+    ).includes(
+        permission
+    );
+};
+
+const formatDate = (
+    dateValue
+) => {
+    if (
+        !dateValue
+    ) {
         return '-';
     }
 
     if (
-        typeof date === 'string' &&
-        /^\d{4}-\d{2}-\d{2}$/.test(date)
+        typeof dateValue ===
+            'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(
+            dateValue
+        )
     ) {
-        const [year, month, day] = date
+        const [
+            year,
+            month,
+            day,
+        ] = dateValue
             .split('-')
             .map(Number);
 
@@ -91,73 +189,285 @@ const formatDate = (date) => {
             year,
             month - 1,
             day
-        ).toLocaleDateString('id-ID', {
-            day: '2-digit',
-            month: 'long',
-            year: 'numeric',
-        });
+        ).toLocaleDateString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+            }
+        );
     }
 
-    const parsedDate = new Date(date);
+    const parsedDate =
+        new Date(
+            dateValue
+        );
 
-    if (Number.isNaN(parsedDate.getTime())) {
+    if (
+        Number.isNaN(
+            parsedDate.getTime()
+        )
+    ) {
         return '-';
     }
 
-    return parsedDate.toLocaleDateString('id-ID', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-    });
+    return parsedDate
+        .toLocaleDateString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+            }
+        );
 };
 
-const formatDateTime = (date) => {
-    if (!date) {
+const formatDateTime = (
+    dateValue
+) => {
+    if (
+        !dateValue
+    ) {
         return '-';
     }
 
-    const parsedDate = new Date(date);
+    const parsedDate =
+        new Date(
+            dateValue
+        );
 
-    if (Number.isNaN(parsedDate.getTime())) {
+    if (
+        Number.isNaN(
+            parsedDate.getTime()
+        )
+    ) {
         return '-';
     }
 
-    return parsedDate.toLocaleString('id-ID', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    });
+    return parsedDate
+        .toLocaleString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            }
+        );
 };
 
-const InfoBox = ({
+const normalizeExternalUrl = (
+    value
+) => {
+    if (
+        !value
+    ) {
+        return null;
+    }
+
+    const normalizedValue =
+        String(
+            value
+        ).trim();
+
+    if (
+        !normalizedValue
+    ) {
+        return null;
+    }
+
+    if (
+        /^https?:\/\//i.test(
+            normalizedValue
+        )
+    ) {
+        return normalizedValue;
+    }
+
+    return `https://${normalizedValue}`;
+};
+
+const extractErrorMessage = (
+    error
+) => {
+    const responseData =
+        error?.response?.data;
+
+    if (
+        responseData?.errors
+    ) {
+        const firstError =
+            Object.values(
+                responseData.errors
+            )?.[0]?.[0];
+
+        if (
+            firstError
+        ) {
+            return firstError;
+        }
+    }
+
+    return (
+        responseData?.message ||
+        'Terjadi kesalahan ketika memproses request.'
+    );
+};
+
+const getCoverageParts = (
+    coverageType
+) => {
+    if (
+        !coverageType
+    ) {
+        return [];
+    }
+
+    return String(
+        coverageType
+    )
+        .split(
+            /[;,]/
+        )
+        .map(
+            (
+                item
+            ) =>
+                item
+                    .trim()
+                    .toUpperCase()
+        )
+        .filter(
+            Boolean
+        );
+};
+
+const getCoverageLabel = (
+    coverageType
+) => {
+    const parts =
+        getCoverageParts(
+            coverageType
+        );
+
+    if (
+        parts.length ===
+        0
+    ) {
+        return '-';
+    }
+
+    return parts
+        .map(
+            (
+                item
+            ) =>
+                COVERAGE_CONFIG[
+                    item
+                ]?.label ||
+                item
+        )
+        .join(
+            '; '
+        );
+};
+
+const getCoverageIcon = (
+    coverageType
+) => {
+    const firstCoverage =
+        getCoverageParts(
+            coverageType
+        )[0];
+
+    return (
+        COVERAGE_CONFIG[
+            firstCoverage
+        ]?.icon ||
+        'bi-camera-reels-fill'
+    );
+};
+
+const formatFileSize = (
+    bytes
+) => {
+    if (
+        !Number.isFinite(
+            bytes
+        ) ||
+        bytes <= 0
+    ) {
+        return '-';
+    }
+
+    const units = [
+        'B',
+        'KB',
+        'MB',
+        'GB',
+    ];
+
+    const unitIndex =
+        Math.min(
+            Math.floor(
+                Math.log(
+                    bytes
+                ) /
+                    Math.log(
+                        1024
+                    )
+            ),
+            units.length -
+                1
+        );
+
+    const size =
+        bytes /
+        1024 **
+            unitIndex;
+
+    return `${size.toFixed(
+        unitIndex === 0
+            ? 0
+            : 2
+    )} ${units[unitIndex]}`;
+};
+
+const DetailItem = ({
     label,
     value,
-    icon = 'bi-info-circle',
+    icon =
+        'bi-info-circle',
+    children,
 }) => {
     return (
         <div className="p-3 rounded-4 bg-light h-100">
             <div className="d-flex align-items-start gap-3">
                 <div
-                    className="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center flex-shrink-0"
+                    className="rounded-circle bg-white text-danger d-flex align-items-center justify-content-center flex-shrink-0"
                     style={{
                         width: 42,
                         height: 42,
                     }}
                 >
-                    <i className={`bi ${icon}`} />
+                    <i
+                        className={`bi ${icon}`}
+                    />
                 </div>
 
-                <div className="min-w-0">
+                <div className="min-w-0 flex-grow-1">
                     <div className="small text-muted mb-1">
                         {label}
                     </div>
 
-                    <div className="fw-bold text-break">
-                        {value || '-'}
-                    </div>
+                    {children || (
+                        <div className="fw-bold text-break">
+                            {value || '-'}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -169,15 +479,33 @@ const TimelineItem = ({
     value,
     icon,
     active = false,
+    rejected = false,
 }) => {
+    let statusClass =
+        'done';
+
+    if (
+        active
+    ) {
+        statusClass =
+            'active';
+    }
+
+    if (
+        rejected
+    ) {
+        statusClass =
+            'rejected';
+    }
+
     return (
         <div
-            className={`request-timeline-item ${
-                active ? 'active' : 'done'
-            }`}
+            className={`request-timeline-item ${statusClass}`}
         >
             <div className="request-timeline-marker">
-                <i className={`bi ${icon}`} />
+                <i
+                    className={`bi ${icon}`}
+                />
             </div>
 
             <div className="request-timeline-content">
@@ -193,418 +521,769 @@ const TimelineItem = ({
     );
 };
 
-export default function MerchandiseApprovalDetailPage() {
-    const { id } = useParams();
-    const navigate = useNavigate();
-
-    const currentUser = getStoredUser();
-
-    const defaultPath = getDefaultPath(currentUser);
-
-    const canView = hasPermission(
-        currentUser,
-        'approval.merchandise.view'
-    );
-
-    const canProcess = hasPermission(
-        currentUser,
-        'approval.merchandise.process'
-    );
-
-    const [order, setOrder] = useState(null);
-    const [adminNote, setAdminNote] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [processing, setProcessing] = useState(false);
-
-    const fetchOrder = useCallback(async () => {
-        if (!canView) {
-            setOrder(null);
-            setLoading(false);
-            return;
-        }
-
-        try {
-            setLoading(true);
-
-            const response = await api.get(
-                `/orders/${id}`
-            );
-
-            const responseData =
-                response?.data?.data || null;
-
-            setOrder(responseData);
-            setAdminNote(
-                responseData?.admin_note || ''
-            );
-        } catch (error) {
-            console.error(
-                'Fetch merchandise detail error:',
-                error?.response?.data || error
-            );
-
-            await showErrorAlert(
-                'Gagal Memuat Detail',
-                getBackendErrorMessage(
-                    error,
-                    'Detail pengajuan merchandise gagal dimuat.'
-                )
-            );
-
-            navigate('/admin/orders', {
-                replace: true,
-            });
-        } finally {
-            setLoading(false);
-        }
-    }, [
-        canView,
+export default function HumasServiceApprovalDetailPage() {
+    const {
         id,
-        navigate,
-    ]);
+    } = useParams();
 
-    useEffect(() => {
-        fetchOrder();
-    }, [fetchOrder]);
+    const navigate =
+        useNavigate();
 
-    const ensureProcessAccess = async () => {
-        if (canProcess) {
-            return true;
-        }
-
-        await showErrorAlert(
-            'Akses Ditolak',
-            'Akun hanya memiliki izin melihat approval dan tidak dapat memproses pengajuan.'
+    const currentUser =
+        useMemo(
+            () =>
+                getCurrentUser(),
+            []
         );
 
-        return false;
-    };
-
-    const validatePendingStatus = async () => {
-        if (order?.status === 'pending') {
-            return true;
-        }
-
-        await showWarningAlert(
-            'Status Tidak Sesuai',
-            'Aksi ini hanya dapat dilakukan saat pengajuan berstatus menunggu.'
+    const canProcess =
+        hasPermission(
+            currentUser,
+            'approval.humas.process'
         );
 
-        return false;
-    };
+    const [
+        requestData,
+        setRequestData,
+    ] = useState(
+        null
+    );
 
-    const handleApprove = async () => {
-        if (
-            !(await ensureProcessAccess()) ||
-            !(await validatePendingStatus())
-        ) {
-            return;
-        }
+    const [
+        loading,
+        setLoading,
+    ] = useState(
+        true
+    );
 
-        const confirmation =
-            await showConfirmAlert({
-                title: 'Setujui Pengajuan?',
-                text:
-                    `Pengajuan ${order.order_code} akan disetujui dan stok merchandise akan dikurangi.`,
-                confirmButtonText: 'Ya, setujui',
-                cancelButtonText: 'Batal',
-                icon: 'question',
-                confirmButtonColor: '#2563eb',
-            });
+    const [
+        processing,
+        setProcessing,
+    ] = useState(
+        false
+    );
 
-        if (!confirmation.isConfirmed) {
-            return;
-        }
+    const [
+        errorMessage,
+        setErrorMessage,
+    ] = useState(
+        ''
+    );
 
-        try {
-            setProcessing(true);
+    const [
+        resultLink,
+        setResultLink,
+    ] = useState(
+        ''
+    );
 
-            showLoadingAlert(
-                'Memproses Approval',
-                'Mohon tunggu sebentar.'
-            );
+    const [
+        resultNote,
+        setResultNote,
+    ] = useState(
+        ''
+    );
 
-            const response = await api.put(
-                `/orders/${order.id}/approve`
-            );
+    const [
+        resultFile,
+        setResultFile,
+    ] = useState(
+        null
+    );
 
-            closeAlert();
+    const loadDetail =
+        useCallback(
+            async () => {
+                try {
+                    setLoading(
+                        true
+                    );
 
-            await showSuccessAlert(
-                'Approval Berhasil',
-                response?.data?.message ||
-                    'Pengajuan merchandise berhasil disetujui.'
-            );
+                    setErrorMessage(
+                        ''
+                    );
 
-            await fetchOrder();
-        } catch (error) {
-            console.error(
-                'Approve merchandise error:',
-                error?.response?.data || error
-            );
+                    const response =
+                        await api.get(
+                            `/humas-service-requests/${id}`
+                        );
 
-            closeAlert();
+                    const data =
+                        response
+                            ?.data
+                            ?.data ||
+                        null;
 
-            await showErrorAlert(
-                'Approval Gagal',
-                getBackendErrorMessage(
-                    error,
-                    'Pengajuan merchandise gagal disetujui.'
-                )
-            );
-        } finally {
-            setProcessing(false);
-        }
-    };
+                    setRequestData(
+                        data
+                    );
 
-    const handleRevision = async () => {
-        if (
-            !(await ensureProcessAccess()) ||
-            !(await validatePendingStatus())
-        ) {
-            return;
-        }
+                    setResultLink(
+                        data?.result_link ||
+                            ''
+                    );
 
-        const normalizedNote = adminNote.trim();
+                    setResultNote(
+                        data?.result_note ||
+                            ''
+                    );
+                } catch (
+                    error
+                ) {
+                    console.error(
+                        'Fetch Humas detail error:',
+                        error
+                            ?.response
+                            ?.data ||
+                            error
+                    );
 
-        if (normalizedNote.length < 5) {
-            await showWarningAlert(
-                'Catatan Revisi Belum Lengkap',
-                'Catatan revisi minimal lima karakter.'
-            );
-
-            return;
-        }
-
-        const confirmation =
-            await showConfirmAlert({
-                title: 'Minta Revisi?',
-                text:
-                    `Pengajuan ${order.order_code} akan dikembalikan kepada pemohon untuk diperbaiki.`,
-                confirmButtonText:
-                    'Ya, minta revisi',
-                cancelButtonText: 'Batal',
-                icon: 'warning',
-                confirmButtonColor: '#0ea5e9',
-            });
-
-        if (!confirmation.isConfirmed) {
-            return;
-        }
-
-        try {
-            setProcessing(true);
-
-            showLoadingAlert(
-                'Meminta Revisi',
-                'Mohon tunggu sebentar.'
-            );
-
-            const response = await api.put(
-                `/orders/${order.id}/revision`,
-                {
-                    admin_note: normalizedNote,
+                    setErrorMessage(
+                        extractErrorMessage(
+                            error
+                        )
+                    );
+                } finally {
+                    setLoading(
+                        false
+                    );
                 }
-            );
+            },
+            [
+                id,
+            ]
+        );
 
-            closeAlert();
+    useEffect(
+        () => {
+            loadDetail();
+        },
+        [
+            loadDetail,
+        ]
+    );
 
-            await showSuccessAlert(
-                'Revisi Diminta',
-                response?.data?.message ||
-                    'Pengajuan dikembalikan kepada pemohon untuk diperbaiki.'
-            );
+    const statusConfig =
+        useMemo(
+            () => {
+                return (
+                    STATUS_CONFIG[
+                        requestData
+                            ?.status
+                    ] || {
+                        label:
+                            requestData
+                                ?.status ||
+                            'Tidak diketahui',
 
-            await fetchOrder();
-        } catch (error) {
-            console.error(
-                'Revision merchandise error:',
-                error?.response?.data || error
-            );
+                        badgeClass:
+                            'bg-secondary-subtle text-secondary',
 
-            closeAlert();
+                        icon:
+                            'bi-info-circle-fill',
+                    }
+                );
+            },
+            [
+                requestData
+                    ?.status,
+            ]
+        );
 
-            await showErrorAlert(
-                'Permintaan Revisi Gagal',
-                getBackendErrorMessage(
-                    error,
-                    'Permintaan revisi gagal diproses.'
-                )
-            );
-        } finally {
-            setProcessing(false);
-        }
-    };
+    const coverageLabel =
+        useMemo(
+            () =>
+                getCoverageLabel(
+                    requestData
+                        ?.coverage_type
+                ),
+            [
+                requestData
+                    ?.coverage_type,
+            ]
+        );
 
-    const handleReject = async () => {
-        if (
-            !(await ensureProcessAccess()) ||
-            !(await validatePendingStatus())
-        ) {
-            return;
-        }
+    const coverageIcon =
+        useMemo(
+            () =>
+                getCoverageIcon(
+                    requestData
+                        ?.coverage_type
+                ),
+            [
+                requestData
+                    ?.coverage_type,
+            ]
+        );
 
-        const normalizedNote = adminNote.trim();
-
-        if (normalizedNote.length < 5) {
-            await showWarningAlert(
-                'Alasan Belum Lengkap',
-                'Alasan penolakan minimal lima karakter.'
-            );
-
-            return;
-        }
-
-        const confirmation =
-            await showConfirmAlert({
-                title: 'Tolak Pengajuan?',
-                text:
-                    `Pengajuan ${order.order_code} akan ditolak secara permanen.`,
-                confirmButtonText: 'Ya, tolak',
-                cancelButtonText: 'Batal',
-                icon: 'warning',
-                confirmButtonColor: '#dc2626',
-            });
-
-        if (!confirmation.isConfirmed) {
-            return;
-        }
-
-        try {
-            setProcessing(true);
-
-            showLoadingAlert(
-                'Menolak Pengajuan',
-                'Mohon tunggu sebentar.'
-            );
-
-            const response = await api.put(
-                `/orders/${order.id}/reject`,
-                {
-                    admin_note: normalizedNote,
+    const resolvedUnitName =
+        useMemo(
+            () => {
+                if (
+                    !requestData
+                ) {
+                    return '-';
                 }
-            );
 
-            closeAlert();
+                if (
+                    requestData
+                        .resolved_unit_name
+                ) {
+                    return requestData
+                        .resolved_unit_name;
+                }
 
-            await showSuccessAlert(
-                'Pengajuan Ditolak',
-                response?.data?.message ||
-                    'Pengajuan merchandise berhasil ditolak.'
-            );
+                if (
+                    requestData
+                        .unit_name ===
+                    'Lainnya'
+                ) {
+                    return (
+                        requestData
+                            .other_unit_name ||
+                        'Lainnya'
+                    );
+                }
 
-            await fetchOrder();
-        } catch (error) {
-            console.error(
-                'Reject merchandise error:',
-                error?.response?.data || error
-            );
+                return (
+                    requestData
+                        .unit_name ||
+                    requestData
+                        .requester_unit ||
+                    requestData
+                        .user
+                        ?.unit_name ||
+                    '-'
+                );
+            },
+            [
+                requestData,
+            ]
+        );
 
-            closeAlert();
+    const referenceUrl =
+        useMemo(
+            () =>
+                normalizeExternalUrl(
+                    requestData
+                        ?.reference_link
+                ),
+            [
+                requestData
+                    ?.reference_link,
+            ]
+        );
+
+    const resultUrl =
+        useMemo(
+            () =>
+                normalizeExternalUrl(
+                    requestData
+                        ?.result_link
+                ),
+            [
+                requestData
+                    ?.result_link,
+            ]
+        );
+
+    const ensureProcessAccess =
+        async () => {
+            if (
+                canProcess
+            ) {
+                return true;
+            }
 
             await showErrorAlert(
-                'Penolakan Gagal',
-                getBackendErrorMessage(
-                    error,
-                    'Pengajuan merchandise gagal ditolak.'
-                )
-            );
-        } finally {
-            setProcessing(false);
-        }
-    };
-
-    const handleComplete = async () => {
-        if (!(await ensureProcessAccess())) {
-            return;
-        }
-
-        if (order?.status !== 'approved') {
-            await showWarningAlert(
-                'Status Tidak Sesuai',
-                'Pengajuan hanya dapat diselesaikan setelah disetujui.'
+                'Akses Ditolak',
+                'Akun hanya memiliki izin melihat approval dan tidak dapat memproses request Humas.'
             );
 
-            return;
-        }
+            return false;
+        };
 
-        const confirmation =
-            await showConfirmAlert({
-                title: 'Tandai Selesai?',
-                text:
-                    `Pengajuan ${order.order_code} akan ditandai selesai.`,
-                confirmButtonText: 'Ya, selesai',
-                cancelButtonText: 'Batal',
-                icon: 'question',
-                confirmButtonColor: '#16a34a',
-            });
+    const processAction =
+        async (
+            action,
+            payload,
+            successTitle
+        ) => {
+            if (
+                !(await ensureProcessAccess())
+            ) {
+                return;
+            }
 
-        if (!confirmation.isConfirmed) {
-            return;
-        }
+            try {
+                setProcessing(
+                    true
+                );
 
-        try {
-            setProcessing(true);
+                showLoadingAlert(
+                    'Memproses Request',
+                    'Mohon tunggu sebentar.'
+                );
 
-            showLoadingAlert(
-                'Memproses Data',
-                'Mohon tunggu sebentar.'
+                const response =
+                    await api.put(
+                        `/humas-service-requests/${id}/${action}`,
+                        payload
+                    );
+
+                closeAlert();
+
+                await showSuccessAlert(
+                    successTitle,
+                    response
+                        ?.data
+                        ?.message ||
+                        'Request berhasil diproses.'
+                );
+
+                if (
+                    response
+                        ?.data
+                        ?.data
+                ) {
+                    setRequestData(
+                        response
+                            .data
+                            .data
+                    );
+                } else {
+                    await loadDetail();
+                }
+            } catch (
+                error
+            ) {
+                console.error(
+                    `Process Humas ${action} error:`,
+                    error
+                        ?.response
+                        ?.data ||
+                        error
+                );
+
+                closeAlert();
+
+                await showErrorAlert(
+                    'Proses Gagal',
+                    extractErrorMessage(
+                        error
+                    )
+                );
+            } finally {
+                setProcessing(
+                    false
+                );
+            }
+        };
+
+    const handleApprove =
+        async () => {
+            if (
+                !(await ensureProcessAccess())
+            ) {
+                return;
+            }
+
+            if (
+                requestData
+                    ?.status !==
+                'pending'
+            ) {
+                await showErrorAlert(
+                    'Status Tidak Sesuai',
+                    'Hanya request berstatus menunggu yang dapat disetujui.'
+                );
+
+                return;
+            }
+
+            const confirmation =
+                await showConfirmAlert({
+                    title:
+                        'Setujui Request Humas?',
+
+                    text:
+                        'Request akan diteruskan kepada tim Humas untuk diproses.',
+
+                    confirmButtonText:
+                        'Ya, setujui',
+
+                    cancelButtonText:
+                        'Batal',
+
+                    icon:
+                        'question',
+
+                    confirmButtonColor:
+                        '#2563eb',
+                });
+
+            if (
+                !confirmation
+                    .isConfirmed
+            ) {
+                return;
+            }
+
+            await processAction(
+                'approve',
+                {},
+                'Request Disetujui'
             );
+        };
 
-            const response = await api.put(
-                `/orders/${order.id}/complete`,
+    const handleReject =
+        async () => {
+            if (
+                !(await ensureProcessAccess())
+            ) {
+                return;
+            }
+
+            if (
+                requestData
+                    ?.status !==
+                'pending'
+            ) {
+                await showErrorAlert(
+                    'Status Tidak Sesuai',
+                    'Hanya request berstatus menunggu yang dapat ditolak.'
+                );
+
+                return;
+            }
+
+            const result =
+                await showTextareaAlert({
+                    title:
+                        'Tolak Request Humas?',
+
+                    text:
+                        'Masukkan alasan penolakan untuk ditampilkan kepada pemohon.',
+
+                    inputLabel:
+                        'Alasan Penolakan',
+
+                    inputPlaceholder:
+                        'Tuliskan alasan penolakan...',
+
+                    confirmButtonText:
+                        'Ya, tolak request',
+
+                    cancelButtonText:
+                        'Batal',
+
+                    confirmButtonColor:
+                        '#dc2626',
+
+                    minimumLength:
+                        5,
+
+                    maximumLength:
+                        2000,
+                });
+
+            if (
+                !result
+                    .isConfirmed ||
+                !result.value
+            ) {
+                return;
+            }
+
+            await processAction(
+                'reject',
                 {
                     admin_note:
-                        adminNote.trim() || null,
-                }
+                        result
+                            .value
+                            .trim(),
+                },
+                'Request Ditolak'
             );
+        };
 
-            closeAlert();
+    const handleResultFileChange =
+        async (
+            event
+        ) => {
+            const file =
+                event
+                    .target
+                    .files?.[0] ||
+                null;
 
-            await showSuccessAlert(
-                'Pengajuan Selesai',
-                response?.data?.message ||
-                    'Pengajuan merchandise berhasil ditandai selesai.'
-            );
+            if (
+                !file
+            ) {
+                setResultFile(
+                    null
+                );
 
-            await fetchOrder();
-        } catch (error) {
-            console.error(
-                'Complete merchandise error:',
-                error?.response?.data || error
-            );
+                return;
+            }
 
-            closeAlert();
+            const allowedExtensions = [
+                'pdf',
+                'doc',
+                'docx',
+                'jpg',
+                'jpeg',
+                'png',
+                'zip',
+            ];
 
-            await showErrorAlert(
-                'Proses Gagal',
-                getBackendErrorMessage(
-                    error,
-                    'Pengajuan gagal ditandai selesai.'
+            const extension =
+                file.name
+                    .split('.')
+                    .pop()
+                    ?.toLowerCase();
+
+            if (
+                !extension ||
+                !allowedExtensions.includes(
+                    extension
                 )
+            ) {
+                event.target.value =
+                    '';
+
+                setResultFile(
+                    null
+                );
+
+                await showErrorAlert(
+                    'Format File Tidak Didukung',
+                    'File hasil harus berformat PDF, DOC, DOCX, JPG, JPEG, PNG, atau ZIP.'
+                );
+
+                return;
+            }
+
+            const maxFileSize =
+                20 *
+                1024 *
+                1024;
+
+            if (
+                file.size >
+                maxFileSize
+            ) {
+                event.target.value =
+                    '';
+
+                setResultFile(
+                    null
+                );
+
+                await showErrorAlert(
+                    'File Terlalu Besar',
+                    'Ukuran file hasil maksimal 20 MB.'
+                );
+
+                return;
+            }
+
+            setResultFile(
+                file
             );
-        } finally {
-            setProcessing(false);
-        }
-    };
+        };
 
-    if (!canView) {
-        return (
-            <Navigate
-                to={defaultPath}
-                replace
-            />
-        );
-    }
+    const handleComplete =
+        async () => {
+            if (
+                !(await ensureProcessAccess())
+            ) {
+                return;
+            }
 
-    if (loading) {
+            if (
+                requestData
+                    ?.status !==
+                'approved'
+            ) {
+                await showErrorAlert(
+                    'Status Tidak Sesuai',
+                    'Request hanya dapat diselesaikan setelah disetujui.'
+                );
+
+                return;
+            }
+
+            const normalizedLink =
+                resultLink
+                    .trim();
+
+            if (
+                !normalizedLink &&
+                !resultFile
+            ) {
+                await showErrorAlert(
+                    'Hasil Belum Lengkap',
+                    'Masukkan link hasil atau unggah file hasil pekerjaan.'
+                );
+
+                return;
+            }
+
+            const confirmation =
+                await showConfirmAlert({
+                    title:
+                        'Selesaikan Request Humas?',
+
+                    text:
+                        'Hasil pekerjaan akan disimpan dan request ditandai selesai.',
+
+                    confirmButtonText:
+                        'Ya, selesaikan',
+
+                    cancelButtonText:
+                        'Batal',
+
+                    icon:
+                        'question',
+
+                    confirmButtonColor:
+                        '#16a34a',
+                });
+
+            if (
+                !confirmation
+                    .isConfirmed
+            ) {
+                return;
+            }
+
+            const formData =
+                new FormData();
+
+            formData.append(
+                '_method',
+                'PUT'
+            );
+
+            if (
+                normalizedLink
+            ) {
+                formData.append(
+                    'result_link',
+                    normalizeExternalUrl(
+                        normalizedLink
+                    )
+                );
+            }
+
+            if (
+                resultNote
+                    .trim()
+            ) {
+                formData.append(
+                    'result_note',
+                    resultNote
+                        .trim()
+                );
+            }
+
+            if (
+                resultFile
+            ) {
+                formData.append(
+                    'result_file',
+                    resultFile
+                );
+            }
+
+            try {
+                setProcessing(
+                    true
+                );
+
+                showLoadingAlert(
+                    'Menyimpan Hasil',
+                    'Hasil pekerjaan sedang disimpan.'
+                );
+
+                const response =
+                    await api.post(
+                        `/humas-service-requests/${id}/complete`,
+                        formData
+                    );
+
+                closeAlert();
+
+                await showSuccessAlert(
+                    'Request Selesai',
+                    response
+                        ?.data
+                        ?.message ||
+                        'Request berhasil diselesaikan.'
+                );
+
+                setResultLink(
+                    ''
+                );
+
+                setResultNote(
+                    ''
+                );
+
+                setResultFile(
+                    null
+                );
+
+                if (
+                    response
+                        ?.data
+                        ?.data
+                ) {
+                    setRequestData(
+                        response
+                            .data
+                            .data
+                    );
+                } else {
+                    await loadDetail();
+                }
+            } catch (
+                error
+            ) {
+                console.error(
+                    'Complete Humas error:',
+                    error
+                        ?.response
+                        ?.data ||
+                        error
+                );
+
+                closeAlert();
+
+                await showErrorAlert(
+                    'Penyelesaian Gagal',
+                    extractErrorMessage(
+                        error
+                    )
+                );
+            } finally {
+                setProcessing(
+                    false
+                );
+            }
+        };
+
+    if (
+        loading
+    ) {
         return (
             <div className="card border-0 shadow-sm rounded-5">
                 <div className="card-body p-5 text-center">
-                    <div className="spinner-border text-primary mb-3" />
+                    <div className="spinner-border text-danger mb-3" />
 
                     <h5 className="fw-bold mb-1">
-                        Memuat detail pengajuan
+                        Memuat detail request
                     </h5>
 
                     <p className="text-muted mb-0">
@@ -615,80 +1294,91 @@ export default function MerchandiseApprovalDetailPage() {
         );
     }
 
-    if (!order) {
+    if (
+        errorMessage ||
+        !requestData
+    ) {
         return (
             <div className="card border-0 shadow-sm rounded-5">
                 <div className="card-body p-5 text-center">
                     <div
                         className="mx-auto mb-3 rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center"
                         style={{
-                            width: 84,
-                            height: 84,
+                            width:
+                                84,
+
+                            height:
+                                84,
                         }}
                     >
                         <i className="bi bi-exclamation-triangle-fill fs-1" />
                     </div>
 
                     <h4 className="fw-black mb-2">
-                        Data tidak ditemukan
+                        Detail gagal dimuat
                     </h4>
 
                     <p className="text-muted mb-4">
-                        Detail pengajuan merchandise tidak tersedia.
+                        {errorMessage ||
+                            'Data request tidak ditemukan.'}
                     </p>
 
-                    <Link
-                        to="/admin/orders"
-                        className="btn btn-primary rounded-pill px-4"
-                    >
-                        <i className="bi bi-arrow-left me-2" />
+                    <div className="d-flex flex-wrap justify-content-center gap-2">
+                        <button
+                            type="button"
+                            className="btn btn-outline-danger rounded-pill"
+                            onClick={
+                                loadDetail
+                            }
+                        >
+                            <i className="bi bi-arrow-clockwise me-2" />
 
-                        Kembali ke Approval Merchandise
-                    </Link>
+                            Coba Lagi
+                        </button>
+
+                        <button
+                            type="button"
+                            className="btn btn-danger rounded-pill"
+                            onClick={() =>
+                                navigate(
+                                    '/admin/humas-services'
+                                )
+                            }
+                        >
+                            <i className="bi bi-arrow-left me-2" />
+
+                            Kembali ke Approval Humas
+                        </button>
+                    </div>
                 </div>
             </div>
         );
     }
-
-    const statusConfig =
-        STATUS_CONFIG[order.status] || {
-            label:
-                order.status ||
-                'Tidak diketahui',
-            badgeClass:
-                'bg-secondary-subtle text-secondary',
-            icon:
-                'bi-info-circle-fill',
-        };
-
-    const orderItems =
-        Array.isArray(order.items)
-            ? order.items
-            : [];
 
     return (
         <div className="container-fluid px-0">
             <header className="approval-detail-header mb-4">
                 <div className="approval-detail-heading">
                     <Link
-                        to="/admin/orders"
+                        to="/admin/humas-services"
                         className="approval-detail-back-link"
                     >
                         <i className="bi bi-arrow-left" />
 
                         <span>
-                            Kembali ke Approval Merchandise
+                            Kembali ke Approval Humas
                         </span>
                     </Link>
 
                     <h2 className="approval-detail-title">
-                        Detail Pengajuan Merchandise
+                        Detail Request Humas
                     </h2>
 
                     <div className="approval-detail-meta">
                         <span className="fw-bold text-muted">
-                            {order.order_code ||
-                                `MER-${order.id}`}
+                            {requestData
+                                .service_code ||
+                                `HMS-${requestData.id}`}
                         </span>
 
                         <span
@@ -698,7 +1388,9 @@ export default function MerchandiseApprovalDetailPage() {
                                 className={`bi ${statusConfig.icon} me-2`}
                             />
 
-                            {statusConfig.label}
+                            {
+                                statusConfig.label
+                            }
                         </span>
                     </div>
                 </div>
@@ -710,8 +1402,10 @@ export default function MerchandiseApprovalDetailPage() {
 
                     <strong>
                         {formatDateTime(
-                            order.submitted_at ||
-                                order.created_at
+                            requestData
+                                .submitted_at ||
+                            requestData
+                                .created_at
                         )}
                     </strong>
                 </div>
@@ -728,37 +1422,8 @@ export default function MerchandiseApprovalDetailPage() {
                             </div>
 
                             <div className="small">
-                                Akun dapat melihat detail pengajuan,
-                                tetapi tidak dapat menyetujui,
-                                meminta revisi, menolak, atau
-                                menyelesaikannya.
+                                Akun dapat melihat detail request, tetapi tidak dapat menyetujui, menolak, atau menyelesaikannya.
                             </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {order.status === 'revision' && (
-                <div className="alert alert-info border-0 shadow-sm rounded-4 mb-4">
-                    <div className="d-flex align-items-start gap-3">
-                        <div className="icon-box bg-white text-info">
-                            <i className="bi bi-pencil-square" />
-                        </div>
-
-                        <div>
-                            <h5 className="fw-black mb-1">
-                                Menunggu Perbaikan Pemohon
-                            </h5>
-
-                            <p
-                                className="mb-0"
-                                style={{
-                                    whiteSpace: 'pre-line',
-                                }}
-                            >
-                                {order.admin_note ||
-                                    'Pengajuan telah dikembalikan kepada pemohon untuk diperbaiki.'}
-                            </p>
                         </div>
                     </div>
                 </div>
@@ -771,44 +1436,29 @@ export default function MerchandiseApprovalDetailPage() {
                             <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
                                 <div>
                                     <h4 className="fw-black mb-1">
-                                        Informasi Kegiatan
+                                        Informasi Pemohon
                                     </h4>
 
                                     <p className="text-muted mb-0">
-                                        Informasi kegiatan, tamu,
-                                        dan dokumen pendukung.
+                                        Informasi akun, unit, dan kontak pemohon.
                                     </p>
                                 </div>
 
-                                <div className="icon-box bg-primary-subtle text-primary">
-                                    <i className="bi bi-calendar-event-fill" />
+                                <div className="icon-box bg-danger-subtle text-danger">
+                                    <i className="bi bi-person-vcard-fill" />
                                 </div>
                             </div>
 
                             <div className="row g-3">
                                 <div className="col-md-6">
-                                    <InfoBox
-                                        label="Nama Kegiatan"
-                                        value={order.event_name}
-                                        icon="bi-calendar-event-fill"
-                                    />
-                                </div>
-
-                                <div className="col-md-6">
-                                    <InfoBox
-                                        label="Tanggal Kegiatan"
-                                        value={formatDate(
-                                            order.activity_date
-                                        )}
-                                        icon="bi-calendar-date-fill"
-                                    />
-                                </div>
-
-                                <div className="col-md-6">
-                                    <InfoBox
-                                        label="Nama Pemohon"
+                                    <DetailItem
+                                        label="Nama Lengkap"
                                         value={
-                                            order.user?.name ||
+                                            requestData
+                                                .applicant_name ||
+                                            requestData
+                                                .user
+                                                ?.name ||
                                             '-'
                                         }
                                         icon="bi-person-fill"
@@ -816,89 +1466,176 @@ export default function MerchandiseApprovalDetailPage() {
                                 </div>
 
                                 <div className="col-md-6">
-                                    <InfoBox
-                                        label="Instansi Tamu"
+                                    <DetailItem
+                                        label="Unit/Program Studi"
                                         value={
-                                            order.institution_name
+                                            resolvedUnitName
                                         }
-                                        icon="bi-buildings-fill"
+                                        icon="bi-building-fill"
                                     />
                                 </div>
 
                                 <div className="col-md-6">
-                                    <InfoBox
-                                        label="Nama Tamu"
-                                        value={order.guest_name}
-                                        icon="bi-person-badge-fill"
-                                    />
-                                </div>
-
-                                <div className="col-md-6">
-                                    <InfoBox
-                                        label="Jabatan Tamu"
-                                        value={order.guest_position}
-                                        icon="bi-briefcase-fill"
-                                    />
-                                </div>
-
-                                <div className="col-12">
-                                    <div className="p-3 rounded-4 bg-light h-100">
-                                        <div className="d-flex align-items-start gap-3">
-                                            <div
-                                                className="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center flex-shrink-0"
-                                                style={{
-                                                    width: 42,
-                                                    height: 42,
-                                                }}
+                                    <DetailItem
+                                        label="WhatsApp PIC Acara"
+                                        icon="bi-whatsapp"
+                                    >
+                                        {requestData
+                                            .pic_whatsapp ? (
+                                            <a
+                                                href={`https://wa.me/62${String(
+                                                    requestData
+                                                        .pic_whatsapp
+                                                )
+                                                    .replace(
+                                                        /\D/g,
+                                                        ''
+                                                    )
+                                                    .replace(
+                                                        /^0/,
+                                                        ''
+                                                    )}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="fw-bold text-success text-decoration-none"
                                             >
-                                                <i className="bi bi-file-earmark-text-fill" />
+                                                {
+                                                    requestData
+                                                        .pic_whatsapp
+                                                }
+
+                                                <i className="bi bi-box-arrow-up-right ms-2" />
+                                            </a>
+                                        ) : (
+                                            <div className="fw-bold">
+                                                -
                                             </div>
+                                        )}
+                                    </DetailItem>
+                                </div>
 
-                                            <div className="min-w-0 flex-grow-1">
-                                                <div className="small text-muted mb-1">
-                                                    Lampiran
-                                                </div>
+                                <div className="col-md-6">
+                                    <DetailItem
+                                        label="Email Akun"
+                                        value={
+                                            requestData
+                                                .user
+                                                ?.email ||
+                                            '-'
+                                        }
+                                        icon="bi-envelope-fill"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </section>
 
-                                                {order.proof_file_url ? (
-                                                    <a
-                                                        href={
-                                                            order.proof_file_url
-                                                        }
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="fw-bold text-primary text-decoration-none"
-                                                    >
-                                                        {order.proof_file_name ||
-                                                            'Buka lampiran'}
+                    <section className="card border-0 shadow-sm rounded-5 mb-4">
+                        <div className="card-body p-4 p-lg-5">
+                            <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
+                                <div>
+                                    <h4 className="fw-black mb-1">
+                                        Detail Kegiatan
+                                    </h4>
 
-                                                        <i className="bi bi-box-arrow-up-right ms-2" />
-                                                    </a>
-                                                ) : (
-                                                    <div className="fw-bold">
-                                                        Tidak tersedia
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <p className="text-muted mb-0">
+                                        Informasi jenis layanan, jadwal, lokasi, dan kebutuhan kegiatan.
+                                    </p>
+                                </div>
+
+                                <div className="icon-box bg-danger-subtle text-danger">
+                                    <i
+                                        className={`bi ${coverageIcon}`}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="row g-3">
+                                <div className="col-md-6">
+                                    <DetailItem
+                                        label="Jenis Layanan"
+                                        icon={
+                                            coverageIcon
+                                        }
+                                        value={
+                                            coverageLabel
+                                        }
+                                    />
+                                </div>
+
+                                <div className="col-md-6">
+                                    <DetailItem
+                                        label="Tanggal Pelaksanaan"
+                                        icon="bi-calendar-event-fill"
+                                        value={formatDate(
+                                            requestData
+                                                .event_date
+                                        )}
+                                    />
                                 </div>
 
                                 <div className="col-12">
-                                    <div className="p-4 rounded-4 border bg-light">
-                                        <div className="small fw-bold text-muted mb-2">
-                                            Catatan Pemohon
+                                    <DetailItem
+                                        label="Lokasi Acara"
+                                        icon="bi-geo-alt-fill"
+                                        value={
+                                            requestData
+                                                .event_location ||
+                                            '-'
+                                        }
+                                    />
+                                </div>
+
+                                <div className="col-12">
+                                    <div className="p-4 rounded-4 bg-light border">
+                                        <div className="small text-muted fw-bold mb-2">
+                                            <i className="bi bi-card-text me-2" />
+
+                                            Detail Kegiatan
                                         </div>
 
                                         <div
                                             style={{
                                                 whiteSpace:
-                                                    'pre-line',
-                                                lineHeight: 1.8,
+                                                    'pre-wrap',
+
+                                                lineHeight:
+                                                    1.8,
                                             }}
                                         >
-                                            {order.user_note ||
+                                            {requestData
+                                                .activity_detail ||
                                                 '-'}
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div className="col-12">
+                                    <div className="p-4 rounded-4 bg-light border">
+                                        <div className="small text-muted fw-bold mb-3">
+                                            <i className="bi bi-link-45deg me-2" />
+
+                                            Link Referensi
+                                        </div>
+
+                                        {referenceUrl ? (
+                                            <a
+                                                href={
+                                                    referenceUrl
+                                                }
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="btn btn-outline-danger rounded-pill"
+                                            >
+                                                <i className="bi bi-box-arrow-up-right me-2" />
+
+                                                Buka Link Referensi
+                                            </a>
+                                        ) : (
+                                            <div className="fw-bold text-muted">
+                                                Tidak tersedia
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -910,150 +1647,234 @@ export default function MerchandiseApprovalDetailPage() {
                             <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
                                 <div>
                                     <h4 className="fw-black mb-1">
-                                        Item Merchandise
+                                        Lampiran / Brief Kegiatan
                                     </h4>
 
                                     <p className="text-muted mb-0">
-                                        Daftar merchandise yang diajukan.
+                                        Brief, TOR, rundown, draft artikel, referensi desain, script, atau dokumen pendukung dari pemohon.
                                     </p>
                                 </div>
 
-                                <span className="badge rounded-pill text-bg-primary px-3 py-2">
-                                    {orderItems.length} item
-                                </span>
+                                <div className="icon-box bg-danger-subtle text-danger">
+                                    <i className="bi bi-file-earmark-arrow-up-fill" />
+                                </div>
                             </div>
 
-                            {orderItems.length === 0 ? (
-                                <div className="alert alert-warning rounded-4 mb-0">
-                                    Tidak ada item merchandise pada
-                                    pengajuan ini.
+                            {requestData
+                                .article_draft_url ? (
+                                <div className="border rounded-4 p-3 bg-light">
+                                    <div className="d-flex align-items-center gap-3 flex-wrap">
+                                        <div
+                                            className="rounded-4 bg-white text-danger d-flex align-items-center justify-content-center shadow-sm flex-shrink-0"
+                                            style={{
+                                                width:
+                                                    54,
+
+                                                height:
+                                                    54,
+                                            }}
+                                        >
+                                            <i className="bi bi-file-earmark-check-fill fs-4" />
+                                        </div>
+
+                                        <div className="flex-grow-1 min-w-0">
+                                            <div className="fw-black text-truncate">
+                                                {requestData
+                                                    .article_draft_name ||
+                                                    'Lampiran / Brief Kegiatan'}
+                                            </div>
+
+                                            <div className="small text-muted">
+                                                {requestData
+                                                    .article_draft_mime ||
+                                                    'Dokumen pendukung'}
+                                            </div>
+                                        </div>
+
+                                        <a
+                                            href={
+                                                requestData
+                                                    .article_draft_url
+                                            }
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="btn btn-danger rounded-pill"
+                                        >
+                                            <i className="bi bi-eye-fill me-2" />
+
+                                            Buka Lampiran
+                                        </a>
+                                    </div>
                                 </div>
                             ) : (
-                                <div className="table-responsive rounded-4 border">
-                                    <table className="table align-middle mb-0">
-                                        <thead className="table-light">
-                                            <tr>
-                                                <th className="ps-4 py-3">
-                                                    Merchandise
-                                                </th>
-
-                                                <th className="py-3">
-                                                    Kategori
-                                                </th>
-
-                                                <th className="text-end py-3">
-                                                    Jumlah
-                                                </th>
-
-                                                <th className="text-end pe-4 py-3">
-                                                    Stok Saat Ini
-                                                </th>
-                                            </tr>
-                                        </thead>
-
-                                        <tbody>
-                                            {orderItems.map(
-                                                (
-                                                    item,
-                                                    index
-                                                ) => (
-                                                    <tr
-                                                        key={
-                                                            item.id ||
-                                                            index
-                                                        }
-                                                    >
-                                                        <td className="ps-4 py-3">
-                                                            <div className="fw-black">
-                                                                {item
-                                                                    .product
-                                                                    ?.name ||
-                                                                    '-'}
-                                                            </div>
-
-                                                            {item
-                                                                .product
-                                                                ?.description && (
-                                                                <div className="small text-muted mt-1">
-                                                                    {
-                                                                        item
-                                                                            .product
-                                                                            .description
-                                                                    }
-                                                                </div>
-                                                            )}
-                                                        </td>
-
-                                                        <td className="py-3">
-                                                            {item
-                                                                .product
-                                                                ?.category
-                                                                ?.name ||
-                                                                '-'}
-                                                        </td>
-
-                                                        <td className="text-end py-3 fw-black">
-                                                            {Number(
-                                                                item.quantity ||
-                                                                    0
-                                                            )}
-                                                        </td>
-
-                                                        <td className="text-end pe-4 py-3">
-                                                            {item
-                                                                .product
-                                                                ?.stock ??
-                                                                '-'}
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            )}
-                                        </tbody>
-                                    </table>
+                                <div className="alert alert-warning rounded-4 mb-0">
+                                    Lampiran / brief kegiatan tidak tersedia.
                                 </div>
                             )}
                         </div>
                     </section>
 
-                    <section className="card border-0 shadow-sm rounded-5">
-                        <div className="card-body p-4 p-lg-5">
-                            <h4 className="fw-black mb-3">
-                                Catatan Admin
-                            </h4>
+                    {requestData
+                        .status ===
+                        'completed' && (
+                        <section className="card border-0 shadow-sm rounded-5">
+                            <div className="card-body p-4 p-lg-5">
+                                <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
+                                    <div>
+                                        <h4 className="fw-black mb-1">
+                                            Hasil Pekerjaan
+                                        </h4>
 
-                            <div
-                                className={`p-4 rounded-4 border ${
-                                    order.admin_note
-                                        ? order.status ===
-                                          'rejected'
-                                            ? 'bg-danger-subtle'
-                                            : order.status ===
-                                                'revision'
-                                              ? 'bg-info-subtle'
-                                              : 'bg-light'
-                                        : 'bg-light'
-                                }`}
-                            >
-                                <div
-                                    style={{
-                                        whiteSpace:
-                                            'pre-line',
-                                        lineHeight: 1.8,
-                                    }}
-                                >
-                                    {order.admin_note ||
-                                        'Belum ada catatan admin.'}
+                                        <p className="text-muted mb-0">
+                                            Hasil pekerjaan yang diberikan oleh tim Humas.
+                                        </p>
+                                    </div>
+
+                                    <div className="icon-box bg-success-subtle text-success">
+                                        <i className="bi bi-cloud-check-fill" />
+                                    </div>
                                 </div>
+
+                                {!resultUrl &&
+                                !requestData
+                                    .result_file_url ? (
+                                    <div className="alert alert-warning rounded-4 mb-0">
+                                        Request sudah selesai, tetapi hasil pekerjaan belum tersedia.
+                                    </div>
+                                ) : (
+                                    <div className="d-flex flex-column gap-3">
+                                        {resultUrl && (
+                                            <div className="border rounded-4 p-4 bg-success-subtle">
+                                                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                                    <div className="min-w-0 flex-grow-1">
+                                                        <div className="small text-muted mb-1">
+                                                            Link Hasil
+                                                        </div>
+
+                                                        <div
+                                                            className="fw-bold text-break"
+                                                            style={{
+                                                                maxWidth:
+                                                                    600,
+                                                            }}
+                                                        >
+                                                            {
+                                                                requestData
+                                                                    .result_link
+                                                            }
+                                                        </div>
+                                                    </div>
+
+                                                    <a
+                                                        href={
+                                                            resultUrl
+                                                        }
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="btn btn-success rounded-pill"
+                                                    >
+                                                        <i className="bi bi-box-arrow-up-right me-2" />
+
+                                                        Buka Hasil
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {requestData
+                                            .result_file_url && (
+                                            <div className="border rounded-4 p-4 bg-light">
+                                                <div className="d-flex align-items-center gap-3 flex-wrap">
+                                                    <div
+                                                        className="rounded-4 bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0"
+                                                        style={{
+                                                            width:
+                                                                54,
+
+                                                            height:
+                                                                54,
+                                                        }}
+                                                    >
+                                                        <i className="bi bi-file-earmark-check-fill fs-4" />
+                                                    </div>
+
+                                                    <div className="flex-grow-1 min-w-0">
+                                                        <div className="small text-muted mb-1">
+                                                            File Hasil
+                                                        </div>
+
+                                                        <div className="fw-black text-break">
+                                                            {requestData
+                                                                .result_file_name ||
+                                                                'File Hasil Humas'}
+                                                        </div>
+
+                                                        {requestData
+                                                            .result_file_mime && (
+                                                            <div className="small text-muted mt-1">
+                                                                {
+                                                                    requestData
+                                                                        .result_file_mime
+                                                                }
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <a
+                                                        href={
+                                                            requestData
+                                                                .result_file_url
+                                                        }
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="btn btn-outline-success rounded-pill"
+                                                    >
+                                                        <i className="bi bi-eye-fill me-2" />
+
+                                                        Buka File
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {requestData
+                                            .result_note && (
+                                            <div className="bg-white border rounded-4 p-4">
+                                                <div className="small text-muted fw-bold mb-2">
+                                                    <i className="bi bi-chat-left-text-fill me-2" />
+
+                                                    Catatan Hasil
+                                                </div>
+
+                                                <div
+                                                    style={{
+                                                        whiteSpace:
+                                                            'pre-wrap',
+
+                                                        lineHeight:
+                                                            1.7,
+                                                    }}
+                                                >
+                                                    {
+                                                        requestData
+                                                            .result_note
+                                                    }
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    </section>
+                        </section>
+                    )}
                 </div>
 
                 <div className="col-xl-4">
                     <div
                         className="position-sticky"
                         style={{
-                            top: 110,
+                            top:
+                                110,
                         }}
                     >
                         <section className="card border-0 shadow-sm rounded-5 mb-4">
@@ -1063,99 +1884,102 @@ export default function MerchandiseApprovalDetailPage() {
                                 </h4>
 
                                 <p className="text-muted mb-4">
-                                    Perkembangan proses pengajuan.
+                                    Perkembangan proses request Humas.
                                 </p>
 
                                 <div className="request-timeline">
                                     <TimelineItem
                                         label="Dikirim"
                                         value={formatDateTime(
-                                            order.submitted_at ||
-                                                order.created_at
+                                            requestData
+                                                .submitted_at ||
+                                            requestData
+                                                .created_at
                                         )}
                                         icon="bi-send-check-fill"
                                     />
 
-                                    {order.revision_requested_at && (
-                                        <TimelineItem
-                                            label="Revisi Diminta"
-                                            value={formatDateTime(
-                                                order.revision_requested_at
-                                            )}
-                                            icon="bi-pencil-square"
-                                        />
-                                    )}
-
-                                    {order.resubmitted_at && (
-                                        <TimelineItem
-                                            label="Dikirim Ulang"
-                                            value={formatDateTime(
-                                                order.resubmitted_at
-                                            )}
-                                            icon="bi-arrow-repeat"
-                                        />
-                                    )}
-
-                                    {order.approved_at && (
+                                    {requestData
+                                        .approved_at && (
                                         <TimelineItem
                                             label="Disetujui"
                                             value={formatDateTime(
-                                                order.approved_at
+                                                requestData
+                                                    .approved_at
                                             )}
                                             icon="bi-check-circle-fill"
                                         />
                                     )}
 
-                                    {order.rejected_at && (
+                                    {requestData
+                                        .rejected_at && (
                                         <TimelineItem
                                             label="Ditolak"
                                             value={formatDateTime(
-                                                order.rejected_at
+                                                requestData
+                                                    .rejected_at
                                             )}
                                             icon="bi-x-circle-fill"
+                                            rejected
                                         />
                                     )}
 
-                                    {order.completed_at && (
+                                    {requestData
+                                        .completed_at && (
                                         <TimelineItem
                                             label="Selesai"
                                             value={formatDateTime(
-                                                order.completed_at
+                                                requestData
+                                                    .completed_at
                                             )}
                                             icon="bi-check2-all"
                                         />
                                     )}
 
-                                    {order.status ===
+                                    {requestData
+                                        .status ===
                                         'pending' && (
                                         <TimelineItem
                                             label="Menunggu Pemeriksaan"
-                                            value="Admin sedang memeriksa pengajuan."
+                                            value="Admin sedang memeriksa request Humas."
                                             icon="bi-hourglass-split"
                                             active
                                         />
                                     )}
 
-                                    {order.status ===
-                                        'revision' && (
-                                        <TimelineItem
-                                            label="Menunggu Pemohon"
-                                            value="Menunggu pemohon mengirimkan hasil perbaikan."
-                                            icon="bi-person-gear"
-                                            active
-                                        />
-                                    )}
-
-                                    {order.status ===
+                                    {requestData
+                                        .status ===
                                         'approved' && (
                                         <TimelineItem
                                             label="Dalam Proses"
-                                            value="Merchandise sedang dipersiapkan."
-                                            icon="bi-box-seam-fill"
+                                            value="Request sedang dikerjakan oleh tim Humas."
+                                            icon="bi-camera-reels-fill"
                                             active
                                         />
                                     )}
                                 </div>
+
+                                {requestData
+                                    .admin_note && (
+                                    <div className="alert alert-danger rounded-4 mt-4 mb-0">
+                                        <div className="fw-black mb-2">
+                                            Catatan Admin
+                                        </div>
+
+                                        <div
+                                            className="small"
+                                            style={{
+                                                whiteSpace:
+                                                    'pre-wrap',
+                                            }}
+                                        >
+                                            {
+                                                requestData
+                                                    .admin_note
+                                            }
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </section>
 
@@ -1166,8 +1990,7 @@ export default function MerchandiseApprovalDetailPage() {
                                 </h4>
 
                                 <p className="text-muted mb-4">
-                                    Proses pengajuan berdasarkan
-                                    status saat ini.
+                                    Proses request berdasarkan status saat ini.
                                 </p>
 
                                 {!canProcess ? (
@@ -1179,161 +2002,231 @@ export default function MerchandiseApprovalDetailPage() {
                                         </h6>
 
                                         <p className="small text-muted mb-0">
-                                            Akun tidak memiliki
-                                            permission proses approval
-                                            merchandise.
+                                            Akun tidak memiliki permission proses approval Humas.
                                         </p>
                                     </div>
                                 ) : (
                                     <>
-                                        {order.status ===
+                                        {requestData
+                                            .status ===
                                             'pending' && (
-                                            <>
-                                                <label className="form-label fw-bold">
-                                                    Catatan Admin
-                                                </label>
-
-                                                <textarea
-                                                    className="form-control rounded-4 mb-2"
-                                                    rows="5"
-                                                    maxLength="2000"
-                                                    placeholder="Wajib diisi untuk meminta revisi atau menolak pengajuan."
-                                                    value={
-                                                        adminNote
-                                                    }
-                                                    onChange={(
-                                                        event
-                                                    ) =>
-                                                        setAdminNote(
-                                                            event
-                                                                .target
-                                                                .value
-                                                        )
+                                            <div className="d-grid gap-2">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-primary rounded-pill"
+                                                    onClick={
+                                                        handleApprove
                                                     }
                                                     disabled={
                                                         processing
                                                     }
-                                                />
+                                                >
+                                                    <i className="bi bi-check-lg me-2" />
 
-                                                <div className="small text-muted text-end mb-3">
-                                                    {
-                                                        adminNote.length
+                                                    Setujui Request
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline-danger rounded-pill"
+                                                    onClick={
+                                                        handleReject
                                                     }
-                                                    /2000 karakter
-                                                </div>
+                                                    disabled={
+                                                        processing
+                                                    }
+                                                >
+                                                    <i className="bi bi-x-lg me-2" />
 
-                                                <div className="d-grid gap-2">
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-primary rounded-pill"
-                                                        onClick={
-                                                            handleApprove
-                                                        }
-                                                        disabled={
-                                                            processing
-                                                        }
-                                                    >
-                                                        <i className="bi bi-check-lg me-2" />
-
-                                                        Setujui Pengajuan
-                                                    </button>
-
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-info text-white rounded-pill"
-                                                        onClick={
-                                                            handleRevision
-                                                        }
-                                                        disabled={
-                                                            processing
-                                                        }
-                                                    >
-                                                        <i className="bi bi-pencil-square me-2" />
-
-                                                        Minta Revisi
-                                                    </button>
-
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-outline-danger rounded-pill"
-                                                        onClick={
-                                                            handleReject
-                                                        }
-                                                        disabled={
-                                                            processing
-                                                        }
-                                                    >
-                                                        <i className="bi bi-x-lg me-2" />
-
-                                                        Tolak Pengajuan
-                                                    </button>
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {order.status ===
-                                            'revision' && (
-                                            <div className="p-4 rounded-4 bg-info-subtle border border-info-subtle">
-                                                <div className="fw-black text-info-emphasis mb-2">
-                                                    Menunggu Perbaikan
-                                                </div>
-
-                                                <p className="small text-muted mb-0">
-                                                    Pemohon harus
-                                                    memperbaiki dan
-                                                    mengirim ulang
-                                                    pengajuan sebelum
-                                                    dapat diproses
-                                                    kembali.
-                                                </p>
+                                                    Tolak Request
+                                                </button>
                                             </div>
                                         )}
 
-                                        {order.status ===
+                                        {requestData
+                                            .status ===
                                             'approved' && (
                                             <>
-                                                <div className="p-3 rounded-4 bg-primary-subtle mb-3">
-                                                    <div className="fw-black text-primary mb-1">
-                                                        Pengajuan Disetujui
-                                                    </div>
+                                                <div className="p-3 rounded-4 bg-primary-subtle mb-4">
+                                                    <div className="d-flex gap-3">
+                                                        <i className="bi bi-info-circle-fill text-primary fs-5" />
 
-                                                    <div className="small text-muted">
-                                                        Tandai selesai
-                                                        setelah
-                                                        merchandise
-                                                        diserahkan.
+                                                        <div>
+                                                            <div className="fw-black text-primary mb-1">
+                                                                Request Sedang Diproses
+                                                            </div>
+
+                                                            <div className="small text-muted">
+                                                                Masukkan link hasil atau unggah file hasil sebelum request ditandai selesai.
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
 
-                                                <label className="form-label fw-bold">
-                                                    Catatan Penyelesaian
-                                                    <span className="text-muted fw-normal">
-                                                        {' '}
-                                                        (Opsional)
-                                                    </span>
-                                                </label>
+                                                <div className="mb-3">
+                                                    <label className="form-label fw-bold">
+                                                        Link Hasil
+                                                    </label>
 
-                                                <textarea
-                                                    className="form-control rounded-4 mb-3"
-                                                    rows="4"
-                                                    maxLength="2000"
-                                                    placeholder="Contoh: Merchandise telah diserahkan kepada pemohon."
-                                                    value={
-                                                        adminNote
-                                                    }
-                                                    onChange={(
-                                                        event
-                                                    ) =>
-                                                        setAdminNote(
+                                                    <input
+                                                        type="text"
+                                                        className="form-control rounded-4"
+                                                        placeholder="https://drive.google.com/... atau link hasil"
+                                                        value={
+                                                            resultLink
+                                                        }
+                                                        onChange={(
                                                             event
-                                                                .target
-                                                                .value
-                                                        )
-                                                    }
-                                                    disabled={
-                                                        processing
-                                                    }
-                                                />
+                                                        ) =>
+                                                            setResultLink(
+                                                                event
+                                                                    .target
+                                                                    .value
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            processing
+                                                        }
+                                                    />
+
+                                                    <div className="form-text">
+                                                        Opsional jika file hasil sudah diunggah.
+                                                    </div>
+                                                </div>
+
+                                                <div className="mb-3">
+                                                    <label className="form-label fw-bold">
+                                                        File Hasil
+                                                    </label>
+
+                                                    <input
+                                                        type="file"
+                                                        className="form-control rounded-4"
+                                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip"
+                                                        onChange={
+                                                            handleResultFileChange
+                                                        }
+                                                        disabled={
+                                                            processing
+                                                        }
+                                                    />
+
+                                                    <div className="form-text">
+                                                        PDF, DOC, DOCX, JPG, JPEG, PNG atau ZIP. Maksimal 20 MB.
+                                                    </div>
+
+                                                    {resultFile && (
+                                                        <div className="mt-3 p-3 border rounded-4 bg-light">
+                                                            <div className="d-flex align-items-start gap-3">
+                                                                <div
+                                                                    className="rounded-circle bg-white text-danger d-flex align-items-center justify-content-center flex-shrink-0"
+                                                                    style={{
+                                                                        width:
+                                                                            42,
+
+                                                                        height:
+                                                                            42,
+                                                                    }}
+                                                                >
+                                                                    <i className="bi bi-paperclip" />
+                                                                </div>
+
+                                                                <div className="min-w-0 flex-grow-1">
+                                                                    <div className="small text-muted">
+                                                                        File dipilih
+                                                                    </div>
+
+                                                                    <div className="fw-black text-break">
+                                                                        {
+                                                                            resultFile
+                                                                                .name
+                                                                        }
+                                                                    </div>
+
+                                                                    <div className="small text-muted mt-1">
+                                                                        {formatFileSize(
+                                                                            resultFile
+                                                                                .size
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-sm btn-outline-danger rounded-circle flex-shrink-0"
+                                                                    onClick={() =>
+                                                                        setResultFile(
+                                                                            null
+                                                                        )
+                                                                    }
+                                                                    disabled={
+                                                                        processing
+                                                                    }
+                                                                    title="Hapus file"
+                                                                >
+                                                                    <i className="bi bi-x-lg" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="mb-4">
+                                                    <label className="form-label fw-bold">
+                                                        Catatan Hasil
+                                                    </label>
+
+                                                    <textarea
+                                                        className="form-control rounded-4"
+                                                        rows={
+                                                            4
+                                                        }
+                                                        maxLength={
+                                                            3000
+                                                        }
+                                                        placeholder="Tambahkan catatan hasil pekerjaan jika diperlukan..."
+                                                        value={
+                                                            resultNote
+                                                        }
+                                                        onChange={(
+                                                            event
+                                                        ) =>
+                                                            setResultNote(
+                                                                event
+                                                                    .target
+                                                                    .value
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            processing
+                                                        }
+                                                    />
+
+                                                    <div className="form-text text-end">
+                                                        {
+                                                            resultNote
+                                                                .length
+                                                        }
+                                                        /3000
+                                                    </div>
+                                                </div>
+
+                                                <div className="alert alert-light border rounded-4 small">
+                                                    <i className="bi bi-info-circle me-2 text-primary" />
+
+                                                    Minimal isi{' '}
+
+                                                    <strong>
+                                                        Link Hasil
+                                                    </strong>{' '}
+
+                                                    atau{' '}
+
+                                                    <strong>
+                                                        File Hasil
+                                                    </strong>
+                                                    .
+                                                </div>
 
                                                 <button
                                                     type="button"
@@ -1345,9 +2238,19 @@ export default function MerchandiseApprovalDetailPage() {
                                                         processing
                                                     }
                                                 >
-                                                    <i className="bi bi-patch-check-fill me-2" />
+                                                    {processing ? (
+                                                        <>
+                                                            <span className="spinner-border spinner-border-sm me-2" />
 
-                                                    Tandai Selesai
+                                                            Menyimpan...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <i className="bi bi-check2-all me-2" />
+
+                                                            Simpan Hasil &amp; Tandai Selesai
+                                                        </>
+                                                    )}
                                                 </button>
                                             </>
                                         )}
@@ -1356,10 +2259,11 @@ export default function MerchandiseApprovalDetailPage() {
                                             'rejected',
                                             'completed',
                                         ].includes(
-                                            order.status
+                                            requestData
+                                                .status
                                         ) && (
                                             <div className="alert alert-light border rounded-4 mb-0">
-                                                Pengajuan berstatus{' '}
+                                                Request berstatus{' '}
 
                                                 <strong>
                                                     {
@@ -1367,8 +2271,7 @@ export default function MerchandiseApprovalDetailPage() {
                                                     }
                                                 </strong>{' '}
 
-                                                dan tidak memiliki
-                                                tindakan lanjutan.
+                                                dan tidak memiliki tindakan lanjutan.
                                             </div>
                                         )}
                                     </>

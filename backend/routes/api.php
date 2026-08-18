@@ -276,6 +276,7 @@ Route::middleware('auth:sanctum')
                 'id'
             );
         });
+
         /*
         |--------------------------------------------------------------------------
         | Pengajuan Layanan Humas
@@ -374,8 +375,17 @@ Route::middleware('auth:sanctum')
 
         /*
         |--------------------------------------------------------------------------
-        | Pengajuan Peminjaman SEKPiM
+        | Pengajuan SEKPiM
         |--------------------------------------------------------------------------
+        |
+        | Satu endpoint digunakan untuk:
+        |
+        | request_type = borrow
+        | → Peminjaman Barang
+        |
+        | request_type = asset_request
+        | → Request Barang
+        |
         */
 
         Route::middleware(
@@ -392,7 +402,7 @@ Route::middleware('auth:sanctum')
 
         /*
         |--------------------------------------------------------------------------
-        | Detail Peminjaman SEKPiM
+        | Detail Pengajuan SEKPiM
         |--------------------------------------------------------------------------
         */
 
@@ -412,7 +422,7 @@ Route::middleware('auth:sanctum')
 
         /*
         |--------------------------------------------------------------------------
-        | Approval Peminjaman SEKPiM - Read
+        | Approval SEKPiM - Read
         |--------------------------------------------------------------------------
         */
 
@@ -430,13 +440,32 @@ Route::middleware('auth:sanctum')
 
         /*
         |--------------------------------------------------------------------------
-        | Approval Peminjaman SEKPiM - Process
+        | Approval SEKPiM - Process
         |--------------------------------------------------------------------------
+        |
+        | PEMINJAMAN BARANG
+        |
+        | pending
+        | → approved
+        | → borrowed
+        | → returned
+        |
+        |
+        | REQUEST BARANG
+        |
+        | pending
+        | → approved
+        | → completed
+        |
         */
 
         Route::middleware(
             'permission:approval.borrowing.process'
         )->group(function (): void {
+            /*
+             * Berlaku untuk Peminjaman Barang
+             * dan Request Barang.
+             */
             Route::put(
                 '/borrow-requests/{id}/approve',
                 [
@@ -447,6 +476,10 @@ Route::middleware('auth:sanctum')
                 'id'
             );
 
+            /*
+             * Berlaku untuk Peminjaman Barang
+             * dan Request Barang.
+             */
             Route::put(
                 '/borrow-requests/{id}/reject',
                 [
@@ -457,6 +490,11 @@ Route::middleware('auth:sanctum')
                 'id'
             );
 
+            /*
+             * Khusus Peminjaman Barang.
+             *
+             * approved → borrowed
+             */
             Route::put(
                 '/borrow-requests/{id}/borrowed',
                 [
@@ -467,11 +505,34 @@ Route::middleware('auth:sanctum')
                 'id'
             );
 
+            /*
+             * Khusus Peminjaman Barang.
+             *
+             * borrowed → returned
+             */
             Route::put(
                 '/borrow-requests/{id}/returned',
                 [
                     BorrowRequestController::class,
                     'returned',
+                ]
+            )->whereNumber(
+                'id'
+            );
+
+            /*
+             * Khusus Request Barang.
+             *
+             * approved → completed
+             *
+             * Bukti penyerahan wajib.
+             * Stok berkurang permanen.
+             */
+            Route::put(
+                '/borrow-requests/{id}/complete',
+                [
+                    BorrowRequestController::class,
+                    'complete',
                 ]
             )->whereNumber(
                 'id'
