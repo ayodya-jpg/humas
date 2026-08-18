@@ -60,6 +60,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'success' => true,
+
             'message' =>
                 'Data dashboard berhasil dimuat.',
 
@@ -231,7 +232,9 @@ class DashboardController extends Controller
             )
                 ? Carbon::createFromFormat(
                     'Y-m-d',
-                    $filters['start_date']
+                    $filters[
+                        'start_date'
+                    ]
                 )->startOfDay()
                 : now()
                     ->subDays(29)
@@ -243,9 +246,12 @@ class DashboardController extends Controller
             )
                 ? Carbon::createFromFormat(
                     'Y-m-d',
-                    $filters['end_date']
+                    $filters[
+                        'end_date'
+                    ]
                 )->endOfDay()
-                : now()->endOfDay();
+                : now()
+                    ->endOfDay();
 
         abort_if(
             $startDate->greaterThan(
@@ -594,6 +600,12 @@ class DashboardController extends Controller
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | NORMALIZE MERCHANDISE
+    |--------------------------------------------------------------------------
+    */
+
     private function normalizeOrder(
         Order $order
     ): array {
@@ -748,6 +760,10 @@ class DashboardController extends Controller
                 $order->event_name
                 ?: 'Pengajuan Merchandise',
 
+            /*
+             * PEMOHON
+             */
+
             'requester' =>
                 $order->user?->name
                 ?: '-',
@@ -755,6 +771,22 @@ class DashboardController extends Controller
             'requester_email' =>
                 $order->user?->email
                 ?: '-',
+
+            /*
+             * PIC MERCHANDISE
+             */
+
+            'pic_name' =>
+                $order->pic_name
+                ?: '-',
+
+            'pic_phone' =>
+                $order->pic_phone
+                ?: '-',
+
+            /*
+             * TAMU / INSTANSI
+             */
 
             'unit' =>
                 $order->institution_name
@@ -772,9 +804,18 @@ class DashboardController extends Controller
                 $order->guest_position
                 ?: '-',
 
+            /*
+             * TANGGAL
+             */
+
             'activity_date' =>
                 $this->dateValue(
                     $order->activity_date
+                ),
+
+            'pickup_date' =>
+                $this->dateValue(
+                    $order->pickup_date
                 ),
 
             'status' =>
@@ -815,6 +856,10 @@ class DashboardController extends Controller
                     $order->completed_at
                 ),
 
+            /*
+             * CATATAN
+             */
+
             'user_note' =>
                 $order->user_note
                 ?: '-',
@@ -822,6 +867,10 @@ class DashboardController extends Controller
             'admin_note' =>
                 $order->admin_note
                 ?: '-',
+
+            /*
+             * REVISI
+             */
 
             'revision_reason' =>
                 $latestRevisionReason,
@@ -845,12 +894,20 @@ class DashboardController extends Controller
             'rejection_reason' =>
                 $rejectionReason,
 
+            /*
+             * ITEMS
+             */
+
             'items_text' =>
                 $itemsText
                 ?: '-',
 
             'total_quantity' =>
                 $totalQuantity,
+
+            /*
+             * EVIDENCE
+             */
 
             'user_evidence_url' =>
                 $order
@@ -885,6 +942,12 @@ class DashboardController extends Controller
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | NORMALIZE HUMAS
+    |--------------------------------------------------------------------------
+    */
+
     private function normalizeHumasRequest(
         HumasServiceRequest $item
     ): array {
@@ -908,7 +971,7 @@ class DashboardController extends Controller
                 self::SERVICE_HUMAS,
 
             'service_label' =>
-                'Liputan Humas',
+                'Layanan Humas',
 
             'code' =>
                 $item->service_code
@@ -1020,7 +1083,8 @@ class DashboardController extends Controller
                 ?: '-',
 
             /*
-             * Evidence dari user.
+             * Lampiran / Brief dari User.
+             * Nama database tetap article_draft_*.
              */
             'user_evidence_url' =>
                 $item
@@ -1038,7 +1102,7 @@ class DashboardController extends Controller
                 $item->reference_link,
 
             /*
-             * Evidence hasil dari Admin Humas.
+             * Hasil Admin Humas.
              */
             'admin_evidence_url' =>
                 $item
@@ -1055,10 +1119,6 @@ class DashboardController extends Controller
             'admin_result_link' =>
                 $item->result_link,
 
-            /*
-             * Field khusus borrowing,
-             * sehingga Humas dibuat null.
-             */
             'handover_evidence_url' =>
                 null,
 
@@ -1075,6 +1135,12 @@ class DashboardController extends Controller
                 null,
         ];
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | NORMALIZE BORROWING
+    |--------------------------------------------------------------------------
+    */
 
     private function normalizeBorrowRequest(
         BorrowRequest $item
@@ -1209,19 +1275,11 @@ class DashboardController extends Controller
                     $item->returned_at
                 ),
 
-            /*
-             * Untuk kebutuhan dashboard,
-             * returned dianggap proses selesai.
-             */
             'completed_at' =>
                 $this->dateTimeValue(
                     $item->returned_at
                 ),
 
-            /*
-             * Peminjaman tidak memiliki
-             * alur revisi.
-             */
             'revision_requested_at' =>
                 null,
 
@@ -1263,10 +1321,6 @@ class DashboardController extends Controller
             'total_quantity' =>
                 $totalQuantity,
 
-            /*
-             * User belum mengupload evidence
-             * pada tahap pembuatan peminjaman.
-             */
             'user_evidence_url' =>
                 null,
 
@@ -1279,10 +1333,6 @@ class DashboardController extends Controller
             'user_reference_link' =>
                 null,
 
-            /*
-             * Tidak menggunakan field hasil
-             * umum seperti layanan Humas.
-             */
             'admin_evidence_url' =>
                 null,
 
@@ -1296,9 +1346,7 @@ class DashboardController extends Controller
                 null,
 
             /*
-             * ==================================
-             * EVIDENCE PEMINJAMAN
-             * ==================================
+             * Evidence Serah Terima
              */
 
             'handover_evidence_url' =>
@@ -1312,6 +1360,10 @@ class DashboardController extends Controller
             'handover_evidence_mime' =>
                 $item
                     ->handover_evidence_mime,
+
+            /*
+             * Evidence Pengembalian
+             */
 
             'return_evidence_url' =>
                 $item
@@ -1329,6 +1381,12 @@ class DashboardController extends Controller
                 null,
         ];
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SUMMARY
+    |--------------------------------------------------------------------------
+    */
 
     private function buildSummary(
         Collection $requests
@@ -1419,6 +1477,12 @@ class DashboardController extends Controller
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | SERVICE DISTRIBUTION
+    |--------------------------------------------------------------------------
+    */
+
     private function buildServiceDistribution(
         Collection $requests,
         array $availableServices
@@ -1428,7 +1492,7 @@ class DashboardController extends Controller
                 'Merchandise',
 
             self::SERVICE_HUMAS =>
-                'Liputan Humas',
+                'Layanan Humas',
 
             self::SERVICE_BORROWING =>
                 'Peminjaman SEKPiM',
@@ -1537,6 +1601,12 @@ class DashboardController extends Controller
             ->all();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | STATUS DISTRIBUTION
+    |--------------------------------------------------------------------------
+    */
+
     private function buildStatusDistribution(
         Collection $requests
     ): array {
@@ -1590,6 +1660,12 @@ class DashboardController extends Controller
             ->all();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | TREND
+    |--------------------------------------------------------------------------
+    */
+
     private function buildTrend(
         Collection $requests,
         Carbon $startDate,
@@ -1642,10 +1718,9 @@ class DashboardController extends Controller
                     $requests
                 ): array {
                     $key =
-                        $date
-                            ->format(
-                                'Y-m-d'
-                            );
+                        $date->format(
+                            'Y-m-d'
+                        );
 
                     $items =
                         $requests
@@ -1677,7 +1752,9 @@ class DashboardController extends Controller
                         ->trendRow(
                             $key,
                             $date
-                                ->locale('id')
+                                ->locale(
+                                    'id'
+                                )
                                 ->translatedFormat(
                                     'd M'
                                 ),
@@ -1748,7 +1825,9 @@ class DashboardController extends Controller
                 $this->trendRow(
                     $key,
                     $cursor
-                        ->locale('id')
+                        ->locale(
+                            'id'
+                        )
                         ->translatedFormat(
                             'M Y'
                         ),
@@ -1803,6 +1882,12 @@ class DashboardController extends Controller
                     ->count(),
         ];
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PERMISSION
+    |--------------------------------------------------------------------------
+    */
 
     private function getAvailableServices(
         mixed $user
@@ -2014,6 +2099,12 @@ class DashboardController extends Controller
             ->all();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | HELPERS
+    |--------------------------------------------------------------------------
+    */
+
     private function resolveGroupBy(
         Carbon $startDate,
         Carbon $endDate
@@ -2026,13 +2117,26 @@ class DashboardController extends Controller
                 : 'day';
     }
 
+    /*
+     * Mapping nama layanan Humas.
+     *
+     * Value baru:
+     * - REQUEST DESIGN INSTAGRAM
+     * - DOKUMENTASI
+     * - PUBLIKASI WEBSITE
+     * - PUBLIKASI MEDIA MASSA
+     * - YOUTUBE
+     * - VIDEO REELS
+     *
+     * SOCIAL MEDIA hanya dipertahankan untuk data lama.
+     */
     private function coverageLabel(
         ?string $coverageType
     ): string {
         if (
             !$coverageType
         ) {
-            return 'Liputan Humas';
+            return 'Layanan Humas';
         }
 
         $parts =
@@ -2061,8 +2165,8 @@ class DashboardController extends Controller
                                 $part
                             )
                         ) {
-                            'SOCIAL MEDIA' =>
-                                'Social Media',
+                            'REQUEST DESIGN INSTAGRAM' =>
+                                'Request Design Instagram',
 
                             'DOKUMENTASI' =>
                                 'Dokumentasi',
@@ -2078,6 +2182,12 @@ class DashboardController extends Controller
 
                             'VIDEO REELS' =>
                                 'Video Reels',
+
+                            /*
+                             * Legacy data.
+                             */
+                            'SOCIAL MEDIA' =>
+                                'Social Media (Data Lama)',
 
                             default =>
                                 $part,

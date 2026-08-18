@@ -24,6 +24,12 @@ class HumasServiceRequest extends Model
 
         'reference_link',
 
+        /*
+         * Nama database tetap article_draft
+         * untuk kompatibilitas data lama.
+         *
+         * Pada UI disebut Lampiran / Brief Kegiatan.
+         */
         'article_draft_path',
         'article_draft_name',
         'article_draft_mime',
@@ -44,15 +50,26 @@ class HumasServiceRequest extends Model
     ];
 
     protected $casts = [
-        'id' => 'integer',
-        'user_id' => 'integer',
+        'id' =>
+            'integer',
 
-        'event_date' => 'date:Y-m-d',
+        'user_id' =>
+            'integer',
 
-        'submitted_at' => 'datetime',
-        'approved_at' => 'datetime',
-        'rejected_at' => 'datetime',
-        'completed_at' => 'datetime',
+        'event_date' =>
+            'date:Y-m-d',
+
+        'submitted_at' =>
+            'datetime',
+
+        'approved_at' =>
+            'datetime',
+
+        'rejected_at' =>
+            'datetime',
+
+        'completed_at' =>
+            'datetime',
     ];
 
     protected $appends = [

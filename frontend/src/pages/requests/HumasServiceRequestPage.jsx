@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import api from '../../api/axios';
 
-
 import {
     closeAlert,
     showConfirmAlert,
@@ -40,11 +39,11 @@ const UNIT_OPTIONS = [
 
 const COVERAGE_OPTIONS = [
     {
-        value: 'SOCIAL MEDIA',
-        label: 'Social Media',
+        value: 'REQUEST DESIGN INSTAGRAM',
+        label: 'Request Design Instagram',
         icon: 'bi-instagram',
         description:
-            'Liputan dan publikasi melalui kanal media sosial resmi.',
+            'Pembuatan desain konten Instagram untuk kebutuhan publikasi resmi.',
     },
     {
         value: 'DOKUMENTASI',
@@ -59,6 +58,13 @@ const COVERAGE_OPTIONS = [
         icon: 'bi-globe2',
         description:
             'Artikel dan publikasi melalui website resmi.',
+    },
+    {
+        value: 'PUBLIKASI MEDIA MASSA',
+        label: 'Publikasi Media Massa',
+        icon: 'bi-newspaper',
+        description:
+            'Publikasi berita atau kegiatan melalui media massa.',
     },
     {
         value: 'YOUTUBE',
@@ -90,7 +96,7 @@ const PIC_CONTACTS = [
         icon: 'bi-youtube',
     },
     {
-        service: 'Social Media',
+        service: 'Request Design Instagram',
         name: 'Naya',
         phone: '0852-3025-1932',
         icon: 'bi-instagram',
@@ -122,12 +128,16 @@ const formatFileSize = (size) => {
 };
 
 const extractErrorMessage = (error) => {
-    const responseData = error?.response?.data;
+    const responseData =
+        error?.response?.data;
 
     if (responseData?.errors) {
-        const firstError = Object.values(responseData.errors)
-            .flat()
-            .find(Boolean);
+        const firstError =
+            Object.values(
+                responseData.errors
+            )
+                .flat()
+                .find(Boolean);
 
         if (firstError) {
             return firstError;
@@ -149,17 +159,24 @@ const getStoredUser = () => {
 
     for (const key of possibleKeys) {
         try {
-            const storedValue = localStorage.getItem(key);
+            const storedValue =
+                localStorage.getItem(
+                    key
+                );
 
             if (!storedValue) {
                 continue;
             }
 
-            const parsedUser = JSON.parse(storedValue);
+            const parsedUser =
+                JSON.parse(
+                    storedValue
+                );
 
             if (
                 parsedUser &&
-                typeof parsedUser === 'object'
+                typeof parsedUser ===
+                    'object'
             ) {
                 return parsedUser;
             }
@@ -172,14 +189,17 @@ const getStoredUser = () => {
 };
 
 const normalizeUrl = (value) => {
-    const trimmedValue = value.trim();
+    const trimmedValue =
+        value.trim();
 
     if (!trimmedValue) {
         return '';
     }
 
     if (
-        /^https?:\/\//i.test(trimmedValue)
+        /^https?:\/\//i.test(
+            trimmedValue
+        )
     ) {
         return trimmedValue;
     }
@@ -193,11 +213,17 @@ const isValidUrl = (value) => {
     }
 
     try {
-        const parsedUrl = new URL(
-            normalizeUrl(value)
-        );
+        const parsedUrl =
+            new URL(
+                normalizeUrl(
+                    value
+                )
+            );
 
-        return ['http:', 'https:'].includes(
+        return [
+            'http:',
+            'https:',
+        ].includes(
             parsedUrl.protocol
         );
     } catch {
@@ -219,7 +245,9 @@ const SectionHeader = ({
                     height: 48,
                 }}
             >
-                <i className={`bi ${icon} fs-5`} />
+                <i
+                    className={`bi ${icon} fs-5`}
+                />
             </div>
 
             <div>
@@ -236,22 +264,37 @@ const SectionHeader = ({
 };
 
 export default function HumasServiceRequestPage() {
-    const navigate = useNavigate();
+    const navigate =
+        useNavigate();
 
-    const storedUser = useMemo(
-        () => getStoredUser(),
-        []
+    const storedUser =
+        useMemo(
+            () =>
+                getStoredUser(),
+            []
+        );
+
+    const [
+        form,
+        setForm,
+    ] = useState(
+        () => ({
+            ...INITIAL_FORM,
+
+            applicant_name:
+                storedUser?.name ||
+                storedUser?.full_name ||
+                storedUser?.username ||
+                '',
+        })
     );
 
-    const [form, setForm] = useState(() => ({
-        ...INITIAL_FORM,
-        applicant_name:
-            storedUser?.name ||
-            storedUser?.full_name ||
-            storedUser?.username ||
-            '',
-    }));
-
+    /*
+     * Secara database nama field tetap article_draft
+     * untuk kompatibilitas data lama.
+     *
+     * Pada UI ditampilkan sebagai Lampiran / Brief Kegiatan.
+     */
     const [
         articleDraft,
         setArticleDraft,
@@ -262,51 +305,85 @@ export default function HumasServiceRequestPage() {
         setSubmitting,
     ] = useState(false);
 
-    const selectedCoverage = useMemo(() => {
-        return COVERAGE_OPTIONS.find(
-            (item) =>
-                item.value ===
-                form.coverage_type
+    const selectedCoverage =
+        useMemo(
+            () => {
+                return COVERAGE_OPTIONS.find(
+                    (item) =>
+                        item.value ===
+                        form.coverage_type
+                );
+            },
+            [
+                form.coverage_type,
+            ]
         );
-    }, [form.coverage_type]);
 
-    const handleChange = (event) => {
-        const { name, value } =
-            event.target;
+    const handleChange = (
+        event
+    ) => {
+        const {
+            name,
+            value,
+        } = event.target;
 
-        setForm((previousForm) => ({
-            ...previousForm,
-            [name]: value,
+        setForm(
+            (
+                previousForm
+            ) => ({
+                ...previousForm,
 
-            ...(name === 'unit_name' &&
-            value !== 'Lainnya'
-                ? {
-                      other_unit_name: '',
-                  }
-                : {}),
-        }));
+                [name]:
+                    value,
+
+                ...(name ===
+                    'unit_name' &&
+                value !==
+                    'Lainnya'
+                    ? {
+                          other_unit_name:
+                              '',
+                      }
+                    : {}),
+            })
+        );
     };
 
-    const handleReferenceLinkBlur = () => {
-        if (!form.reference_link.trim()) {
-            return;
-        }
+    const handleReferenceLinkBlur =
+        () => {
+            if (
+                !form.reference_link.trim()
+            ) {
+                return;
+            }
 
-        setForm((previousForm) => ({
-            ...previousForm,
-            reference_link: normalizeUrl(
-                previousForm.reference_link
-            ),
-        }));
-    };
+            setForm(
+                (
+                    previousForm
+                ) => ({
+                    ...previousForm,
+
+                    reference_link:
+                        normalizeUrl(
+                            previousForm.reference_link
+                        ),
+                })
+            );
+        };
 
     const handleCoverageChange = (
         coverageType
     ) => {
-        setForm((previousForm) => ({
-            ...previousForm,
-            coverage_type: coverageType,
-        }));
+        setForm(
+            (
+                previousForm
+            ) => ({
+                ...previousForm,
+
+                coverage_type:
+                    coverageType,
+            })
+        );
     };
 
     const handleArticleDraftChange = (
@@ -316,6 +393,10 @@ export default function HumasServiceRequestPage() {
             event.target.files?.[0];
 
         if (!file) {
+            setArticleDraft(
+                null
+            );
+
             return;
         }
 
@@ -323,12 +404,16 @@ export default function HumasServiceRequestPage() {
             'pdf',
             'doc',
             'docx',
+            'jpg',
+            'jpeg',
+            'png',
         ];
 
-        const extension = file.name
-            .split('.')
-            .pop()
-            ?.toLowerCase();
+        const extension =
+            file.name
+                .split('.')
+                .pop()
+                ?.toLowerCase();
 
         if (
             !extension ||
@@ -336,11 +421,16 @@ export default function HumasServiceRequestPage() {
                 extension
             )
         ) {
-            event.target.value = '';
+            event.target.value =
+                '';
+
+            setArticleDraft(
+                null
+            );
 
             showWarningAlert(
                 'Format File Tidak Didukung',
-                'Draft artikel harus berformat PDF, DOC, atau DOCX.'
+                'Lampiran harus berformat PDF, DOC, DOCX, JPG, JPEG, atau PNG.'
             );
 
             return;
@@ -348,295 +438,352 @@ export default function HumasServiceRequestPage() {
 
         if (
             file.size >
-            10 * 1024 * 1024
+            10 *
+                1024 *
+                1024
         ) {
-            event.target.value = '';
+            event.target.value =
+                '';
+
+            setArticleDraft(
+                null
+            );
 
             showWarningAlert(
                 'Ukuran File Terlalu Besar',
-                'Ukuran draft artikel maksimal 10 MB.'
+                'Ukuran lampiran maksimal 10 MB.'
             );
 
             return;
         }
 
-        setArticleDraft(file);
+        setArticleDraft(
+            file
+        );
     };
 
-    const validateForm = () => {
-        if (
-            !form.applicant_name.trim()
-        ) {
-            return 'Nama lengkap pemohon wajib diisi.';
-        }
+    const validateForm =
+        () => {
+            if (
+                !form.applicant_name.trim()
+            ) {
+                return 'Nama lengkap pemohon wajib diisi.';
+            }
 
-        if (
-            form.applicant_name.trim()
-                .length < 3
-        ) {
-            return 'Nama lengkap pemohon minimal tiga karakter.';
-        }
+            if (
+                form.applicant_name
+                    .trim()
+                    .length <
+                3
+            ) {
+                return 'Nama lengkap pemohon minimal tiga karakter.';
+            }
 
-        if (!form.unit_name) {
-            return 'Nama unit atau program studi wajib dipilih.';
-        }
+            if (
+                !form.unit_name
+            ) {
+                return 'Nama unit atau program studi wajib dipilih.';
+            }
 
-        if (
-            form.unit_name ===
-                'Lainnya' &&
-            !form.other_unit_name.trim()
-        ) {
-            return 'Nama unit atau program studi lainnya wajib diisi.';
-        }
+            if (
+                form.unit_name ===
+                    'Lainnya' &&
+                !form.other_unit_name.trim()
+            ) {
+                return 'Nama unit atau program studi lainnya wajib diisi.';
+            }
 
-        if (
-            !form.pic_whatsapp.trim()
-        ) {
-            return 'Kontak WhatsApp PIC acara wajib diisi.';
-        }
+            if (
+                !form.pic_whatsapp.trim()
+            ) {
+                return 'Kontak WhatsApp PIC acara wajib diisi.';
+            }
 
-        const normalizedPhone =
-            form.pic_whatsapp.replace(
-                /[\s\-()+]/g,
-                ''
-            );
+            const normalizedPhone =
+                form.pic_whatsapp.replace(
+                    /[\s\-()+]/g,
+                    ''
+                );
 
-        if (
-            !/^[0-9]{9,15}$/.test(
-                normalizedPhone
-            )
-        ) {
-            return 'Format nomor WhatsApp PIC tidak valid.';
-        }
+            if (
+                !/^[0-9]{9,15}$/.test(
+                    normalizedPhone
+                )
+            ) {
+                return 'Format nomor WhatsApp PIC tidak valid.';
+            }
 
-        if (
-            !form.activity_detail.trim()
-        ) {
-            return 'Detail kegiatan wajib diisi.';
-        }
+            if (
+                !form.activity_detail.trim()
+            ) {
+                return 'Detail kegiatan wajib diisi.';
+            }
 
-        if (
-            form.activity_detail.trim()
-                .length < 10
-        ) {
-            return 'Detail kegiatan minimal sepuluh karakter.';
-        }
+            if (
+                form.activity_detail
+                    .trim()
+                    .length <
+                10
+            ) {
+                return 'Detail kegiatan minimal sepuluh karakter.';
+            }
 
-        if (!form.coverage_type) {
-            return 'Jenis liputan wajib dipilih.';
-        }
+            if (
+                !form.coverage_type
+            ) {
+                return 'Jenis layanan Humas wajib dipilih.';
+            }
 
-        if (
-            !form.event_location.trim()
-        ) {
-            return 'Lokasi acara wajib diisi.';
-        }
+            if (
+                !form.event_location.trim()
+            ) {
+                return 'Lokasi acara wajib diisi.';
+            }
 
-        if (
-            form.event_location.trim()
-                .length < 3
-        ) {
-            return 'Lokasi acara minimal tiga karakter.';
-        }
+            if (
+                form.event_location
+                    .trim()
+                    .length <
+                3
+            ) {
+                return 'Lokasi acara minimal tiga karakter.';
+            }
 
-        if (!form.event_date) {
-            return 'Tanggal pelaksanaan kegiatan wajib diisi.';
-        }
+            if (
+                !form.event_date
+            ) {
+                return 'Tanggal pelaksanaan kegiatan wajib diisi.';
+            }
 
-        if (
-            form.reference_link.trim() &&
-            !isValidUrl(
-                form.reference_link
-            )
-        ) {
-            return 'Link bahan mentah atau referensi tidak valid.';
-        }
-
-        if (!articleDraft) {
-            return 'Draft artikel kegiatan wajib diunggah.';
-        }
-
-        return null;
-    };
-
-    const buildFormData = () => {
-        const formData = new FormData();
-
-        formData.append(
-            'applicant_name',
-            form.applicant_name.trim()
-        );
-
-        formData.append(
-            'unit_name',
-            form.unit_name
-        );
-
-        if (
-            form.unit_name === 'Lainnya'
-        ) {
-            formData.append(
-                'other_unit_name',
-                form.other_unit_name.trim()
-            );
-        }
-
-        formData.append(
-            'pic_whatsapp',
-            form.pic_whatsapp.trim()
-        );
-
-        formData.append(
-            'activity_detail',
-            form.activity_detail.trim()
-        );
-
-        formData.append(
-            'coverage_type',
-            form.coverage_type
-        );
-
-        formData.append(
-            'event_location',
-            form.event_location.trim()
-        );
-
-        formData.append(
-            'event_date',
-            form.event_date
-        );
-
-        if (
-            form.reference_link.trim()
-        ) {
-            formData.append(
-                'reference_link',
-                normalizeUrl(
+            if (
+                form.reference_link.trim() &&
+                !isValidUrl(
                     form.reference_link
                 )
-            );
-        }
+            ) {
+                return 'Link bahan mentah atau referensi tidak valid.';
+            }
 
-        formData.append(
-            'article_draft',
-            articleDraft
-        );
+            if (
+                !articleDraft
+            ) {
+                return 'Lampiran atau brief kegiatan wajib diunggah.';
+            }
 
-        return formData;
-    };
+            return null;
+        };
 
-    const resetForm = () => {
-        setForm({
-            ...INITIAL_FORM,
-            applicant_name:
-                storedUser?.name ||
-                storedUser?.full_name ||
-                storedUser?.username ||
-                '',
-        });
+    const buildFormData =
+        () => {
+            const formData =
+                new FormData();
 
-        setArticleDraft(null);
-
-        const fileInput =
-            document.getElementById(
-                'article_draft'
+            formData.append(
+                'applicant_name',
+                form.applicant_name.trim()
             );
 
-        if (fileInput) {
-            fileInput.value = '';
-        }
-    };
-
-    const handleSubmit = async (
-        event
-    ) => {
-        event.preventDefault();
-
-        const validationError =
-            validateForm();
-
-        if (validationError) {
-            await showWarningAlert(
-                'Form Belum Lengkap',
-                validationError
+            formData.append(
+                'unit_name',
+                form.unit_name
             );
 
-            return;
-        }
+            if (
+                form.unit_name ===
+                'Lainnya'
+            ) {
+                formData.append(
+                    'other_unit_name',
+                    form.other_unit_name.trim()
+                );
+            }
 
-        const confirmation =
-            await showConfirmAlert({
-                title:
-                    'Kirim request liputan?',
-                text:
-                    'Pastikan data kegiatan, jenis liputan, link bahan, dan draft artikel sudah benar.',
-                confirmButtonText:
-                    'Ya, kirim request',
-                cancelButtonText:
-                    'Periksa lagi',
-                icon: 'question',
-                confirmButtonColor:
-                    '#dc2626',
+            formData.append(
+                'pic_whatsapp',
+                form.pic_whatsapp.trim()
+            );
+
+            formData.append(
+                'activity_detail',
+                form.activity_detail.trim()
+            );
+
+            formData.append(
+                'coverage_type',
+                form.coverage_type
+            );
+
+            formData.append(
+                'event_location',
+                form.event_location.trim()
+            );
+
+            formData.append(
+                'event_date',
+                form.event_date
+            );
+
+            if (
+                form.reference_link.trim()
+            ) {
+                formData.append(
+                    'reference_link',
+                    normalizeUrl(
+                        form.reference_link
+                    )
+                );
+            }
+
+            /*
+             * Nama request backend tetap article_draft
+             * supaya tidak perlu migration/database rename.
+             */
+            formData.append(
+                'article_draft',
+                articleDraft
+            );
+
+            return formData;
+        };
+
+    const resetForm =
+        () => {
+            setForm({
+                ...INITIAL_FORM,
+
+                applicant_name:
+                    storedUser?.name ||
+                    storedUser?.full_name ||
+                    storedUser?.username ||
+                    '',
             });
 
-        if (
-            !confirmation.isConfirmed
-        ) {
-            return;
-        }
-
-        try {
-            setSubmitting(true);
-
-            showLoadingAlert(
-                'Mengirim Request',
-                'Data request liputan sedang diproses.'
+            setArticleDraft(
+                null
             );
 
-            const response = await api.post(
-                '/humas-service-requests',
-                buildFormData(),
-                {
-                    headers: {
-                        'Content-Type':
-                            'multipart/form-data',
-                    },
-                }
-            );
+            const fileInput =
+                document.getElementById(
+                    'article_draft'
+                );
 
-            closeAlert();
+            if (fileInput) {
+                fileInput.value =
+                    '';
+            }
+        };
 
-            await showSuccessAlert(
-                'Request Berhasil Dikirim',
-                response?.data?.message ||
-                    'Request liputan Humas berhasil dikirim.'
-            );
+    const handleSubmit =
+        async (
+            event
+        ) => {
+            event.preventDefault();
 
-            resetForm();
+            const validationError =
+                validateForm();
 
-            navigate(
-                '/admin/my-requests',
-                {
-                    replace: true,
-                }
-            );
-        } catch (error) {
-            console.error(
-                'Submit request liputan error:',
-                error?.response?.data ||
-                    error
-            );
+            if (
+                validationError
+            ) {
+                await showWarningAlert(
+                    'Form Belum Lengkap',
+                    validationError
+                );
 
-            closeAlert();
+                return;
+            }
 
-            await showErrorAlert(
-                'Request Gagal Dikirim',
-                extractErrorMessage(error)
-            );
-        } finally {
-            setSubmitting(false);
-        }
-    };
+            const confirmation =
+                await showConfirmAlert({
+                    title:
+                        'Kirim request Humas?',
+
+                    text:
+                        'Pastikan data kegiatan, jenis layanan, link bahan, dan lampiran/brief kegiatan sudah benar.',
+
+                    confirmButtonText:
+                        'Ya, kirim request',
+
+                    cancelButtonText:
+                        'Periksa lagi',
+
+                    icon:
+                        'question',
+
+                    confirmButtonColor:
+                        '#dc2626',
+                });
+
+            if (
+                !confirmation.isConfirmed
+            ) {
+                return;
+            }
+
+            try {
+                setSubmitting(
+                    true
+                );
+
+                showLoadingAlert(
+                    'Mengirim Request',
+                    'Data request Humas sedang diproses.'
+                );
+
+                const response =
+                    await api.post(
+                        '/humas-service-requests',
+                        buildFormData(),
+                        {
+                            headers: {
+                                'Content-Type':
+                                    'multipart/form-data',
+                            },
+                        }
+                    );
+
+                closeAlert();
+
+                await showSuccessAlert(
+                    'Request Berhasil Dikirim',
+                    response?.data
+                        ?.message ||
+                        'Request layanan Humas berhasil dikirim.'
+                );
+
+                resetForm();
+
+                navigate(
+                    '/admin/my-requests',
+                    {
+                        replace:
+                            true,
+                    }
+                );
+            } catch (
+                error
+            ) {
+                console.error(
+                    'Submit request Humas error:',
+                    error?.response
+                        ?.data ||
+                        error
+                );
+
+                closeAlert();
+
+                await showErrorAlert(
+                    'Request Gagal Dikirim',
+                    extractErrorMessage(
+                        error
+                    )
+                );
+            } finally {
+                setSubmitting(
+                    false
+                );
+            }
+        };
 
     return (
         <div className="container-fluid px-0">
@@ -655,20 +802,23 @@ export default function HumasServiceRequestPage() {
                             </span>
 
                             <h1 className="display-6 fw-bold mb-3">
-                                Form Request Liputan
+                                Form Request Layanan
                                 HUMAS TUS
                             </h1>
 
                             <p
                                 className="text-white-50 mb-3"
                                 style={{
-                                    maxWidth: 850,
-                                    lineHeight: 1.8,
+                                    maxWidth:
+                                        850,
+
+                                    lineHeight:
+                                        1.8,
                                 }}
                             >
                                 Mohon melengkapi data
                                 kegiatan untuk kebutuhan
-                                liputan Humas. Pemohon dapat
+                                layanan Humas. Pemohon dapat
                                 mencantumkan link bahan
                                 mentah, referensi, atau folder
                                 pendukung yang dibutuhkan oleh
@@ -678,17 +828,19 @@ export default function HumasServiceRequestPage() {
                             <div className="d-flex flex-wrap gap-2">
                                 <span className="badge bg-white bg-opacity-10 border border-white border-opacity-25 rounded-pill px-3 py-2">
                                     <i className="bi bi-shield-check me-2" />
-                                    Data tercatat dalam
-                                    sistem
+
+                                    Data tercatat dalam sistem
                                 </span>
 
                                 <span className="badge bg-white bg-opacity-10 border border-white border-opacity-25 rounded-pill px-3 py-2">
                                     <i className="bi bi-link-45deg me-2" />
+
                                     Mendukung link bahan
                                 </span>
 
                                 <span className="badge bg-white bg-opacity-10 border border-white border-opacity-25 rounded-pill px-3 py-2">
                                     <i className="bi bi-clock-history me-2" />
+
                                     Status dapat dipantau
                                 </span>
                             </div>
@@ -704,8 +856,11 @@ export default function HumasServiceRequestPage() {
                                     <div
                                         className="rounded-circle bg-white text-danger d-flex align-items-center justify-content-center flex-shrink-0"
                                         style={{
-                                            width: 52,
-                                            height: 52,
+                                            width:
+                                                52,
+
+                                            height:
+                                                52,
                                         }}
                                     >
                                         <i className="bi bi-person-fill fs-4" />
@@ -755,7 +910,9 @@ export default function HumasServiceRequestPage() {
 
                 <div className="row g-3">
                     {PIC_CONTACTS.map(
-                        (contact) => (
+                        (
+                            contact
+                        ) => (
                             <div
                                 className="col-12 col-md-4"
                                 key={
@@ -768,8 +925,11 @@ export default function HumasServiceRequestPage() {
                                             <div
                                                 className="rounded-4 bg-danger-subtle text-danger d-flex align-items-center justify-content-center flex-shrink-0"
                                                 style={{
-                                                    width: 52,
-                                                    height: 52,
+                                                    width:
+                                                        52,
+
+                                                    height:
+                                                        52,
                                                 }}
                                             >
                                                 <i
@@ -805,6 +965,7 @@ export default function HumasServiceRequestPage() {
                                                     className="text-decoration-none text-success fw-semibold"
                                                 >
                                                     <i className="bi bi-whatsapp me-1" />
+
                                                     {
                                                         contact.phone
                                                     }
@@ -819,7 +980,11 @@ export default function HumasServiceRequestPage() {
                 </div>
             </section>
 
-            <form onSubmit={handleSubmit}>
+            <form
+                onSubmit={
+                    handleSubmit
+                }
+            >
                 <div className="row g-4 align-items-start">
                     <div className="col-xl-8">
                         <section className="card border-0 shadow-sm rounded-5 mb-4">
@@ -833,8 +998,8 @@ export default function HumasServiceRequestPage() {
                                 <div className="row g-3">
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">
-                                            Nama Lengkap
-                                            Pemohon
+                                            Nama Lengkap Pemohon
+
                                             <span className="text-danger ms-1">
                                                 *
                                             </span>
@@ -860,6 +1025,7 @@ export default function HumasServiceRequestPage() {
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">
                                             Nama Unit/Prodi
+
                                             <span className="text-danger ms-1">
                                                 *
                                             </span>
@@ -879,12 +1045,13 @@ export default function HumasServiceRequestPage() {
                                             }
                                         >
                                             <option value="">
-                                                Pilih unit atau
-                                                program studi
+                                                Pilih unit atau program studi
                                             </option>
 
                                             {UNIT_OPTIONS.map(
-                                                (unit) => (
+                                                (
+                                                    unit
+                                                ) => (
                                                     <option
                                                         value={
                                                             unit
@@ -906,8 +1073,8 @@ export default function HumasServiceRequestPage() {
                                         'Lainnya' && (
                                         <div className="col-md-6">
                                             <label className="form-label fw-bold">
-                                                Nama Unit/Prodi
-                                                Lainnya
+                                                Nama Unit/Prodi Lainnya
+
                                                 <span className="text-danger ms-1">
                                                     *
                                                 </span>
@@ -940,8 +1107,8 @@ export default function HumasServiceRequestPage() {
                                         }
                                     >
                                         <label className="form-label fw-bold">
-                                            Kontak WhatsApp
-                                            PIC Acara
+                                            Kontak WhatsApp PIC Acara
+
                                             <span className="text-danger ms-1">
                                                 *
                                             </span>
@@ -978,13 +1145,14 @@ export default function HumasServiceRequestPage() {
                                 <SectionHeader
                                     icon="bi-calendar-event-fill"
                                     title="Detail Kegiatan"
-                                    description="Jelaskan kegiatan yang membutuhkan liputan Humas."
+                                    description="Jelaskan kegiatan yang membutuhkan layanan Humas."
                                 />
 
                                 <div className="row g-3">
                                     <div className="col-12">
                                         <label className="form-label fw-bold">
                                             Detail Kegiatan
+
                                             <span className="text-danger ms-1">
                                                 *
                                             </span>
@@ -1009,8 +1177,7 @@ export default function HumasServiceRequestPage() {
 
                                         <div className="d-flex justify-content-between form-text">
                                             <span>
-                                                Minimal 10
-                                                karakter.
+                                                Minimal 10 karakter.
                                             </span>
 
                                             <span>
@@ -1027,6 +1194,7 @@ export default function HumasServiceRequestPage() {
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">
                                             Lokasi Acara
+
                                             <span className="text-danger ms-1">
                                                 *
                                             </span>
@@ -1051,8 +1219,8 @@ export default function HumasServiceRequestPage() {
 
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">
-                                            Pelaksanaan
-                                            Kegiatan
+                                            Pelaksanaan Kegiatan
+
                                             <span className="text-danger ms-1">
                                                 *
                                             </span>
@@ -1081,13 +1249,15 @@ export default function HumasServiceRequestPage() {
                             <div className="card-body p-4 p-lg-5">
                                 <SectionHeader
                                     icon="bi-camera-reels-fill"
-                                    title="Jenis Liputan"
-                                    description="Pilih salah satu jenis liputan yang dibutuhkan."
+                                    title="Jenis Layanan Humas"
+                                    description="Pilih salah satu jenis layanan yang dibutuhkan."
                                 />
 
                                 <div className="row g-3">
                                     {COVERAGE_OPTIONS.map(
-                                        (coverage) => {
+                                        (
+                                            coverage
+                                        ) => {
                                             const isSelected =
                                                 form.coverage_type ===
                                                 coverage.value;
@@ -1124,8 +1294,11 @@ export default function HumasServiceRequestPage() {
                                                                             : 'bg-light text-danger'
                                                                     }`}
                                                                     style={{
-                                                                        width: 44,
-                                                                        height: 44,
+                                                                        width:
+                                                                            44,
+
+                                                                        height:
+                                                                            44,
                                                                     }}
                                                                 >
                                                                     <i
@@ -1172,8 +1345,8 @@ export default function HumasServiceRequestPage() {
                                 />
 
                                 <label className="form-label fw-bold">
-                                    Link Bahan atau
-                                    Referensi
+                                    Link Bahan atau Referensi
+
                                     <span className="text-muted fw-normal ms-2">
                                         Opsional
                                     </span>
@@ -1213,6 +1386,7 @@ export default function HumasServiceRequestPage() {
                                                         previousForm
                                                     ) => ({
                                                         ...previousForm,
+
                                                         reference_link:
                                                             '',
                                                     })
@@ -1228,13 +1402,10 @@ export default function HumasServiceRequestPage() {
                                 </div>
 
                                 <div className="form-text">
-                                    Pastikan akses link
-                                    telah diatur agar dapat
-                                    dibuka oleh Admin Humas.
-                                    Link dapat berasal dari
-                                    Google Drive, OneDrive,
-                                    Dropbox, Canva, YouTube,
-                                    atau website lainnya.
+                                    Pastikan akses link telah diatur agar dapat
+                                    dibuka oleh Admin Humas. Link dapat berasal
+                                    dari Google Drive, OneDrive, Dropbox, Canva,
+                                    YouTube, atau website lainnya.
                                 </div>
 
                                 {form.reference_link &&
@@ -1245,8 +1416,8 @@ export default function HumasServiceRequestPage() {
                                             <div className="d-flex align-items-center justify-content-between gap-3 flex-wrap">
                                                 <div>
                                                     <i className="bi bi-check-circle-fill me-2" />
-                                                    Link terdeteksi
-                                                    valid.
+
+                                                    Link terdeteksi valid.
                                                 </div>
 
                                                 <a
@@ -1258,6 +1429,7 @@ export default function HumasServiceRequestPage() {
                                                     className="btn btn-sm btn-outline-success rounded-pill"
                                                 >
                                                     <i className="bi bi-box-arrow-up-right me-2" />
+
                                                     Uji Link
                                                 </a>
                                             </div>
@@ -1270,8 +1442,8 @@ export default function HumasServiceRequestPage() {
                             <div className="card-body p-4 p-lg-5">
                                 <SectionHeader
                                     icon="bi-file-earmark-arrow-up-fill"
-                                    title="Draft Artikel Kegiatan"
-                                    description="Unggah draft artikel atau dokumen pendukung kegiatan."
+                                    title="Lampiran / Brief Kegiatan"
+                                    description="Unggah brief, TOR, rundown, draft artikel, script, referensi desain, atau dokumen pendukung lainnya."
                                 />
 
                                 {!articleDraft ? (
@@ -1279,38 +1451,43 @@ export default function HumasServiceRequestPage() {
                                         htmlFor="article_draft"
                                         className="border border-2 border-dashed rounded-5 p-4 p-lg-5 text-center w-100 bg-light"
                                         style={{
-                                            cursor: submitting
-                                                ? 'not-allowed'
-                                                : 'pointer',
+                                            cursor:
+                                                submitting
+                                                    ? 'not-allowed'
+                                                    : 'pointer',
                                         }}
                                     >
                                         <div
                                             className="mx-auto mb-3 rounded-circle bg-white text-danger d-flex align-items-center justify-content-center shadow-sm"
                                             style={{
-                                                width: 68,
-                                                height: 68,
+                                                width:
+                                                    68,
+
+                                                height:
+                                                    68,
                                             }}
                                         >
                                             <i className="bi bi-cloud-arrow-up-fill fs-2" />
                                         </div>
 
                                         <h6 className="fw-bold mb-2">
-                                            Klik untuk
-                                            mengunggah draft
-                                            artikel
+                                            Klik untuk mengunggah lampiran
                                         </h6>
 
+                                        <p className="small text-muted mb-1">
+                                            Wajib untuk seluruh jenis layanan Humas.
+                                        </p>
+
                                         <p className="small text-muted mb-0">
-                                            Format PDF, DOC,
-                                            atau DOCX. Maksimal
-                                            10 MB.
+                                            PDF, DOC, DOCX, JPG, JPEG, atau PNG.
+                                            Maksimal 10 MB.
                                         </p>
 
                                         <input
                                             id="article_draft"
                                             name="article_draft"
                                             type="file"
-                                            accept=".pdf,.doc,.docx"
+                                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                                             className="d-none"
                                             onChange={
                                                 handleArticleDraftChange
@@ -1326,8 +1503,11 @@ export default function HumasServiceRequestPage() {
                                             <div
                                                 className="rounded-4 bg-white text-danger d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm"
                                                 style={{
-                                                    width: 52,
-                                                    height: 52,
+                                                    width:
+                                                        52,
+
+                                                    height:
+                                                        52,
                                                 }}
                                             >
                                                 <i className="bi bi-file-earmark-check-fill fs-4" />
@@ -1384,7 +1564,8 @@ export default function HumasServiceRequestPage() {
                         <div
                             className="position-sticky"
                             style={{
-                                top: 110,
+                                top:
+                                    110,
                             }}
                         >
                             <section className="card border-0 shadow-sm rounded-5 mb-4">
@@ -1422,7 +1603,7 @@ export default function HumasServiceRequestPage() {
 
                                         <div className="border-bottom pb-3">
                                             <div className="small text-muted mb-1">
-                                                Jenis Liputan
+                                                Jenis Layanan
                                             </div>
 
                                             <div className="fw-semibold">
@@ -1456,7 +1637,7 @@ export default function HumasServiceRequestPage() {
 
                                         <div>
                                             <div className="small text-muted mb-1">
-                                                Draft Artikel
+                                                Lampiran / Brief
                                             </div>
 
                                             <div className="fw-semibold text-truncate">
@@ -1479,13 +1660,14 @@ export default function HumasServiceRequestPage() {
                                             {submitting ? (
                                                 <>
                                                     <span className="spinner-border spinner-border-sm me-2" />
+
                                                     Mengirim...
                                                 </>
                                             ) : (
                                                 <>
                                                     <i className="bi bi-send-fill me-2" />
-                                                    Kirim
-                                                    Request
+
+                                                    Kirim Request
                                                 </>
                                             )}
                                         </button>
@@ -1501,6 +1683,7 @@ export default function HumasServiceRequestPage() {
                                             }
                                         >
                                             <i className="bi bi-arrow-counterclockwise me-2" />
+
                                             Reset Form
                                         </button>
 
@@ -1509,8 +1692,8 @@ export default function HumasServiceRequestPage() {
                                             className="btn btn-light border rounded-pill"
                                         >
                                             <i className="bi bi-clock-history me-2" />
-                                            Riwayat
-                                            Pengajuan
+
+                                            Riwayat Pengajuan
                                         </Link>
                                     </div>
                                 </div>
@@ -1530,15 +1713,11 @@ export default function HumasServiceRequestPage() {
 
                                             <div>
                                                 <div className="fw-semibold">
-                                                    Request
-                                                    dikirim
+                                                    Request dikirim
                                                 </div>
 
                                                 <div className="small text-muted">
-                                                    Data dan
-                                                    bahan masuk
-                                                    ke Admin
-                                                    Humas.
+                                                    Data dan bahan masuk ke Admin Humas.
                                                 </div>
                                             </div>
                                         </div>
@@ -1550,14 +1729,11 @@ export default function HumasServiceRequestPage() {
 
                                             <div>
                                                 <div className="fw-semibold">
-                                                    Pemeriksaan
-                                                    admin
+                                                    Pemeriksaan admin
                                                 </div>
 
                                                 <div className="small text-muted">
-                                                    Admin
-                                                    menyetujui
-                                                    atau menolak.
+                                                    Admin menyetujui atau menolak.
                                                 </div>
                                             </div>
                                         </div>
@@ -1569,14 +1745,11 @@ export default function HumasServiceRequestPage() {
 
                                             <div>
                                                 <div className="fw-semibold">
-                                                    Liputan
-                                                    diproses
+                                                    Layanan diproses
                                                 </div>
 
                                                 <div className="small text-muted">
-                                                    PIC
-                                                    mengerjakan
-                                                    layanan.
+                                                    PIC mengerjakan layanan.
                                                 </div>
                                             </div>
                                         </div>
@@ -1588,14 +1761,11 @@ export default function HumasServiceRequestPage() {
 
                                             <div>
                                                 <div className="fw-semibold">
-                                                    Hasil
-                                                    diberikan
+                                                    Hasil diberikan
                                                 </div>
 
                                                 <div className="small text-muted">
-                                                    Link hasil
-                                                    muncul pada
-                                                    riwayat user.
+                                                    File atau link hasil muncul pada riwayat user.
                                                 </div>
                                             </div>
                                         </div>
@@ -1625,8 +1795,7 @@ export default function HumasServiceRequestPage() {
                     </div>
 
                     <div className="small text-muted mt-1">
-                        Humas Telkom University Kampus
-                        Surabaya
+                        Humas Telkom University Kampus Surabaya
                     </div>
                 </div>
             </section>

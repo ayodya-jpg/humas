@@ -17,7 +17,7 @@ class DashboardExcelService
 {
     /*
     |--------------------------------------------------------------------------
-    | WARNA EXPORT LAMA
+    | Warna Export
     |--------------------------------------------------------------------------
     */
 
@@ -116,7 +116,7 @@ class DashboardExcelService
 
         /*
         |--------------------------------------------------------------------------
-        | Liputan Humas
+        | Layanan Humas
         |--------------------------------------------------------------------------
         */
 
@@ -126,7 +126,7 @@ class DashboardExcelService
 
         $humasSheet
             ->setTitle(
-                'Liputan Humas'
+                'Layanan Humas'
             );
 
         $this->buildHumasSheet(
@@ -230,12 +230,6 @@ class DashboardExcelService
         array $filters,
         Collection $requests
     ): void {
-        /*
-        |--------------------------------------------------------------------------
-        | Judul
-        |--------------------------------------------------------------------------
-        */
-
         $sheet->mergeCells(
             'A1:D1'
         );
@@ -604,7 +598,7 @@ class DashboardExcelService
 
         $sheet->setCellValue(
             'A22',
-            'Pengajuan dengan Bukti User'
+            'Pengajuan dengan Lampiran User'
         );
 
         $sheet->setCellValue(
@@ -653,6 +647,7 @@ class DashboardExcelService
         $serviceRows = [
             [
                 'Merchandise',
+
                 $requests
                     ->where(
                         'service',
@@ -662,7 +657,8 @@ class DashboardExcelService
             ],
 
             [
-                'Liputan Humas',
+                'Layanan Humas',
+
                 $requests
                     ->where(
                         'service',
@@ -673,6 +669,7 @@ class DashboardExcelService
 
             [
                 'Peminjaman SEKPiM',
+
                 $requests
                     ->where(
                         'service',
@@ -701,12 +698,6 @@ class DashboardExcelService
 
             $serviceRow++;
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Ukuran Kolom Lama
-        |--------------------------------------------------------------------------
-        */
 
         $sheet
             ->getColumnDimension(
@@ -763,11 +754,6 @@ class DashboardExcelService
         Worksheet $sheet,
         Collection $requests
     ): void {
-        /*
-         * Struktur utama mengikuti export lama.
-         * Detail terbaru dipertahankan.
-         */
-
         $headers = [
             'No',
             'Kode Pengajuan',
@@ -776,6 +762,11 @@ class DashboardExcelService
             'Email Pemohon',
             'Unit / Instansi',
             'Judul / Kegiatan',
+
+            'Nama PIC',
+            'Nomor PIC',
+            'Tanggal Pengambilan Merchandise',
+
             'Tanggal Pengajuan',
             'Status',
 
@@ -792,10 +783,10 @@ class DashboardExcelService
             'Catatan Admin',
             'Catatan Hasil Admin',
 
-            'Bukti User',
+            'Lampiran User',
             'Link Referensi User',
 
-            'Bukti Admin',
+            'File / Bukti Admin',
             'Link Hasil Admin',
 
             'Bukti Serah Terima',
@@ -866,6 +857,29 @@ class DashboardExcelService
 
             $sheet->setCellValue(
                 "H{$row}",
+                $item[
+                    'pic_name'
+                ] ?? '-'
+            );
+
+            $sheet->setCellValue(
+                "I{$row}",
+                $item[
+                    'pic_phone'
+                ] ?? '-'
+            );
+
+            $sheet->setCellValue(
+                "J{$row}",
+                $this->formatDate(
+                    $item[
+                        'pickup_date'
+                    ] ?? null
+                )
+            );
+
+            $sheet->setCellValue(
+                "K{$row}",
                 $this->formatDateTime(
                     $item[
                         'submitted_at'
@@ -874,7 +888,7 @@ class DashboardExcelService
             );
 
             $sheet->setCellValue(
-                "I{$row}",
+                "L{$row}",
                 $this->statusLabel(
                     $item[
                         'status'
@@ -883,14 +897,14 @@ class DashboardExcelService
             );
 
             $sheet->setCellValue(
-                "J{$row}",
+                "M{$row}",
                 $item[
                     'revision_count'
                 ] ?? 0
             );
 
             $sheet->setCellValue(
-                "K{$row}",
+                "N{$row}",
                 $this->formatDateTime(
                     $item[
                         'latest_revision_at'
@@ -899,21 +913,21 @@ class DashboardExcelService
             );
 
             $sheet->setCellValue(
-                "L{$row}",
+                "O{$row}",
                 $item[
                     'latest_revision_reason'
                 ] ?? '-'
             );
 
             $sheet->setCellValue(
-                "M{$row}",
+                "P{$row}",
                 $item[
                     'revision_history_text'
                 ] ?? '-'
             );
 
             $sheet->setCellValue(
-                "N{$row}",
+                "Q{$row}",
                 $this->formatDateTime(
                     $item[
                         'approved_at'
@@ -922,7 +936,7 @@ class DashboardExcelService
             );
 
             $sheet->setCellValue(
-                "O{$row}",
+                "R{$row}",
                 $this->formatDateTime(
                     $item[
                         'rejected_at'
@@ -931,7 +945,7 @@ class DashboardExcelService
             );
 
             $sheet->setCellValue(
-                "P{$row}",
+                "S{$row}",
                 $this->formatDateTime(
                     $item[
                         'completed_at'
@@ -940,21 +954,21 @@ class DashboardExcelService
             );
 
             $sheet->setCellValue(
-                "Q{$row}",
+                "T{$row}",
                 $item[
                     'rejection_reason'
                 ] ?? '-'
             );
 
             $sheet->setCellValue(
-                "R{$row}",
+                "U{$row}",
                 $item[
                     'admin_note'
                 ] ?? '-'
             );
 
             $sheet->setCellValue(
-                "S{$row}",
+                "V{$row}",
                 $item[
                     'admin_result_note'
                 ] ?? '-'
@@ -962,16 +976,16 @@ class DashboardExcelService
 
             $this->setHyperlinkCell(
                 $sheet,
-                "T{$row}",
+                "W{$row}",
                 $item[
                     'user_evidence_url'
                 ] ?? null,
-                'Buka Bukti User'
+                'Buka Lampiran User'
             );
 
             $this->setHyperlinkCell(
                 $sheet,
-                "U{$row}",
+                "X{$row}",
                 $item[
                     'user_reference_link'
                 ] ?? null,
@@ -980,16 +994,16 @@ class DashboardExcelService
 
             $this->setHyperlinkCell(
                 $sheet,
-                "V{$row}",
+                "Y{$row}",
                 $item[
                     'admin_evidence_url'
                 ] ?? null,
-                'Buka Bukti Admin'
+                'Buka File Admin'
             );
 
             $this->setHyperlinkCell(
                 $sheet,
-                "W{$row}",
+                "Z{$row}",
                 $item[
                     'admin_result_link'
                 ] ?? null,
@@ -998,7 +1012,7 @@ class DashboardExcelService
 
             $this->setHyperlinkCell(
                 $sheet,
-                "X{$row}",
+                "AA{$row}",
                 $item[
                     'handover_evidence_url'
                 ] ?? null,
@@ -1007,7 +1021,7 @@ class DashboardExcelService
 
             $this->setHyperlinkCell(
                 $sheet,
-                "Y{$row}",
+                "AB{$row}",
                 $item[
                     'return_evidence_url'
                 ] ?? null,
@@ -1016,7 +1030,7 @@ class DashboardExcelService
 
             $this->setHyperlinkCell(
                 $sheet,
-                "Z{$row}",
+                "AC{$row}",
                 $item[
                     'detail_url'
                 ] ?? null,
@@ -1064,6 +1078,10 @@ class DashboardExcelService
             'Nama Kegiatan',
             'Tanggal Kegiatan',
 
+            'Nama PIC',
+            'Nomor PIC',
+            'Tanggal Pengambilan Merchandise',
+
             'Instansi Tamu',
             'Nama Tamu',
             'Jabatan Tamu',
@@ -1088,7 +1106,7 @@ class DashboardExcelService
             'Catatan Pemohon',
             'Catatan Admin',
 
-            'Bukti File User',
+            'Bukti / Lampiran User',
             'Link Bukti User',
 
             'Bukti Admin',
@@ -1131,6 +1149,20 @@ class DashboardExcelService
                 $this->formatDate(
                     $item[
                         'activity_date'
+                    ] ?? null
+                ),
+
+                $item[
+                    'pic_name'
+                ] ?? '-',
+
+                $item[
+                    'pic_phone'
+                ] ?? '-',
+
+                $this->formatDate(
+                    $item[
+                        'pickup_date'
                     ] ?? null
                 ),
 
@@ -1240,7 +1272,7 @@ class DashboardExcelService
 
             $this->setHyperlinkCell(
                 $sheet,
-                "Y{$row}",
+                "AB{$row}",
                 $item[
                     'user_evidence_url'
                 ] ?? null,
@@ -1249,7 +1281,7 @@ class DashboardExcelService
 
             $this->setHyperlinkCell(
                 $sheet,
-                "Z{$row}",
+                "AC{$row}",
                 $item[
                     'user_reference_link'
                 ] ?? null,
@@ -1258,7 +1290,7 @@ class DashboardExcelService
 
             $this->setHyperlinkCell(
                 $sheet,
-                "AA{$row}",
+                "AD{$row}",
                 $item[
                     'admin_evidence_url'
                 ] ?? null,
@@ -1267,7 +1299,7 @@ class DashboardExcelService
 
             $this->setHyperlinkCell(
                 $sheet,
-                "AB{$row}",
+                "AE{$row}",
                 $item[
                     'detail_url'
                 ] ?? null,
@@ -1298,7 +1330,7 @@ class DashboardExcelService
 
     /*
     |--------------------------------------------------------------------------
-    | LIPUTAN HUMAS
+    | LAYANAN HUMAS
     |--------------------------------------------------------------------------
     */
 
@@ -1306,11 +1338,6 @@ class DashboardExcelService
         Worksheet $sheet,
         Collection $requests
     ): void {
-        /*
-         * Struktur utama sengaja dipertahankan
-         * sama dengan export lama.
-         */
-
         $headers = [
             'No',
             'Kode Request',
@@ -1322,7 +1349,7 @@ class DashboardExcelService
             'Kontak WhatsApp PIC',
 
             'Detail Kegiatan',
-            'Jenis Liputan',
+            'Jenis Layanan Humas',
             'Lokasi Acara',
 
             'Pelaksanaan Kegiatan',
@@ -1337,10 +1364,10 @@ class DashboardExcelService
             'Alasan Penolakan',
             'Catatan Admin',
 
-            'Draft Artikel User',
+            'Lampiran / Brief Kegiatan',
             'Link Referensi User',
 
-            'Bukti / File Admin',
+            'File Hasil Admin',
             'Link Hasil Humas',
             'Catatan Hasil Humas',
 
@@ -1387,6 +1414,19 @@ class DashboardExcelService
                     'activity_detail'
                 ] ?? '-',
 
+                /*
+                 * coverage_label sudah dinormalisasi
+                 * DashboardController.
+                 *
+                 * REQUEST DESIGN INSTAGRAM
+                 * → Request Design Instagram
+                 *
+                 * PUBLIKASI MEDIA MASSA
+                 * → Publikasi Media Massa
+                 *
+                 * SOCIAL MEDIA legacy
+                 * → Social Media (Data Lama)
+                 */
                 $item[
                     'coverage_label'
                 ] ??
@@ -1461,15 +1501,21 @@ class DashboardExcelService
                 );
             }
 
+            /*
+             * R = Lampiran / Brief User
+             */
             $this->setHyperlinkCell(
                 $sheet,
                 "R{$row}",
                 $item[
                     'user_evidence_url'
                 ] ?? null,
-                'Buka Draft Artikel'
+                'Buka Lampiran / Brief'
             );
 
+            /*
+             * S = Link Referensi User
+             */
             $this->setHyperlinkCell(
                 $sheet,
                 "S{$row}",
@@ -1479,15 +1525,21 @@ class DashboardExcelService
                 'Buka Referensi'
             );
 
+            /*
+             * T = File Hasil Admin
+             */
             $this->setHyperlinkCell(
                 $sheet,
                 "T{$row}",
                 $item[
                     'admin_evidence_url'
                 ] ?? null,
-                'Buka File Admin'
+                'Buka File Hasil'
             );
 
+            /*
+             * U = Link Hasil Humas
+             */
             $this->setHyperlinkCell(
                 $sheet,
                 "U{$row}",
@@ -1497,6 +1549,9 @@ class DashboardExcelService
                 'Buka Hasil Humas'
             );
 
+            /*
+             * V = Catatan Hasil
+             */
             $sheet->setCellValue(
                 "V{$row}",
                 $item[
@@ -1504,6 +1559,9 @@ class DashboardExcelService
                 ] ?? '-'
             );
 
+            /*
+             * W = Detail
+             */
             $this->setHyperlinkCell(
                 $sheet,
                 "W{$row}",
@@ -1545,13 +1603,6 @@ class DashboardExcelService
         Worksheet $sheet,
         Collection $requests
     ): void {
-        /*
-         * Tampilan mengikuti export lama.
-         *
-         * Evidence terbaru tetap ditambahkan
-         * pada posisi yang sudah sesuai.
-         */
-
         $headers = [
             'No',
             'Kode Peminjaman',
@@ -1771,7 +1822,7 @@ class DashboardExcelService
 
     /*
     |--------------------------------------------------------------------------
-    | STYLE HEADER TABLE
+    | HEADER TABEL
     |--------------------------------------------------------------------------
     */
 
@@ -1786,7 +1837,8 @@ class DashboardExcelService
         ) {
             $column =
                 Coordinate::stringFromColumnIndex(
-                    $index + 1
+                    $index +
+                    1
                 );
 
             $sheet->setCellValue(
@@ -1878,7 +1930,7 @@ class DashboardExcelService
 
     /*
     |--------------------------------------------------------------------------
-    | STYLE BODY LAMA
+    | BODY TABEL
     |--------------------------------------------------------------------------
     */
 
@@ -1895,14 +1947,9 @@ class DashboardExcelService
         $range =
             "A{$row}:{$lastColumn}{$row}";
 
-        /*
-         * Baris data pertama = abu muda,
-         * baris berikutnya putih.
-         *
-         * Ini mengikuti export lama.
-         */
         if (
-            $row % 2 === 0
+            $row % 2 ===
+            0
         ) {
             $sheet
                 ->getStyle(
@@ -1962,7 +2009,8 @@ class DashboardExcelService
             );
 
         if (
-            $lastRow < 1
+            $lastRow <
+            1
         ) {
             $lastRow =
                 1;
@@ -1974,7 +2022,8 @@ class DashboardExcelService
         );
 
         if (
-            $lastRow >= 2
+            $lastRow >=
+            2
         ) {
             $sheet
                 ->getStyle(
@@ -2057,14 +2106,11 @@ class DashboardExcelService
         Worksheet $sheet,
         string $range
     ): void {
-        $borders =
-            $sheet
-                ->getStyle(
-                    $range
-                )
-                ->getBorders();
-
-        $borders
+        $sheet
+            ->getStyle(
+                $range
+            )
+            ->getBorders()
             ->getAllBorders()
             ->setBorderStyle(
                 Border::BORDER_THIN
@@ -2148,11 +2194,13 @@ class DashboardExcelService
 
         $url =
             trim(
-                (string) $url
+                (string)
+                $url
             );
 
         if (
-            $url === ''
+            $url ===
+            ''
         ) {
             return null;
         }
@@ -2175,7 +2223,7 @@ class DashboardExcelService
 
     /*
     |--------------------------------------------------------------------------
-    | WIDTH SEMUA LAYANAN
+    | LEBAR KOLOM SEMUA LAYANAN
     |--------------------------------------------------------------------------
     */
 
@@ -2185,37 +2233,42 @@ class DashboardExcelService
         $widths = [
             'A' => 6,
             'B' => 26,
-            'C' => 20,
+            'C' => 22,
             'D' => 24,
             'E' => 28,
             'F' => 24,
-            'G' => 30,
-            'H' => 20,
-            'I' => 18,
+            'G' => 32,
 
-            'J' => 14,
-            'K' => 21,
-            'L' => 30,
-            'M' => 65,
+            'H' => 24,
+            'I' => 20,
+            'J' => 26,
 
-            'N' => 20,
-            'O' => 20,
-            'P' => 20,
+            'K' => 20,
+            'L' => 18,
 
-            'Q' => 30,
-            'R' => 30,
-            'S' => 30,
+            'M' => 14,
+            'N' => 21,
+            'O' => 30,
+            'P' => 65,
 
-            'T' => 20,
-            'U' => 22,
+            'Q' => 20,
+            'R' => 20,
+            'S' => 20,
 
-            'V' => 20,
-            'W' => 20,
+            'T' => 30,
+            'U' => 30,
+            'V' => 30,
 
+            'W' => 22,
             'X' => 22,
-            'Y' => 22,
 
-            'Z' => 20,
+            'Y' => 22,
+            'Z' => 22,
+
+            'AA' => 22,
+            'AB' => 22,
+
+            'AC' => 20,
         ];
 
         $this->applyWidths(
@@ -2226,7 +2279,7 @@ class DashboardExcelService
 
     /*
     |--------------------------------------------------------------------------
-    | WIDTH MERCHANDISE
+    | LEBAR KOLOM MERCHANDISE
     |--------------------------------------------------------------------------
     */
 
@@ -2243,33 +2296,37 @@ class DashboardExcelService
             'F' => 20,
 
             'G' => 24,
-            'H' => 22,
-            'I' => 22,
+            'H' => 20,
+            'I' => 26,
 
-            'J' => 36,
-            'K' => 14,
+            'J' => 24,
+            'K' => 22,
+            'L' => 22,
 
-            'L' => 20,
-            'M' => 18,
-
+            'M' => 36,
             'N' => 14,
-            'O' => 22,
-            'P' => 24,
-            'Q' => 32,
-            'R' => 68,
 
-            'S' => 20,
-            'T' => 20,
-            'U' => 20,
+            'O' => 20,
+            'P' => 18,
 
-            'V' => 30,
-            'W' => 32,
-            'X' => 32,
+            'Q' => 14,
+            'R' => 22,
+            'S' => 24,
+            'T' => 32,
+            'U' => 68,
 
-            'Y' => 20,
-            'Z' => 20,
-            'AA' => 20,
-            'AB' => 20,
+            'V' => 20,
+            'W' => 20,
+            'X' => 20,
+
+            'Y' => 30,
+            'Z' => 32,
+            'AA' => 32,
+
+            'AB' => 22,
+            'AC' => 22,
+            'AD' => 22,
+            'AE' => 20,
         ];
 
         $this->applyWidths(
@@ -2280,7 +2337,7 @@ class DashboardExcelService
 
     /*
     |--------------------------------------------------------------------------
-    | WIDTH HUMAS
+    | LEBAR KOLOM LAYANAN HUMAS
     |--------------------------------------------------------------------------
     */
 
@@ -2298,7 +2355,15 @@ class DashboardExcelService
             'F' => 22,
 
             'G' => 45,
-            'H' => 24,
+
+            /*
+             * Lebih lebar karena
+             * "Request Design Instagram"
+             * dan
+             * "Publikasi Media Massa".
+             */
+            'H' => 30,
+
             'I' => 24,
 
             'J' => 22,
@@ -2313,11 +2378,11 @@ class DashboardExcelService
             'P' => 30,
             'Q' => 30,
 
-            'R' => 21,
-            'S' => 21,
+            'R' => 26,
+            'S' => 22,
 
-            'T' => 21,
-            'U' => 21,
+            'T' => 22,
+            'U' => 22,
             'V' => 35,
 
             'W' => 20,
@@ -2331,7 +2396,7 @@ class DashboardExcelService
 
     /*
     |--------------------------------------------------------------------------
-    | WIDTH BORROWING
+    | LEBAR KOLOM PEMINJAMAN
     |--------------------------------------------------------------------------
     */
 
@@ -2401,7 +2466,7 @@ class DashboardExcelService
 
     /*
     |--------------------------------------------------------------------------
-    | LABEL
+    | LABEL LAYANAN
     |--------------------------------------------------------------------------
     */
 
@@ -2415,7 +2480,7 @@ class DashboardExcelService
                 'Merchandise',
 
             'humas' =>
-                'Liputan Humas',
+                'Layanan Humas',
 
             'borrowing' =>
                 'Peminjaman SEKPiM',
@@ -2427,10 +2492,17 @@ class DashboardExcelService
 
             default =>
                 ucfirst(
-                    (string) $service
+                    (string)
+                    $service
                 ),
         };
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | LABEL STATUS
+    |--------------------------------------------------------------------------
+    */
 
     private function statusLabel(
         ?string $status
@@ -2466,7 +2538,8 @@ class DashboardExcelService
 
             default =>
                 ucfirst(
-                    (string) $status
+                    (string)
+                    $status
                 ),
         };
     }

@@ -41,8 +41,15 @@ class HumasServiceRequestController extends Controller
         'Lainnya',
     ];
 
+    /*
+     * Jenis layanan yang dapat dibuat untuk pengajuan BARU.
+     *
+     * SOCIAL MEDIA tidak lagi digunakan untuk pengajuan baru.
+     * Record lama dengan value SOCIAL MEDIA tetap aman karena
+     * data lama tidak diubah.
+     */
     private const COVERAGE_TYPES = [
-        'SOCIAL MEDIA',
+        'REQUEST DESIGN INSTAGRAM',
         'DOKUMENTASI',
         'PUBLIKASI WEBSITE',
         'PUBLIKASI MEDIA MASSA',
@@ -64,21 +71,30 @@ class HumasServiceRequestController extends Controller
             )
         ) {
             return $this->forbiddenResponse(
-                'Kamu tidak memiliki izin melihat seluruh request liputan Humas.'
+                'Kamu tidak memiliki izin melihat seluruh request layanan Humas.'
             );
         }
 
         $requests =
             HumasServiceRequest::query()
-                ->with('user')
-                ->latest('submitted_at')
-                ->latest('created_at')
+                ->with(
+                    'user'
+                )
+                ->latest(
+                    'submitted_at'
+                )
+                ->latest(
+                    'created_at'
+                )
                 ->get();
 
         return response()->json([
-            'success' => true,
+            'success' =>
+                true,
+
             'message' =>
-                'Data request liputan Humas berhasil diambil.',
+                'Data request layanan Humas berhasil diambil.',
+
             'data' =>
                 $requests,
         ]);
@@ -98,25 +114,34 @@ class HumasServiceRequestController extends Controller
             )
         ) {
             return $this->forbiddenResponse(
-                'Kamu tidak memiliki izin melihat riwayat request liputan Humas.'
+                'Kamu tidak memiliki izin melihat riwayat request layanan Humas.'
             );
         }
 
         $requests =
             HumasServiceRequest::query()
-                ->with('user')
+                ->with(
+                    'user'
+                )
                 ->where(
                     'user_id',
                     $user->id
                 )
-                ->latest('submitted_at')
-                ->latest('created_at')
+                ->latest(
+                    'submitted_at'
+                )
+                ->latest(
+                    'created_at'
+                )
                 ->get();
 
         return response()->json([
-            'success' => true,
+            'success' =>
+                true,
+
             'message' =>
-                'Riwayat request liputan Humas berhasil diambil.',
+                'Riwayat request layanan Humas berhasil diambil.',
+
             'data' =>
                 $requests,
         ]);
@@ -128,8 +153,12 @@ class HumasServiceRequestController extends Controller
     ): JsonResponse {
         $serviceRequest =
             HumasServiceRequest::query()
-                ->with('user')
-                ->findOrFail($id);
+                ->with(
+                    'user'
+                )
+                ->findOrFail(
+                    $id
+                );
 
         if (
             !$this->canAccessServiceRequest(
@@ -138,14 +167,17 @@ class HumasServiceRequestController extends Controller
             )
         ) {
             return $this->forbiddenResponse(
-                'Akses ditolak. Kamu tidak memiliki izin melihat request liputan ini.'
+                'Akses ditolak. Kamu tidak memiliki izin melihat request Humas ini.'
             );
         }
 
         return response()->json([
-            'success' => true,
+            'success' =>
+                true,
+
             'message' =>
-                'Detail request liputan Humas berhasil diambil.',
+                'Detail request layanan Humas berhasil diambil.',
+
             'data' =>
                 $serviceRequest,
         ]);
@@ -165,7 +197,7 @@ class HumasServiceRequestController extends Controller
             )
         ) {
             return $this->forbiddenResponse(
-                'Kamu tidak memiliki izin membuat request liputan Humas.'
+                'Kamu tidak memiliki izin membuat request layanan Humas.'
             );
         }
 
@@ -180,6 +212,7 @@ class HumasServiceRequestController extends Controller
 
                 'unit_name' => [
                     'required',
+
                     Rule::in(
                         self::UNIT_NAMES
                     ),
@@ -209,6 +242,7 @@ class HumasServiceRequestController extends Controller
 
                 'coverage_type' => [
                     'required',
+
                     Rule::in(
                         self::COVERAGE_TYPES
                     ),
@@ -232,10 +266,16 @@ class HumasServiceRequestController extends Controller
                     'max:2000',
                 ],
 
+                /*
+                 * Nama field tetap article_draft agar kompatibel
+                 * dengan struktur database lama.
+                 *
+                 * Secara bisnis sekarang disebut Lampiran / Brief.
+                 */
                 'article_draft' => [
                     'required',
                     'file',
-                    'mimes:pdf,doc,docx',
+                    'mimes:pdf,doc,docx,jpg,jpeg,png',
                     'max:10240',
                 ],
             ], [
@@ -257,14 +297,20 @@ class HumasServiceRequestController extends Controller
                 'pic_whatsapp.required' =>
                     'Kontak WhatsApp PIC acara wajib diisi.',
 
+                'pic_whatsapp.regex' =>
+                    'Format nomor WhatsApp PIC tidak valid.',
+
                 'activity_detail.required' =>
                     'Detail kegiatan wajib diisi.',
 
+                'activity_detail.min' =>
+                    'Detail kegiatan minimal sepuluh karakter.',
+
                 'coverage_type.required' =>
-                    'Jenis liputan wajib dipilih.',
+                    'Jenis layanan Humas wajib dipilih.',
 
                 'coverage_type.in' =>
-                    'Jenis liputan tidak valid.',
+                    'Jenis layanan Humas tidak valid.',
 
                 'event_location.required' =>
                     'Lokasi acara wajib diisi.',
@@ -276,13 +322,13 @@ class HumasServiceRequestController extends Controller
                     'Link bahan atau referensi harus berupa URL yang valid.',
 
                 'article_draft.required' =>
-                    'Draft artikel kegiatan wajib diunggah.',
+                    'Lampiran atau brief kegiatan wajib diunggah.',
 
                 'article_draft.mimes' =>
-                    'Draft artikel harus berformat PDF, DOC, atau DOCX.',
+                    'Lampiran harus berformat PDF, DOC, DOCX, JPG, JPEG, atau PNG.',
 
                 'article_draft.max' =>
-                    'Ukuran draft artikel maksimal 10 MB.',
+                    'Ukuran lampiran maksimal 10 MB.',
             ]);
 
         $articleDraftPath =
@@ -432,12 +478,17 @@ class HumasServiceRequestController extends Controller
                 );
 
             $serviceRequest
-                ->load('user');
+                ->load(
+                    'user'
+                );
 
             return response()->json([
-                'success' => true,
+                'success' =>
+                    true,
+
                 'message' =>
-                    'Request liputan Humas berhasil dikirim.',
+                    'Request layanan Humas berhasil dikirim.',
+
                 'data' =>
                     $serviceRequest,
             ], 201);
@@ -461,11 +512,14 @@ class HumasServiceRequestController extends Controller
             );
 
             return response()->json([
-                'success' => false,
+                'success' =>
+                    false,
+
                 'message' =>
                     app()->isLocal()
                         ? $error->getMessage()
-                        : 'Request liputan Humas gagal dikirim.',
+                        : 'Request layanan Humas gagal dikirim.',
+
                 'data' =>
                     null,
             ], 500);
@@ -482,7 +536,7 @@ class HumasServiceRequestController extends Controller
             )
         ) {
             return $this->forbiddenResponse(
-                'Kamu tidak memiliki izin menyetujui request liputan Humas.'
+                'Kamu tidak memiliki izin menyetujui request Humas.'
             );
         }
 
@@ -551,9 +605,12 @@ class HumasServiceRequestController extends Controller
                 );
 
             return response()->json([
-                'success' => true,
+                'success' =>
+                    true,
+
                 'message' =>
-                    'Request liputan Humas berhasil disetujui.',
+                    'Request Humas berhasil disetujui.',
+
                 'data' =>
                     $serviceRequest,
             ]);
@@ -569,9 +626,12 @@ class HumasServiceRequestController extends Controller
             );
 
             return response()->json([
-                'success' => false,
+                'success' =>
+                    false,
+
                 'message' =>
-                    'Approval request liputan gagal diproses.',
+                    'Approval request Humas gagal diproses.',
+
                 'data' =>
                     null,
             ], 500);
@@ -588,7 +648,7 @@ class HumasServiceRequestController extends Controller
             )
         ) {
             return $this->forbiddenResponse(
-                'Kamu tidak memiliki izin menolak request liputan Humas.'
+                'Kamu tidak memiliki izin menolak request Humas.'
             );
         }
 
@@ -681,9 +741,12 @@ class HumasServiceRequestController extends Controller
                 );
 
             return response()->json([
-                'success' => true,
+                'success' =>
+                    true,
+
                 'message' =>
-                    'Request liputan Humas berhasil ditolak.',
+                    'Request Humas berhasil ditolak.',
+
                 'data' =>
                     $serviceRequest,
             ]);
@@ -699,25 +762,18 @@ class HumasServiceRequestController extends Controller
             );
 
             return response()->json([
-                'success' => false,
+                'success' =>
+                    false,
+
                 'message' =>
-                    'Penolakan request liputan gagal diproses.',
+                    'Penolakan request Humas gagal diproses.',
+
                 'data' =>
                     null,
             ], 500);
         }
     }
 
-    /**
-     * Menyelesaikan request Humas.
-     *
-     * Admin dapat mengirim:
-     * - link hasil;
-     * - file hasil;
-     * - atau keduanya.
-     *
-     * Minimal salah satu wajib tersedia.
-     */
     public function complete(
         Request $request,
         int $id
@@ -728,7 +784,7 @@ class HumasServiceRequestController extends Controller
             )
         ) {
             return $this->forbiddenResponse(
-                'Kamu tidak memiliki izin menyelesaikan request liputan Humas.'
+                'Kamu tidak memiliki izin menyelesaikan request Humas.'
             );
         }
 
@@ -889,9 +945,12 @@ class HumasServiceRequestController extends Controller
                 );
 
             return response()->json([
-                'success' => true,
+                'success' =>
+                    true,
+
                 'message' =>
-                    'Request liputan berhasil diselesaikan dan hasil pekerjaan telah disimpan.',
+                    'Request Humas berhasil diselesaikan dan hasil pekerjaan telah disimpan.',
+
                 'data' =>
                     $serviceRequest,
             ]);
@@ -915,11 +974,14 @@ class HumasServiceRequestController extends Controller
             );
 
             return response()->json([
-                'success' => false,
+                'success' =>
+                    false,
+
                 'message' =>
                     app()->isLocal()
                         ? $error->getMessage()
-                        : 'Penyelesaian request liputan gagal diproses.',
+                        : 'Penyelesaian request Humas gagal diproses.',
+
                 'data' =>
                     null,
             ], 500);
@@ -1074,9 +1136,12 @@ class HumasServiceRequestController extends Controller
         string $message
     ): JsonResponse {
         return response()->json([
-            'success' => false,
+            'success' =>
+                false,
+
             'message' =>
                 $message,
+
             'data' =>
                 null,
         ], 403);

@@ -8,6 +8,7 @@ use App\Models\OrderItem;
 use App\Models\OrderRevisionHistory;
 use App\Models\Product;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -53,8 +54,10 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Data pengajuan merchandise berhasil diambil.',
-            'data' => $orders,
+            'message' =>
+                'Data pengajuan merchandise berhasil diambil.',
+            'data' =>
+                $orders,
         ]);
     }
 
@@ -97,8 +100,10 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Riwayat pengajuan merchandise berhasil diambil.',
-            'data' => $orders,
+            'message' =>
+                'Riwayat pengajuan merchandise berhasil diambil.',
+            'data' =>
+                $orders,
         ]);
     }
 
@@ -130,8 +135,10 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Detail pengajuan merchandise berhasil diambil.',
-            'data' => $order,
+            'message' =>
+                'Detail pengajuan merchandise berhasil diambil.',
+            'data' =>
+                $order,
         ]);
     }
 
@@ -204,6 +211,20 @@ class OrderController extends Controller
                                             ]
                                         ),
 
+                                    'pic_name' =>
+                                        trim(
+                                            $validated[
+                                                'pic_name'
+                                            ]
+                                        ),
+
+                                    'pic_phone' =>
+                                        trim(
+                                            $validated[
+                                                'pic_phone'
+                                            ]
+                                        ),
+
                                     'institution_name' =>
                                         trim(
                                             $validated[
@@ -228,6 +249,11 @@ class OrderController extends Controller
                                     'activity_date' =>
                                         $validated[
                                             'activity_date'
+                                        ],
+
+                                    'pickup_date' =>
+                                        $validated[
+                                            'pickup_date'
                                         ],
 
                                     'proof_link' =>
@@ -294,8 +320,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Pengajuan merchandise berhasil dikirim.',
-                'data' => $order,
+                'message' =>
+                    'Pengajuan merchandise berhasil dikirim.',
+                'data' =>
+                    $order,
             ], 201);
         } catch (
             HttpResponseException $error
@@ -318,15 +346,14 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Pengajuan merchandise gagal dikirim.',
-                'data' => null,
+                'message' =>
+                    'Pengajuan merchandise gagal dikirim.',
+                'data' =>
+                    null,
             ], 500);
         }
     }
 
-    /**
-     * Admin meminta revisi merchandise.
-     */
     public function revision(
         Request $request,
         int $id
@@ -398,13 +425,6 @@ class OrderController extends Controller
                         $requestedAt =
                             now();
 
-                        /*
-                         * Simpan riwayat revisi terlebih dahulu.
-                         *
-                         * Walaupun admin_note order nantinya
-                         * dihapus setelah resubmit, history ini
-                         * tidak akan hilang.
-                         */
                         OrderRevisionHistory::query()
                             ->create([
                                 'order_id' =>
@@ -423,28 +443,29 @@ class OrderController extends Controller
                                     null,
                             ]);
 
-                        $lockedOrder->update([
-                            'status' =>
-                                'revision',
+                        $lockedOrder
+                            ->update([
+                                'status' =>
+                                    'revision',
 
-                            'admin_note' =>
-                                $revisionNote,
+                                'admin_note' =>
+                                    $revisionNote,
 
-                            'revision_requested_at' =>
-                                $requestedAt,
+                                'revision_requested_at' =>
+                                    $requestedAt,
 
-                            'resubmitted_at' =>
-                                null,
+                                'resubmitted_at' =>
+                                    null,
 
-                            'approved_at' =>
-                                null,
+                                'approved_at' =>
+                                    null,
 
-                            'rejected_at' =>
-                                null,
+                                'rejected_at' =>
+                                    null,
 
-                            'completed_at' =>
-                                null,
-                        ]);
+                                'completed_at' =>
+                                    null,
+                            ]);
 
                         return $lockedOrder
                             ->fresh([
@@ -457,8 +478,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Pengajuan merchandise dikembalikan kepada pemohon untuk direvisi.',
-                'data' => $order,
+                'message' =>
+                    'Pengajuan merchandise dikembalikan kepada pemohon untuk direvisi.',
+                'data' =>
+                    $order,
             ]);
         } catch (
             HttpResponseException $error
@@ -473,16 +496,14 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Permintaan revisi gagal diproses.',
-                'data' => null,
+                'message' =>
+                    'Permintaan revisi gagal diproses.',
+                'data' =>
+                    null,
             ], 500);
         }
     }
 
-    /**
-     * User memperbaiki dan mengirim ulang
-     * pengajuan yang berstatus revision.
-     */
     public function resubmit(
         Request $request,
         int $id
@@ -527,15 +548,18 @@ class OrderController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Pengajuan hanya dapat diperbarui ketika berstatus revisi.',
-                'data' => null,
+                'message' =>
+                    'Pengajuan hanya dapat diperbarui ketika berstatus revisi.',
+                'data' =>
+                    null,
             ], 422);
         }
 
         $validated =
             $this->validateOrderRequest(
                 $request,
-                false
+                false,
+                $order
             );
 
         $newProofFilePath =
@@ -595,10 +619,6 @@ class OrderController extends Controller
                         $resubmittedAt =
                             now();
 
-                        /*
-                         * Cari history revisi terbaru
-                         * yang belum memiliki waktu resubmit.
-                         */
                         $revisionHistory =
                             OrderRevisionHistory::query()
                                 ->where(
@@ -635,6 +655,20 @@ class OrderController extends Controller
                                     ]
                                 ),
 
+                            'pic_name' =>
+                                trim(
+                                    $validated[
+                                        'pic_name'
+                                    ]
+                                ),
+
+                            'pic_phone' =>
+                                trim(
+                                    $validated[
+                                        'pic_phone'
+                                    ]
+                                ),
+
                             'institution_name' =>
                                 trim(
                                     $validated[
@@ -661,6 +695,11 @@ class OrderController extends Controller
                                     'activity_date'
                                 ],
 
+                            'pickup_date' =>
+                                $validated[
+                                    'pickup_date'
+                                ],
+
                             'user_note' =>
                                 trim(
                                     $validated[
@@ -671,19 +710,9 @@ class OrderController extends Controller
                             'status' =>
                                 'pending',
 
-                            /*
-                             * Catatan revisi aktif boleh
-                             * dibersihkan karena sudah aman
-                             * tersimpan di history.
-                             */
                             'admin_note' =>
                                 null,
 
-                            /*
-                             * submitted_at tetap menjadi waktu
-                             * submit terbaru seperti konsep
-                             * project sebelumnya.
-                             */
                             'submitted_at' =>
                                 $resubmittedAt,
 
@@ -722,9 +751,10 @@ class OrderController extends Controller
                                     ->getMimeType();
                         }
 
-                        $lockedOrder->update(
-                            $payload
-                        );
+                        $lockedOrder
+                            ->update(
+                                $payload
+                            );
 
                         $this->replaceOrderItems(
                             $lockedOrder,
@@ -755,8 +785,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Perbaikan pengajuan berhasil dikirim ulang.',
-                'data' => $updatedOrder,
+                'message' =>
+                    'Perbaikan pengajuan berhasil dikirim ulang.',
+                'data' =>
+                    $updatedOrder,
             ]);
         } catch (
             HttpResponseException $error
@@ -779,8 +811,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Perbaikan pengajuan gagal dikirim ulang.',
-                'data' => null,
+                'message' =>
+                    'Perbaikan pengajuan gagal dikirim ulang.',
+                'data' =>
+                    null,
             ], 500);
         }
     }
@@ -929,8 +963,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Pengajuan merchandise berhasil disetujui.',
-                'data' => $order,
+                'message' =>
+                    'Pengajuan merchandise berhasil disetujui.',
+                'data' =>
+                    $order,
             ]);
         } catch (
             HttpResponseException $error
@@ -945,8 +981,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Approval merchandise gagal diproses.',
-                'data' => null,
+                'message' =>
+                    'Approval merchandise gagal diproses.',
+                'data' =>
+                    null,
             ], 500);
         }
     }
@@ -1041,8 +1079,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Pengajuan merchandise berhasil ditolak.',
-                'data' => $order,
+                'message' =>
+                    'Pengajuan merchandise berhasil ditolak.',
+                'data' =>
+                    $order,
             ]);
         } catch (
             HttpResponseException $error
@@ -1057,8 +1097,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Penolakan pengajuan gagal diproses.',
-                'data' => null,
+                'message' =>
+                    'Penolakan pengajuan gagal diproses.',
+                'data' =>
+                    null,
             ], 500);
         }
     }
@@ -1148,8 +1190,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Pengajuan merchandise berhasil ditandai selesai.',
-                'data' => $order,
+                'message' =>
+                    'Pengajuan merchandise berhasil ditandai selesai.',
+                'data' =>
+                    $order,
             ]);
         } catch (
             HttpResponseException $error
@@ -1164,101 +1208,264 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Penyelesaian pengajuan gagal diproses.',
-                'data' => null,
+                'message' =>
+                    'Penyelesaian pengajuan gagal diproses.',
+                'data' =>
+                    null,
             ], 500);
         }
     }
 
     private function validateOrderRequest(
         Request $request,
-        bool $proofFileRequired
+        bool $proofFileRequired,
+        ?Order $existingOrder = null
     ): array {
-        return $request->validate([
-            'event_name' => [
-                'required',
-                'string',
-                'min:3',
-                'max:255',
-            ],
+        $validated =
+            $request->validate([
+                'event_name' => [
+                    'required',
+                    'string',
+                    'min:3',
+                    'max:255',
+                ],
 
-            'institution_name' => [
-                'required',
-                'string',
-                'min:2',
-                'max:255',
-            ],
+                'pic_name' => [
+                    'required',
+                    'string',
+                    'min:2',
+                    'max:255',
+                ],
 
-            'guest_name' => [
-                'required',
-                'string',
-                'min:2',
-                'max:255',
-            ],
+                'pic_phone' => [
+                    'required',
+                    'string',
+                    'min:8',
+                    'max:30',
+                    'regex:/^[0-9+\-\s().]+$/',
+                ],
 
-            'guest_position' => [
-                'required',
-                'string',
-                'min:2',
-                'max:255',
-            ],
+                'institution_name' => [
+                    'required',
+                    'string',
+                    'min:2',
+                    'max:255',
+                ],
 
-            'activity_date' => [
-                'required',
-                'date',
-            ],
+                'guest_name' => [
+                    'required',
+                    'string',
+                    'min:2',
+                    'max:255',
+                ],
 
-            'user_note' => [
-                'required',
-                'string',
-                'min:5',
-                'max:5000',
-            ],
+                'guest_position' => [
+                    'required',
+                    'string',
+                    'min:2',
+                    'max:255',
+                ],
 
-            'proof_file' => [
-                $proofFileRequired
-                    ? 'required'
-                    : 'nullable',
+                'activity_date' => [
+                    'required',
+                    'date',
+                ],
 
-                'file',
-                'mimes:pdf,jpg,jpeg,png',
-                'max:5120',
-            ],
+                'pickup_date' => [
+                    'required',
+                    'date',
+                    'before_or_equal:activity_date',
+                ],
 
-            'items' => [
-                'required',
-                'array',
-                'min:1',
-            ],
+                'user_note' => [
+                    'required',
+                    'string',
+                    'min:5',
+                    'max:5000',
+                ],
 
-            'items.*.product_id' => [
-                'required',
-                'integer',
-                'distinct',
-                'exists:products,id',
-            ],
+                'proof_file' => [
+                    $proofFileRequired
+                        ? 'required'
+                        : 'nullable',
 
-            'items.*.quantity' => [
-                'required',
-                'integer',
-                'min:1',
-            ],
-        ], [
-            'proof_file.required' =>
-                'Dokumen pendukung wajib diunggah.',
+                    'file',
+                    'mimes:pdf,jpg,jpeg,png',
+                    'max:5120',
+                ],
 
-            'proof_file.mimes' =>
-                'Lampiran harus berformat PDF, JPG, JPEG, atau PNG.',
+                'items' => [
+                    'required',
+                    'array',
+                    'min:1',
+                ],
 
-            'proof_file.max' =>
-                'Ukuran lampiran maksimal 5 MB.',
+                'items.*.product_id' => [
+                    'required',
+                    'integer',
+                    'distinct',
+                    'exists:products,id',
+                ],
 
-            'items.required' =>
-                'Pilih minimal satu merchandise.',
+                'items.*.quantity' => [
+                    'required',
+                    'integer',
+                    'min:1',
+                ],
+            ], [
+                'event_name.required' =>
+                    'Nama kegiatan wajib diisi.',
 
-            'items.min' =>
-                'Pilih minimal satu merchandise.',
-        ]);
+                'pic_name.required' =>
+                    'Nama PIC wajib diisi.',
+
+                'pic_name.min' =>
+                    'Nama PIC minimal dua karakter.',
+
+                'pic_phone.required' =>
+                    'Nomor PIC wajib diisi.',
+
+                'pic_phone.min' =>
+                    'Nomor PIC minimal delapan karakter.',
+
+                'pic_phone.regex' =>
+                    'Format nomor PIC tidak valid.',
+
+                'activity_date.required' =>
+                    'Tanggal kegiatan wajib diisi.',
+
+                'pickup_date.required' =>
+                    'Tanggal pengambilan merchandise wajib diisi.',
+
+                'pickup_date.before_or_equal' =>
+                    'Tanggal pengambilan tidak boleh setelah tanggal kegiatan.',
+
+                'proof_file.required' =>
+                    'Dokumen pendukung wajib diunggah.',
+
+                'proof_file.mimes' =>
+                    'Lampiran harus berformat PDF, JPG, JPEG, atau PNG.',
+
+                'proof_file.max' =>
+                    'Ukuran lampiran maksimal 5 MB.',
+
+                'items.required' =>
+                    'Pilih minimal satu merchandise.',
+
+                'items.min' =>
+                    'Pilih minimal satu merchandise.',
+            ]);
+
+        $today =
+            Carbon::today();
+
+        $minimumActivityDate =
+            $today
+                ->copy()
+                ->addDays(4);
+
+        $activityDate =
+            Carbon::parse(
+                $validated[
+                    'activity_date'
+                ]
+            )->startOfDay();
+
+        $pickupDate =
+            Carbon::parse(
+                $validated[
+                    'pickup_date'
+                ]
+            )->startOfDay();
+
+        /*
+         * Pengajuan baru wajib minimal H-4.
+         *
+         * Saat resubmit revisi, aturan H-4 hanya
+         * diterapkan lagi apabila tanggal kegiatan
+         * diubah oleh user.
+         */
+        $existingActivityDate =
+            $existingOrder
+                ?->activity_date
+                ?->format(
+                    'Y-m-d'
+                );
+
+        $activityDateChanged =
+            !$existingOrder ||
+            $existingActivityDate !==
+                $activityDate
+                    ->format(
+                        'Y-m-d'
+                    );
+
+        if (
+            $activityDateChanged &&
+            $activityDate->lt(
+                $minimumActivityDate
+            )
+        ) {
+            $this->abortJson(
+                'Pengajuan merchandise wajib dilakukan minimal H-4 sebelum tanggal kegiatan. Pilih tanggal kegiatan minimal ' .
+                    $minimumActivityDate
+                        ->locale(
+                            'id'
+                        )
+                        ->translatedFormat(
+                            'd F Y'
+                        ) .
+                    '.',
+                422
+            );
+        }
+
+        if (
+            $pickupDate->gt(
+                $activityDate
+            )
+        ) {
+            $this->abortJson(
+                'Tanggal pengambilan merchandise tidak boleh setelah tanggal kegiatan.',
+                422
+            );
+        }
+
+        /*
+         * Pickup lama tetap boleh dipertahankan ketika
+         * user hanya melakukan resubmit revisi.
+         *
+         * Tetapi jika pickup diubah, tanggal baru tidak
+         * boleh berada di masa lalu.
+         */
+        $existingPickupDate =
+            $existingOrder
+                ?->pickup_date
+                ?->format(
+                    'Y-m-d'
+                );
+
+        $pickupDateChanged =
+            !$existingOrder ||
+            $existingPickupDate !==
+                $pickupDate
+                    ->format(
+                        'Y-m-d'
+                    );
+
+        if (
+            $pickupDateChanged &&
+            $pickupDate->lt(
+                $today
+            )
+        ) {
+            $this->abortJson(
+                'Tanggal pengambilan merchandise tidak boleh menggunakan tanggal yang sudah lewat.',
+                422
+            );
+        }
+
+        return $validated;
     }
 
     private function replaceOrderItems(
@@ -1500,8 +1707,10 @@ class OrderController extends Controller
     ): JsonResponse {
         return response()->json([
             'success' => false,
-            'message' => $message,
-            'data' => null,
+            'message' =>
+                $message,
+            'data' =>
+                null,
         ], 403);
     }
 
@@ -1511,9 +1720,14 @@ class OrderController extends Controller
     ): never {
         throw new HttpResponseException(
             response()->json([
-                'success' => false,
-                'message' => $message,
-                'data' => null,
+                'success' =>
+                    false,
+
+                'message' =>
+                    $message,
+
+                'data' =>
+                    null,
             ], $statusCode)
         );
     }
