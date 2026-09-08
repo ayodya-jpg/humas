@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\BorrowRequest;
 use App\Models\BorrowRequestItem;
 use App\Models\Product;
+use App\Models\ServiceSubmissionSetting;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,12 +19,6 @@ use Throwable;
 
 class BorrowRequestController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | REQUEST TYPES
-    |--------------------------------------------------------------------------
-    */
-
     private const TYPE_BORROW =
         'borrow';
 
@@ -36,29 +30,11 @@ class BorrowRequestController extends Controller
         self::TYPE_ASSET_REQUEST,
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | ACTIVE BORROW STATUSES
-    |--------------------------------------------------------------------------
-    |
-    | Selama user mempunyai Peminjaman Barang pada salah satu status
-    | berikut, user tidak dapat membuat Peminjaman Barang baru.
-    |
-    | Rule ini TIDAK berlaku untuk Request Barang.
-    |
-    */
-
     private const ACTIVE_BORROW_STATUSES = [
         'pending',
         'approved',
         'borrowed',
     ];
-
-    /*
-    |--------------------------------------------------------------------------
-    | INDEX
-    |--------------------------------------------------------------------------
-    */
 
     public function index(
         Request $request
@@ -93,8 +69,7 @@ class BorrowRequestController extends Controller
                 ->get();
 
         return response()->json([
-            'success' =>
-                true,
+            'success' => true,
 
             'message' =>
                 'Data pengajuan SEKPiM berhasil diambil.',
@@ -103,12 +78,6 @@ class BorrowRequestController extends Controller
                 $borrowRequests,
         ]);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | MY REQUESTS
-    |--------------------------------------------------------------------------
-    */
 
     public function myBorrowRequests(
         Request $request
@@ -147,8 +116,7 @@ class BorrowRequestController extends Controller
                 ->get();
 
         return response()->json([
-            'success' =>
-                true,
+            'success' => true,
 
             'message' =>
                 'Riwayat pengajuan SEKPiM berhasil diambil.',
@@ -157,12 +125,6 @@ class BorrowRequestController extends Controller
                 $borrowRequests,
         ]);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | SHOW
-    |--------------------------------------------------------------------------
-    */
 
     public function show(
         Request $request,
@@ -190,8 +152,7 @@ class BorrowRequestController extends Controller
         }
 
         return response()->json([
-            'success' =>
-                true,
+            'success' => true,
 
             'message' =>
                 'Detail pengajuan SEKPiM berhasil diambil.',
@@ -200,21 +161,6 @@ class BorrowRequestController extends Controller
                 $borrowRequest,
         ]);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | STORE
-    |--------------------------------------------------------------------------
-    |
-    | Membuat:
-    |
-    | 1. Peminjaman Barang
-    |    request_type = borrow
-    |
-    | 2. Request Barang
-    |    request_type = asset_request
-    |
-    */
 
     public function store(
         Request $request
@@ -235,13 +181,53 @@ class BorrowRequestController extends Controller
         }
 
         /*
-         * Tanggal kegiatan minimal H-4.
+         * Kita perlu mengetahui jenis pengajuan terlebih dahulu
+         * agar dapat mengambil setting H-n yang benar.
          */
+        $requestType =
+            $request->input(
+                'request_type'
+            );
+
+        if (
+            !in_array(
+                $requestType,
+                self::REQUEST_TYPES,
+                true
+            )
+        ) {
+            return response()->json([
+                'success' =>
+                    false,
+
+                'message' =>
+                    'Jenis pengajuan tidak valid.',
+
+                'data' =>
+                    null,
+            ], 422);
+        }
+
+        /*
+         * Peminjaman Barang dan Request Barang
+         * mempunyai setting H-n masing-masing.
+         */
+        $serviceKey =
+            $requestType ===
+            self::TYPE_ASSET_REQUEST
+                ? ServiceSubmissionSetting::SERVICE_SEKPIM_ASSET_REQUEST
+                : ServiceSubmissionSetting::SERVICE_SEKPIM_BORROW;
+
+        $minimumSubmissionDays =
+            ServiceSubmissionSetting::minimumDays(
+                $serviceKey
+            );
+
         $minimumActivityDate =
             now()
                 ->startOfDay()
                 ->addDays(
-                    4
+                    $minimumSubmissionDays
                 )
                 ->toDateString();
 
@@ -282,37 +268,24 @@ class BorrowRequestController extends Controller
                     'max:3000',
                 ],
 
-                /*
-                 * Rule H-4.
-                 */
                 'activity_date' => [
                     'required',
                     'date',
+
                     'after_or_equal:' .
                         $minimumActivityDate,
                 ],
 
-                /*
-                 * borrow_date sekarang berfungsi sebagai
-                 * Tanggal Pengambilan.
-                 *
-                 * Sama seperti Merchandise:
-                 *
-                 * hari ini <= tanggal pengambilan <= tanggal kegiatan
-                 */
                 'borrow_date' => [
                     'required',
                     'date',
+
                     'after_or_equal:' .
                         $today,
+
                     'before_or_equal:activity_date',
                 ],
 
-                /*
-                 * Hanya wajib pada Peminjaman Barang.
-                 *
-                 * Untuk Request Barang akan disimpan NULL.
-                 */
                 'return_date' => [
                     'nullable',
                     'date',
@@ -381,7 +354,10 @@ class BorrowRequestController extends Controller
                     'Format tanggal kegiatan tidak valid.',
 
                 'activity_date.after_or_equal' =>
-                    'Pengajuan harus dilakukan minimal H-4 sebelum tanggal kegiatan.',
+                    $minimumSubmissionDays ===
+                    0
+                        ? 'Tanggal kegiatan tidak boleh sebelum hari ini.'
+                        : "Pengajuan harus dilakukan minimal H-{$minimumSubmissionDays} sebelum tanggal kegiatan.",
 
                 'borrow_date.required' =>
                     'Tanggal pengambilan wajib diisi.',
@@ -429,9 +405,6 @@ class BorrowRequestController extends Controller
                     'Jumlah barang minimal satu.',
             ]);
 
-        /*
-         * Peminjaman Barang wajib mempunyai tanggal pengembalian.
-         */
         if (
             $validated[
                 'request_type'
@@ -449,9 +422,6 @@ class BorrowRequestController extends Controller
             );
         }
 
-        /*
-         * Request Barang tidak mempunyai tanggal pengembalian.
-         */
         if (
             $validated[
                 'request_type'
@@ -471,10 +441,6 @@ class BorrowRequestController extends Controller
                         $user,
                         $validated
                     ): BorrowRequest {
-                        /*
-                         * Lock user supaya dua request BORROW
-                         * tidak dapat masuk bersamaan dari dua tab/device.
-                         */
                         $lockedUser =
                             User::query()
                                 ->lockForUpdate()
@@ -482,11 +448,6 @@ class BorrowRequestController extends Controller
                                     $user->id
                                 );
 
-                        /*
-                         * Rule satu Peminjaman Barang aktif.
-                         *
-                         * Request Barang tidak terkena rule ini.
-                         */
                         if (
                             $validated[
                                 'request_type'
@@ -498,9 +459,6 @@ class BorrowRequestController extends Controller
                             );
                         }
 
-                        /*
-                         * Validasi produk berdasarkan jenis request.
-                         */
                         $this->validateRequestItems(
                             $validated[
                                 'items'
@@ -610,14 +568,12 @@ class BorrowRequestController extends Controller
                         foreach (
                             $validated[
                                 'items'
-                            ] as
-                            $item
+                            ] as $item
                         ) {
                             BorrowRequestItem::query()
                                 ->create([
                                     'borrow_request_id' =>
-                                        $borrowRequest
-                                            ->id,
+                                        $borrowRequest->id,
 
                                     'product_id' =>
                                         $item[
@@ -640,8 +596,7 @@ class BorrowRequestController extends Controller
                 );
 
             return response()->json([
-                'success' =>
-                    true,
+                'success' => true,
 
                 'message' =>
                     $borrowRequest
@@ -665,8 +620,7 @@ class BorrowRequestController extends Controller
             );
 
             return response()->json([
-                'success' =>
-                    false,
+                'success' => false,
 
                 'message' =>
                     app()->isLocal()
@@ -678,20 +632,6 @@ class BorrowRequestController extends Controller
             ], 500);
         }
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | APPROVE
-    |--------------------------------------------------------------------------
-    |
-    | Berlaku untuk:
-    |
-    | - Peminjaman Barang
-    | - Request Barang
-    |
-    | Stok BELUM dikurangi saat approve.
-    |
-    */
 
     public function approve(
         Request $request,
@@ -747,10 +687,6 @@ class BorrowRequestController extends Controller
                             );
                         }
 
-                        /*
-                         * Validasi ulang karena stok/status produk
-                         * dapat berubah sejak user submit.
-                         */
                         $items =
                             $lockedRequest
                                 ->items
@@ -848,12 +784,6 @@ class BorrowRequestController extends Controller
             ], 500);
         }
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | REJECT
-    |--------------------------------------------------------------------------
-    */
 
     public function reject(
         Request $request,
@@ -989,22 +919,6 @@ class BorrowRequestController extends Controller
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | BORROWED
-    |--------------------------------------------------------------------------
-    |
-    | KHUSUS request_type = borrow.
-    |
-    | approved
-    |     ↓
-    | borrowed
-    |
-    | - Bukti serah terima wajib.
-    | - Stok dikurangi.
-    |
-    */
-
     public function borrowed(
         Request $request,
         int $id
@@ -1019,27 +933,26 @@ class BorrowRequestController extends Controller
             );
         }
 
-        $validated =
-            $request->validate([
-                'handover_evidence' => [
-                    'required',
-                    'file',
-                    'mimes:pdf,jpg,jpeg,png',
-                    'max:10240',
-                ],
-            ], [
-                'handover_evidence.required' =>
-                    'Bukti serah terima wajib diunggah.',
+        $request->validate([
+            'handover_evidence' => [
+                'required',
+                'file',
+                'mimes:pdf,jpg,jpeg,png',
+                'max:10240',
+            ],
+        ], [
+            'handover_evidence.required' =>
+                'Bukti serah terima wajib diunggah.',
 
-                'handover_evidence.file' =>
-                    'Bukti serah terima tidak valid.',
+            'handover_evidence.file' =>
+                'Bukti serah terima tidak valid.',
 
-                'handover_evidence.mimes' =>
-                    'Bukti serah terima harus berformat PDF, JPG, JPEG, atau PNG.',
+            'handover_evidence.mimes' =>
+                'Bukti serah terima harus berformat PDF, JPG, JPEG, atau PNG.',
 
-                'handover_evidence.max' =>
-                    'Ukuran bukti serah terima maksimal 10 MB.',
-            ]);
+            'handover_evidence.max' =>
+                'Ukuran bukti serah terima maksimal 10 MB.',
+        ]);
 
         $evidencePath =
             null;
@@ -1070,9 +983,6 @@ class BorrowRequestController extends Controller
                                     $id
                                 );
 
-                        /*
-                         * Asset Request tidak boleh memakai endpoint borrowed.
-                         */
                         if (
                             (
                                 $lockedRequest
@@ -1082,7 +992,7 @@ class BorrowRequestController extends Controller
                             self::TYPE_BORROW
                         ) {
                             $this->abortJson(
-                                'Request Barang tidak menggunakan proses peminjaman. Gunakan proses serah terima Request Barang.',
+                                'Request Barang tidak menggunakan proses peminjaman.',
                                 422
                             );
                         }
@@ -1114,13 +1024,9 @@ class BorrowRequestController extends Controller
                             );
                         }
 
-                        /*
-                         * Lock semua produk dan pastikan stok tersedia.
-                         */
                         foreach (
                             $lockedRequest
-                                ->items as
-                            $item
+                                ->items as $item
                         ) {
                             $product =
                                 Product::query()
@@ -1148,13 +1054,9 @@ class BorrowRequestController extends Controller
                             );
                         }
 
-                        /*
-                         * Baru kurangi stok setelah SEMUA valid.
-                         */
                         foreach (
                             $lockedRequest
-                                ->items as
-                            $item
+                                ->items as $item
                         ) {
                             $product =
                                 Product::query()
@@ -1250,23 +1152,6 @@ class BorrowRequestController extends Controller
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | RETURNED
-    |--------------------------------------------------------------------------
-    |
-    | KHUSUS request_type = borrow.
-    |
-    | borrowed
-    |     ↓
-    | returned
-    |
-    | - Evidence pengembalian wajib.
-    | - Stok dikembalikan.
-    | - Setelah RETURNED, user boleh meminjam lagi.
-    |
-    */
-
     public function returned(
         Request $request,
         int $id
@@ -1281,27 +1166,26 @@ class BorrowRequestController extends Controller
             );
         }
 
-        $validated =
-            $request->validate([
-                'return_evidence' => [
-                    'required',
-                    'file',
-                    'mimes:pdf,jpg,jpeg,png',
-                    'max:10240',
-                ],
-            ], [
-                'return_evidence.required' =>
-                    'Bukti pengembalian wajib diunggah.',
+        $request->validate([
+            'return_evidence' => [
+                'required',
+                'file',
+                'mimes:pdf,jpg,jpeg,png',
+                'max:10240',
+            ],
+        ], [
+            'return_evidence.required' =>
+                'Bukti pengembalian wajib diunggah.',
 
-                'return_evidence.file' =>
-                    'Bukti pengembalian tidak valid.',
+            'return_evidence.file' =>
+                'Bukti pengembalian tidak valid.',
 
-                'return_evidence.mimes' =>
-                    'Bukti pengembalian harus berformat PDF, JPG, JPEG, atau PNG.',
+            'return_evidence.mimes' =>
+                'Bukti pengembalian harus berformat PDF, JPG, JPEG, atau PNG.',
 
-                'return_evidence.max' =>
-                    'Ukuran bukti pengembalian maksimal 10 MB.',
-            ]);
+            'return_evidence.max' =>
+                'Ukuran bukti pengembalian maksimal 10 MB.',
+        ]);
 
         $evidencePath =
             null;
@@ -1373,14 +1257,9 @@ class BorrowRequestController extends Controller
                             );
                         }
 
-                        /*
-                         * Karena barang dikembalikan,
-                         * stok ditambahkan kembali.
-                         */
                         foreach (
                             $lockedRequest
-                                ->items as
-                            $item
+                                ->items as $item
                         ) {
                             $product =
                                 Product::query()
@@ -1482,31 +1361,6 @@ class BorrowRequestController extends Controller
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | COMPLETE ASSET REQUEST
-    |--------------------------------------------------------------------------
-    |
-    | KHUSUS:
-    |
-    | request_type = asset_request
-    |
-    | Flow:
-    |
-    | pending
-    |   ↓
-    | approved
-    |   ↓
-    | completed
-    |
-    | Pada completed:
-    |
-    | - Evidence penyerahan wajib.
-    | - Stok dikurangi PERMANEN.
-    | - Tidak ada proses return.
-    |
-    */
-
     public function complete(
         Request $request,
         int $id
@@ -1521,27 +1375,26 @@ class BorrowRequestController extends Controller
             );
         }
 
-        $validated =
-            $request->validate([
-                'handover_evidence' => [
-                    'required',
-                    'file',
-                    'mimes:pdf,jpg,jpeg,png',
-                    'max:10240',
-                ],
-            ], [
-                'handover_evidence.required' =>
-                    'Bukti penyerahan barang wajib diunggah.',
+        $request->validate([
+            'handover_evidence' => [
+                'required',
+                'file',
+                'mimes:pdf,jpg,jpeg,png',
+                'max:10240',
+            ],
+        ], [
+            'handover_evidence.required' =>
+                'Bukti penyerahan barang wajib diunggah.',
 
-                'handover_evidence.file' =>
-                    'Bukti penyerahan barang tidak valid.',
+            'handover_evidence.file' =>
+                'Bukti penyerahan barang tidak valid.',
 
-                'handover_evidence.mimes' =>
-                    'Bukti penyerahan harus berformat PDF, JPG, JPEG, atau PNG.',
+            'handover_evidence.mimes' =>
+                'Bukti penyerahan harus berformat PDF, JPG, JPEG, atau PNG.',
 
-                'handover_evidence.max' =>
-                    'Ukuran bukti penyerahan maksimal 10 MB.',
-            ]);
+            'handover_evidence.max' =>
+                'Ukuran bukti penyerahan maksimal 10 MB.',
+        ]);
 
         $evidencePath =
             null;
@@ -1610,13 +1463,9 @@ class BorrowRequestController extends Controller
                             );
                         }
 
-                        /*
-                         * Lock dan validasi stok seluruh produk.
-                         */
                         foreach (
                             $lockedRequest
-                                ->items as
-                            $item
+                                ->items as $item
                         ) {
                             $product =
                                 Product::query()
@@ -1644,14 +1493,9 @@ class BorrowRequestController extends Controller
                             );
                         }
 
-                        /*
-                         * Request Barang:
-                         * stok dikurangi permanen.
-                         */
                         foreach (
                             $lockedRequest
-                                ->items as
-                            $item
+                                ->items as $item
                         ) {
                             $product =
                                 Product::query()
@@ -1674,10 +1518,6 @@ class BorrowRequestController extends Controller
                                 'status' =>
                                     'completed',
 
-                                /*
-                                 * Kita reuse handover_evidence_* sebagai
-                                 * bukti penyerahan Request Barang.
-                                 */
                                 'handover_evidence_path' =>
                                     $evidencePath,
 
@@ -1751,21 +1591,6 @@ class BorrowRequestController extends Controller
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | ACTIVE BORROW CHECK
-    |--------------------------------------------------------------------------
-    |
-    | Hanya untuk Peminjaman Barang.
-    |
-    | User tidak dapat membuat peminjaman baru jika masih mempunyai:
-    |
-    | pending
-    | approved
-    | borrowed
-    |
-    */
-
     private function ensureNoActiveBorrow(
         User $user
     ): void {
@@ -1779,23 +1604,14 @@ class BorrowRequestController extends Controller
                     function (
                         $query
                     ): void {
-                        /*
-                         * request_type = borrow
-                         */
-                        $query->where(
-                            'request_type',
-                            self::TYPE_BORROW
-                        )
-
-                        /*
-                         * Dukungan data lama.
-                         *
-                         * Jika request_type NULL,
-                         * dianggap sebagai Peminjaman Barang.
-                         */
-                        ->orWhereNull(
-                            'request_type'
-                        );
+                        $query
+                            ->where(
+                                'request_type',
+                                self::TYPE_BORROW
+                            )
+                            ->orWhereNull(
+                                'request_type'
+                            );
                     }
                 )
                 ->whereIn(
@@ -1834,8 +1650,7 @@ class BorrowRequestController extends Controller
             $activeBorrow
                 ->borrow_code
             ?: 'BRW-' .
-                $activeBorrow
-                    ->id;
+                $activeBorrow->id;
 
         $this->abortJson(
             "Kamu masih memiliki Peminjaman Barang aktif ({$code}) yang {$statusLabel}. Selesaikan peminjaman tersebut terlebih dahulu sebelum membuat Peminjaman Barang baru.",
@@ -1843,19 +1658,12 @@ class BorrowRequestController extends Controller
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | VALIDATE REQUEST ITEMS
-    |--------------------------------------------------------------------------
-    */
-
     private function validateRequestItems(
         array $items,
         string $requestType
     ): void {
         foreach (
-            $items as
-            $item
+            $items as $item
         ) {
             $product =
                 Product::query()
@@ -1885,19 +1693,14 @@ class BorrowRequestController extends Controller
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | VALIDATE PRODUCT FOR REQUEST
-    |--------------------------------------------------------------------------
-    */
-
     private function validateProductForRequest(
         Product $product,
         string $requestType,
         int $quantity
     ): void {
         if (
-            $product->status !==
+            $product
+                ->status !==
             'active'
         ) {
             $this->abortJson(
@@ -1906,20 +1709,18 @@ class BorrowRequestController extends Controller
             );
         }
 
-        /*
-         * Legacy fallback.
-         *
-         * Produk lama type borrow/both yang sekpim_item_type
-         * belum terisi tetap dianggap barang pinjaman.
-         */
         $sekpimItemType =
             $product
                 ->sekpim_item_type;
 
+        /*
+         * Compatibility produk lama.
+         */
         if (
             !$sekpimItemType &&
             in_array(
-                $product->type,
+                $product
+                    ->type,
                 [
                     'borrow',
                     'both',
@@ -1981,7 +1782,8 @@ class BorrowRequestController extends Controller
 
         if (
             (int)
-                $product->stock <
+                $product
+                    ->stock <
             $quantity
         ) {
             $this->abortJson(
@@ -1990,12 +1792,6 @@ class BorrowRequestController extends Controller
             );
         }
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | ACCESS
-    |--------------------------------------------------------------------------
-    */
 
     private function canAccessBorrowRequest(
         Request $request,
@@ -2053,12 +1849,6 @@ class BorrowRequestController extends Controller
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | PERMISSIONS
-    |--------------------------------------------------------------------------
-    */
-
     private function userHasPermission(
         User $user,
         string $permission
@@ -2097,8 +1887,9 @@ class BorrowRequestController extends Controller
         }
 
         $permissions =
-            $user->permissions
-                ?? [];
+            $user
+                ->permissions
+            ?? [];
 
         if (
             is_string(
@@ -2144,12 +1935,6 @@ class BorrowRequestController extends Controller
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | REQUEST CODE
-    |--------------------------------------------------------------------------
-    */
-
     private function generateRequestCode(
         string $requestType
     ): string {
@@ -2185,12 +1970,6 @@ class BorrowRequestController extends Controller
         return $code;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | FILE HELPER
-    |--------------------------------------------------------------------------
-    */
-
     private function deleteFileIfExists(
         ?string $filePath
     ): void {
@@ -2214,12 +1993,6 @@ class BorrowRequestController extends Controller
             );
         }
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | RESPONSE HELPERS
-    |--------------------------------------------------------------------------
-    */
 
     private function forbiddenResponse(
         string $message

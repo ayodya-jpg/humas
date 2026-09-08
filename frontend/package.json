@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fullcalendar/react": "^7.1.0",
     "axios": "^1.18.1",
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
@@ -18,7 +19,8 @@
     "react-is": "^19.2.7",
     "react-router-dom": "^7.18.1",
     "recharts": "^3.10.1",
-    "sweetalert2": "^11.26.25"
+    "sweetalert2": "^11.26.25",
+    "temporal-polyfill": "^1.0.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

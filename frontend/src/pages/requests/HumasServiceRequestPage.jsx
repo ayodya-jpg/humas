@@ -1,5 +1,14 @@
-import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from 'react';
+
+import {
+    Link,
+    useNavigate,
+} from 'react-router-dom';
 
 import api from '../../api/axios';
 
@@ -115,38 +124,118 @@ const INITIAL_FORM = {
     reference_link: '',
 };
 
-const formatFileSize = (size) => {
+const formatFileSize = (
+    size
+) => {
     if (!size) {
         return '0 KB';
     }
 
-    if (size < 1024 * 1024) {
-        return `${(size / 1024).toFixed(1)} KB`;
+    if (
+        size <
+        1024 * 1024
+    ) {
+        return `${(
+            size / 1024
+        ).toFixed(1)} KB`;
     }
 
-    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(
+        size /
+        (
+            1024 *
+            1024
+        )
+    ).toFixed(1)} MB`;
 };
 
-const extractErrorMessage = (error) => {
+const formatDate = (
+    dateValue
+) => {
+    if (!dateValue) {
+        return '-';
+    }
+
+    if (
+        /^\d{4}-\d{2}-\d{2}$/.test(
+            dateValue
+        )
+    ) {
+        const [
+            year,
+            month,
+            day,
+        ] =
+            dateValue
+                .split('-')
+                .map(Number);
+
+        return new Date(
+            year,
+            month - 1,
+            day
+        ).toLocaleDateString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+            }
+        );
+    }
+
+    const parsedDate =
+        new Date(
+            dateValue
+        );
+
+    if (
+        Number.isNaN(
+            parsedDate.getTime()
+        )
+    ) {
+        return dateValue;
+    }
+
+    return parsedDate
+        .toLocaleDateString(
+            'id-ID',
+            {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+            }
+        );
+};
+
+const extractErrorMessage = (
+    error
+) => {
     const responseData =
         error?.response?.data;
 
-    if (responseData?.errors) {
+    if (
+        responseData?.errors
+    ) {
         const firstError =
             Object.values(
                 responseData.errors
             )
                 .flat()
-                .find(Boolean);
+                .find(
+                    Boolean
+                );
 
-        if (firstError) {
+        if (
+            firstError
+        ) {
             return firstError;
         }
     }
 
     return (
         responseData?.message ||
-        'Request liputan gagal dikirim. Silakan periksa kembali data yang diisi.'
+        'Request layanan Humas gagal dikirim. Silakan periksa kembali data yang diisi.'
     );
 };
 
@@ -157,14 +246,19 @@ const getStoredUser = () => {
         'auth_user',
     ];
 
-    for (const key of possibleKeys) {
+    for (
+        const key of
+        possibleKeys
+    ) {
         try {
             const storedValue =
                 localStorage.getItem(
                     key
                 );
 
-            if (!storedValue) {
+            if (
+                !storedValue
+            ) {
                 continue;
             }
 
@@ -181,18 +275,22 @@ const getStoredUser = () => {
                 return parsedUser;
             }
         } catch {
-            // Lanjut ke key berikutnya.
+            // lanjut
         }
     }
 
     return {};
 };
 
-const normalizeUrl = (value) => {
+const normalizeUrl = (
+    value
+) => {
     const trimmedValue =
         value.trim();
 
-    if (!trimmedValue) {
+    if (
+        !trimmedValue
+    ) {
         return '';
     }
 
@@ -207,8 +305,12 @@ const normalizeUrl = (value) => {
     return `https://${trimmedValue}`;
 };
 
-const isValidUrl = (value) => {
-    if (!value.trim()) {
+const isValidUrl = (
+    value
+) => {
+    if (
+        !value.trim()
+    ) {
         return true;
     }
 
@@ -229,6 +331,25 @@ const isValidUrl = (value) => {
     } catch {
         return false;
     }
+};
+
+const getRuleLabel = (
+    days
+) => {
+    const numericDays =
+        Number(
+            days ||
+                0
+        );
+
+    if (
+        numericDays ===
+        0
+    ) {
+        return 'H-0';
+    }
+
+    return `H-${numericDays}`;
 };
 
 const SectionHeader = ({
@@ -274,6 +395,15 @@ export default function HumasServiceRequestPage() {
             []
         );
 
+    const isUserRole =
+        storedUser?.role ===
+        'user';
+
+    const basePath =
+        isUserRole
+            ? '/user'
+            : '/admin';
+
     const [
         form,
         setForm,
@@ -289,35 +419,208 @@ export default function HumasServiceRequestPage() {
         })
     );
 
-    /*
-     * Secara database nama field tetap article_draft
-     * untuk kompatibilitas data lama.
-     *
-     * Pada UI ditampilkan sebagai Lampiran / Brief Kegiatan.
-     */
     const [
         articleDraft,
         setArticleDraft,
-    ] = useState(null);
+    ] = useState(
+        null
+    );
 
     const [
         submitting,
         setSubmitting,
-    ] = useState(false);
+    ] = useState(
+        false
+    );
+
+    const [
+        settingsLoading,
+        setSettingsLoading,
+    ] = useState(
+        true
+    );
+
+    const [
+        settingsError,
+        setSettingsError,
+    ] = useState(
+        ''
+    );
+
+    const [
+        humasSettings,
+        setHumasSettings,
+    ] = useState({
+        min_submission_days: 4,
+        minimum_date: '',
+        services: [],
+    });
+
+    const loadSettings =
+        useCallback(
+            async () => {
+                try {
+                    setSettingsLoading(
+                        true
+                    );
+
+                    setSettingsError(
+                        ''
+                    );
+
+                    const response =
+                        await api.get(
+                            '/humas-settings'
+                        );
+
+                    const data =
+                        response
+                            ?.data
+                            ?.data ||
+                        {};
+
+                    setHumasSettings({
+                        min_submission_days:
+                            Number(
+                                data
+                                    ?.min_submission_days ??
+                                    4
+                            ),
+
+                        minimum_date:
+                            data
+                                ?.minimum_date ||
+                            '',
+
+                        services:
+                            Array.isArray(
+                                data?.services
+                            )
+                                ? data.services
+                                : [],
+                    });
+                } catch (
+                    error
+                ) {
+                    console.error(
+                        'Load Humas settings error:',
+                        error
+                            ?.response
+                            ?.data ||
+                            error
+                    );
+
+                    setSettingsError(
+                        extractErrorMessage(
+                            error
+                        )
+                    );
+                } finally {
+                    setSettingsLoading(
+                        false
+                    );
+                }
+            },
+            []
+        );
+
+    useEffect(
+        () => {
+            loadSettings();
+        },
+        [
+            loadSettings,
+        ]
+    );
+
+    const serviceAvailabilityMap =
+        useMemo(
+            () => {
+                const map =
+                    new Map();
+
+                humasSettings
+                    .services
+                    .forEach(
+                        (
+                            service
+                        ) => {
+                            map.set(
+                                service
+                                    .coverage_type,
+                                Boolean(
+                                    service
+                                        .is_active
+                                )
+                            );
+                        }
+                    );
+
+                return map;
+            },
+            [
+                humasSettings.services,
+            ]
+        );
+
+    const coverageOptionsWithAvailability =
+        useMemo(
+            () => {
+                return COVERAGE_OPTIONS.map(
+                    (
+                        coverage
+                    ) => {
+                        const hasSetting =
+                            serviceAvailabilityMap.has(
+                                coverage.value
+                            );
+
+                        return {
+                            ...coverage,
+
+                            isActive:
+                                hasSetting
+                                    ? serviceAvailabilityMap.get(
+                                          coverage.value
+                                      )
+                                    : true,
+                        };
+                    }
+                );
+            },
+            [
+                serviceAvailabilityMap,
+            ]
+        );
 
     const selectedCoverage =
         useMemo(
             () => {
-                return COVERAGE_OPTIONS.find(
-                    (item) =>
+                return coverageOptionsWithAvailability.find(
+                    (
+                        item
+                    ) =>
                         item.value ===
                         form.coverage_type
                 );
             },
             [
+                coverageOptionsWithAvailability,
                 form.coverage_type,
             ]
         );
+
+    const minimumSubmissionDays =
+        Number(
+            humasSettings
+                .min_submission_days ||
+                0
+        );
+
+    const minimumEventDate =
+        humasSettings
+            .minimum_date ||
+        '';
 
     const handleChange = (
         event
@@ -325,7 +628,8 @@ export default function HumasServiceRequestPage() {
         const {
             name,
             value,
-        } = event.target;
+        } =
+            event.target;
 
         setForm(
             (
@@ -336,15 +640,17 @@ export default function HumasServiceRequestPage() {
                 [name]:
                     value,
 
-                ...(name ===
-                    'unit_name' &&
-                value !==
-                    'Lainnya'
-                    ? {
-                          other_unit_name:
-                              '',
-                      }
-                    : {}),
+                ...(
+                    name ===
+                        'unit_name' &&
+                    value !==
+                        'Lainnya'
+                        ? {
+                              other_unit_name:
+                                  '',
+                          }
+                        : {}
+                ),
             })
         );
     };
@@ -352,7 +658,9 @@ export default function HumasServiceRequestPage() {
     const handleReferenceLinkBlur =
         () => {
             if (
-                !form.reference_link.trim()
+                !form
+                    .reference_link
+                    .trim()
             ) {
                 return;
             }
@@ -365,113 +673,147 @@ export default function HumasServiceRequestPage() {
 
                     reference_link:
                         normalizeUrl(
-                            previousForm.reference_link
+                            previousForm
+                                .reference_link
                         ),
                 })
             );
         };
 
-    const handleCoverageChange = (
-        coverageType
-    ) => {
-        setForm(
-            (
-                previousForm
-            ) => ({
-                ...previousForm,
+    const handleCoverageChange =
+        async (
+            coverage
+        ) => {
+            if (
+                !coverage
+                    .isActive
+            ) {
+                await showWarningAlert(
+                    'Layanan Sedang Ditutup',
+                    `${coverage.label} sedang tidak menerima pengajuan baru. Silakan pilih layanan lain atau hubungi Admin Humas.`
+                );
 
-                coverage_type:
-                    coverageType,
-            })
-        );
-    };
+                return;
+            }
 
-    const handleArticleDraftChange = (
-        event
-    ) => {
-        const file =
-            event.target.files?.[0];
+            setForm(
+                (
+                    previousForm
+                ) => ({
+                    ...previousForm,
 
-        if (!file) {
+                    coverage_type:
+                        coverage.value,
+                })
+            );
+        };
+
+    const handleArticleDraftChange =
+        (
+            event
+        ) => {
+            const file =
+                event
+                    .target
+                    .files?.[0];
+
+            if (
+                !file
+            ) {
+                setArticleDraft(
+                    null
+                );
+
+                return;
+            }
+
+            const allowedExtensions = [
+                'pdf',
+                'doc',
+                'docx',
+                'jpg',
+                'jpeg',
+                'png',
+            ];
+
+            const extension =
+                file.name
+                    .split('.')
+                    .pop()
+                    ?.toLowerCase();
+
+            if (
+                !extension ||
+                !allowedExtensions.includes(
+                    extension
+                )
+            ) {
+                event.target.value =
+                    '';
+
+                setArticleDraft(
+                    null
+                );
+
+                showWarningAlert(
+                    'Format File Tidak Didukung',
+                    'Lampiran harus berformat PDF, DOC, DOCX, JPG, JPEG, atau PNG.'
+                );
+
+                return;
+            }
+
+            if (
+                file.size >
+                10 *
+                    1024 *
+                    1024
+            ) {
+                event.target.value =
+                    '';
+
+                setArticleDraft(
+                    null
+                );
+
+                showWarningAlert(
+                    'Ukuran File Terlalu Besar',
+                    'Ukuran lampiran maksimal 10 MB.'
+                );
+
+                return;
+            }
+
             setArticleDraft(
-                null
+                file
             );
-
-            return;
-        }
-
-        const allowedExtensions = [
-            'pdf',
-            'doc',
-            'docx',
-            'jpg',
-            'jpeg',
-            'png',
-        ];
-
-        const extension =
-            file.name
-                .split('.')
-                .pop()
-                ?.toLowerCase();
-
-        if (
-            !extension ||
-            !allowedExtensions.includes(
-                extension
-            )
-        ) {
-            event.target.value =
-                '';
-
-            setArticleDraft(
-                null
-            );
-
-            showWarningAlert(
-                'Format File Tidak Didukung',
-                'Lampiran harus berformat PDF, DOC, DOCX, JPG, JPEG, atau PNG.'
-            );
-
-            return;
-        }
-
-        if (
-            file.size >
-            10 *
-                1024 *
-                1024
-        ) {
-            event.target.value =
-                '';
-
-            setArticleDraft(
-                null
-            );
-
-            showWarningAlert(
-                'Ukuran File Terlalu Besar',
-                'Ukuran lampiran maksimal 10 MB.'
-            );
-
-            return;
-        }
-
-        setArticleDraft(
-            file
-        );
-    };
+        };
 
     const validateForm =
         () => {
             if (
-                !form.applicant_name.trim()
+                settingsLoading
+            ) {
+                return 'Pengaturan layanan Humas masih dimuat. Silakan tunggu sebentar.';
+            }
+
+            if (
+                settingsError
+            ) {
+                return 'Pengaturan layanan Humas belum berhasil dimuat. Silakan refresh halaman.';
+            }
+
+            if (
+                !form
+                    .applicant_name
+                    .trim()
             ) {
                 return 'Nama lengkap pemohon wajib diisi.';
             }
 
             if (
-                form.applicant_name
+                form
+                    .applicant_name
                     .trim()
                     .length <
                 3
@@ -488,13 +830,17 @@ export default function HumasServiceRequestPage() {
             if (
                 form.unit_name ===
                     'Lainnya' &&
-                !form.other_unit_name.trim()
+                !form
+                    .other_unit_name
+                    .trim()
             ) {
                 return 'Nama unit atau program studi lainnya wajib diisi.';
             }
 
             if (
-                !form.pic_whatsapp.trim()
+                !form
+                    .pic_whatsapp
+                    .trim()
             ) {
                 return 'Kontak WhatsApp PIC acara wajib diisi.';
             }
@@ -514,13 +860,16 @@ export default function HumasServiceRequestPage() {
             }
 
             if (
-                !form.activity_detail.trim()
+                !form
+                    .activity_detail
+                    .trim()
             ) {
                 return 'Detail kegiatan wajib diisi.';
             }
 
             if (
-                form.activity_detail
+                form
+                    .activity_detail
                     .trim()
                     .length <
                 10
@@ -535,13 +884,23 @@ export default function HumasServiceRequestPage() {
             }
 
             if (
-                !form.event_location.trim()
+                !selectedCoverage
+                    ?.isActive
+            ) {
+                return 'Jenis layanan Humas yang dipilih sedang ditutup.';
+            }
+
+            if (
+                !form
+                    .event_location
+                    .trim()
             ) {
                 return 'Lokasi acara wajib diisi.';
             }
 
             if (
-                form.event_location
+                form
+                    .event_location
                     .trim()
                     .length <
                 3
@@ -556,7 +915,24 @@ export default function HumasServiceRequestPage() {
             }
 
             if (
-                form.reference_link.trim() &&
+                minimumEventDate &&
+                form.event_date <
+                    minimumEventDate
+            ) {
+                return minimumSubmissionDays ===
+                    0
+                    ? 'Tanggal kegiatan tidak boleh sebelum hari ini.'
+                    : `Pengajuan saat ini minimal ${getRuleLabel(
+                          minimumSubmissionDays
+                      )}. Tanggal kegiatan paling cepat ${formatDate(
+                          minimumEventDate
+                      )}.`;
+            }
+
+            if (
+                form
+                    .reference_link
+                    .trim() &&
                 !isValidUrl(
                     form.reference_link
                 )
@@ -580,7 +956,9 @@ export default function HumasServiceRequestPage() {
 
             formData.append(
                 'applicant_name',
-                form.applicant_name.trim()
+                form
+                    .applicant_name
+                    .trim()
             );
 
             formData.append(
@@ -594,18 +972,24 @@ export default function HumasServiceRequestPage() {
             ) {
                 formData.append(
                     'other_unit_name',
-                    form.other_unit_name.trim()
+                    form
+                        .other_unit_name
+                        .trim()
                 );
             }
 
             formData.append(
                 'pic_whatsapp',
-                form.pic_whatsapp.trim()
+                form
+                    .pic_whatsapp
+                    .trim()
             );
 
             formData.append(
                 'activity_detail',
-                form.activity_detail.trim()
+                form
+                    .activity_detail
+                    .trim()
             );
 
             formData.append(
@@ -615,7 +999,9 @@ export default function HumasServiceRequestPage() {
 
             formData.append(
                 'event_location',
-                form.event_location.trim()
+                form
+                    .event_location
+                    .trim()
             );
 
             formData.append(
@@ -624,20 +1010,19 @@ export default function HumasServiceRequestPage() {
             );
 
             if (
-                form.reference_link.trim()
+                form
+                    .reference_link
+                    .trim()
             ) {
                 formData.append(
                     'reference_link',
                     normalizeUrl(
-                        form.reference_link
+                        form
+                            .reference_link
                     )
                 );
             }
 
-            /*
-             * Nama request backend tetap article_draft
-             * supaya tidak perlu migration/database rename.
-             */
             formData.append(
                 'article_draft',
                 articleDraft
@@ -652,9 +1037,12 @@ export default function HumasServiceRequestPage() {
                 ...INITIAL_FORM,
 
                 applicant_name:
-                    storedUser?.name ||
-                    storedUser?.full_name ||
-                    storedUser?.username ||
+                    storedUser
+                        ?.name ||
+                    storedUser
+                        ?.full_name ||
+                    storedUser
+                        ?.username ||
                     '',
             });
 
@@ -667,7 +1055,9 @@ export default function HumasServiceRequestPage() {
                     'article_draft'
                 );
 
-            if (fileInput) {
+            if (
+                fileInput
+            ) {
                 fileInput.value =
                     '';
             }
@@ -715,7 +1105,8 @@ export default function HumasServiceRequestPage() {
                 });
 
             if (
-                !confirmation.isConfirmed
+                !confirmation
+                    .isConfirmed
             ) {
                 return;
             }
@@ -746,7 +1137,8 @@ export default function HumasServiceRequestPage() {
 
                 await showSuccessAlert(
                     'Request Berhasil Dikirim',
-                    response?.data
+                    response
+                        ?.data
                         ?.message ||
                         'Request layanan Humas berhasil dikirim.'
                 );
@@ -754,7 +1146,7 @@ export default function HumasServiceRequestPage() {
                 resetForm();
 
                 navigate(
-                    '/admin/my-requests',
+                    `${basePath}/my-requests`,
                     {
                         replace:
                             true,
@@ -765,7 +1157,8 @@ export default function HumasServiceRequestPage() {
             ) {
                 console.error(
                     'Submit request Humas error:',
-                    error?.response
+                    error
+                        ?.response
                         ?.data ||
                         error
                 );
@@ -778,6 +1171,12 @@ export default function HumasServiceRequestPage() {
                         error
                     )
                 );
+
+                /*
+                 * Refresh setting apabila admin baru saja
+                 * menutup layanan atau mengubah H-n.
+                 */
+                await loadSettings();
             } finally {
                 setSubmitting(
                     false
@@ -802,8 +1201,7 @@ export default function HumasServiceRequestPage() {
                             </span>
 
                             <h1 className="display-6 fw-bold mb-3">
-                                Form Request Layanan
-                                HUMAS TUS
+                                Form Request Layanan HUMAS TUS
                             </h1>
 
                             <p
@@ -816,13 +1214,7 @@ export default function HumasServiceRequestPage() {
                                         1.8,
                                 }}
                             >
-                                Mohon melengkapi data
-                                kegiatan untuk kebutuhan
-                                layanan Humas. Pemohon dapat
-                                mencantumkan link bahan
-                                mentah, referensi, atau folder
-                                pendukung yang dibutuhkan oleh
-                                tim Humas.
+                                Mohon melengkapi data kegiatan untuk kebutuhan layanan Humas. Pemohon dapat mencantumkan link bahan mentah, referensi, atau folder pendukung yang dibutuhkan oleh tim Humas.
                             </p>
 
                             <div className="d-flex flex-wrap gap-2">
@@ -833,15 +1225,20 @@ export default function HumasServiceRequestPage() {
                                 </span>
 
                                 <span className="badge bg-white bg-opacity-10 border border-white border-opacity-25 rounded-pill px-3 py-2">
-                                    <i className="bi bi-link-45deg me-2" />
+                                    <i className="bi bi-clock-history me-2" />
 
-                                    Mendukung link bahan
+                                    {settingsLoading
+                                        ? 'Memuat aturan pengajuan...'
+                                        : minimumSubmissionDays ===
+                                            0
+                                          ? 'Pengajuan dapat dilakukan H-0'
+                                          : `Pengajuan minimal H-${minimumSubmissionDays}`}
                                 </span>
 
                                 <span className="badge bg-white bg-opacity-10 border border-white border-opacity-25 rounded-pill px-3 py-2">
-                                    <i className="bi bi-clock-history me-2" />
+                                    <i className="bi bi-toggle-on me-2" />
 
-                                    Status dapat dipantau
+                                    Ketersediaan layanan mengikuti Admin Humas
                                 </span>
                             </div>
                         </div>
@@ -849,48 +1246,87 @@ export default function HumasServiceRequestPage() {
                         <div className="col-lg-4">
                             <div className="bg-white bg-opacity-10 border border-white border-opacity-25 rounded-5 p-4">
                                 <div className="small text-white-50 mb-2">
-                                    Pemohon terdeteksi
+                                    Aturan Pengajuan Aktif
                                 </div>
 
-                                <div className="d-flex align-items-center gap-3">
-                                    <div
-                                        className="rounded-circle bg-white text-danger d-flex align-items-center justify-content-center flex-shrink-0"
-                                        style={{
-                                            width:
-                                                52,
+                                {settingsLoading ? (
+                                    <div className="d-flex align-items-center gap-2">
+                                        <span className="spinner-border spinner-border-sm" />
 
-                                            height:
-                                                52,
-                                        }}
-                                    >
-                                        <i className="bi bi-person-fill fs-4" />
+                                        <span>
+                                            Memuat...
+                                        </span>
                                     </div>
-
-                                    <div className="min-w-0">
-                                        <div className="fw-bold text-truncate">
-                                            {form.applicant_name ||
-                                                'Pengguna'}
+                                ) : settingsError ? (
+                                    <>
+                                        <div className="fw-bold text-warning mb-2">
+                                            Pengaturan gagal dimuat
                                         </div>
 
-                                        <div className="small text-white-50 text-truncate">
-                                            {storedUser?.email ||
-                                                'Akun pengguna aktif'}
+                                        <button
+                                            type="button"
+                                            className="btn btn-sm btn-light rounded-pill"
+                                            onClick={
+                                                loadSettings
+                                            }
+                                        >
+                                            <i className="bi bi-arrow-clockwise me-2" />
+
+                                            Muat Ulang
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="display-6 fw-bold">
+                                            {getRuleLabel(
+                                                minimumSubmissionDays
+                                            )}
                                         </div>
-                                    </div>
-                                </div>
 
-                                <hr className="border-white border-opacity-25" />
+                                        <div className="small text-white-50 mt-2">
+                                            Tanggal kegiatan paling cepat{' '}
 
-                                <p className="small text-white-50 mb-0">
-                                    Nama dan email akun
-                                    pengirim dapat dilihat oleh
-                                    Admin Humas.
-                                </p>
+                                            <strong className="text-white">
+                                                {formatDate(
+                                                    minimumEventDate
+                                                )}
+                                            </strong>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
+
+            {settingsError && (
+                <div className="alert alert-danger border-0 shadow-sm rounded-4 mb-4">
+                    <div className="d-flex align-items-start gap-3">
+                        <i className="bi bi-exclamation-triangle-fill fs-4" />
+
+                        <div className="flex-grow-1">
+                            <div className="fw-bold">
+                                Pengaturan Humas gagal dimuat
+                            </div>
+
+                            <div className="small mt-1">
+                                {settingsError}
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger rounded-pill"
+                            onClick={
+                                loadSettings
+                            }
+                        >
+                            Coba Lagi
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <section className="mb-4">
                 <div className="mb-3">
@@ -903,8 +1339,7 @@ export default function HumasServiceRequestPage() {
                     </h4>
 
                     <p className="text-muted mb-0">
-                        Hubungi PIC terkait setelah
-                        request berhasil dikirim.
+                        Hubungi PIC terkait setelah request berhasil dikirim.
                     </p>
                 </div>
 
@@ -939,15 +1374,11 @@ export default function HumasServiceRequestPage() {
 
                                             <div className="min-w-0">
                                                 <div className="small text-muted">
-                                                    {
-                                                        contact.service
-                                                    }
+                                                    {contact.service}
                                                 </div>
 
                                                 <h6 className="fw-bold mb-1">
-                                                    {
-                                                        contact.name
-                                                    }
+                                                    {contact.name}
                                                 </h6>
 
                                                 <a
@@ -966,9 +1397,7 @@ export default function HumasServiceRequestPage() {
                                                 >
                                                     <i className="bi bi-whatsapp me-1" />
 
-                                                    {
-                                                        contact.phone
-                                                    }
+                                                    {contact.phone}
                                                 </a>
                                             </div>
                                         </div>
@@ -999,7 +1428,6 @@ export default function HumasServiceRequestPage() {
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">
                                             Nama Lengkap Pemohon
-
                                             <span className="text-danger ms-1">
                                                 *
                                             </span>
@@ -1025,7 +1453,6 @@ export default function HumasServiceRequestPage() {
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">
                                             Nama Unit/Prodi
-
                                             <span className="text-danger ms-1">
                                                 *
                                             </span>
@@ -1060,9 +1487,7 @@ export default function HumasServiceRequestPage() {
                                                             unit
                                                         }
                                                     >
-                                                        {
-                                                            unit
-                                                        }
+                                                        {unit}
                                                     </option>
                                                 )
                                             )}
@@ -1074,7 +1499,6 @@ export default function HumasServiceRequestPage() {
                                         <div className="col-md-6">
                                             <label className="form-label fw-bold">
                                                 Nama Unit/Prodi Lainnya
-
                                                 <span className="text-danger ms-1">
                                                     *
                                                 </span>
@@ -1108,7 +1532,6 @@ export default function HumasServiceRequestPage() {
                                     >
                                         <label className="form-label fw-bold">
                                             Kontak WhatsApp PIC Acara
-
                                             <span className="text-danger ms-1">
                                                 *
                                             </span>
@@ -1152,7 +1575,6 @@ export default function HumasServiceRequestPage() {
                                     <div className="col-12">
                                         <label className="form-label fw-bold">
                                             Detail Kegiatan
-
                                             <span className="text-danger ms-1">
                                                 *
                                             </span>
@@ -1194,7 +1616,6 @@ export default function HumasServiceRequestPage() {
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">
                                             Lokasi Acara
-
                                             <span className="text-danger ms-1">
                                                 *
                                             </span>
@@ -1220,7 +1641,6 @@ export default function HumasServiceRequestPage() {
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">
                                             Pelaksanaan Kegiatan
-
                                             <span className="text-danger ms-1">
                                                 *
                                             </span>
@@ -1233,13 +1653,42 @@ export default function HumasServiceRequestPage() {
                                             value={
                                                 form.event_date
                                             }
+                                            min={
+                                                minimumEventDate ||
+                                                undefined
+                                            }
                                             onChange={
                                                 handleChange
                                             }
                                             disabled={
-                                                submitting
+                                                submitting ||
+                                                settingsLoading ||
+                                                Boolean(
+                                                    settingsError
+                                                )
                                             }
                                         />
+
+                                        {!settingsLoading &&
+                                            !settingsError && (
+                                                <div className="form-text">
+                                                    Aturan aktif:{' '}
+
+                                                    <strong>
+                                                        {getRuleLabel(
+                                                            minimumSubmissionDays
+                                                        )}
+                                                    </strong>
+                                                    . Tanggal paling cepat{' '}
+
+                                                    <strong>
+                                                        {formatDate(
+                                                            minimumEventDate
+                                                        )}
+                                                    </strong>
+                                                    .
+                                                </div>
+                                            )}
                                     </div>
                                 </div>
                             </div>
@@ -1250,89 +1699,133 @@ export default function HumasServiceRequestPage() {
                                 <SectionHeader
                                     icon="bi-camera-reels-fill"
                                     title="Jenis Layanan Humas"
-                                    description="Pilih salah satu jenis layanan yang dibutuhkan."
+                                    description="Layanan yang sedang ditutup tetap ditampilkan, tetapi tidak dapat dipilih."
                                 />
 
-                                <div className="row g-3">
-                                    {COVERAGE_OPTIONS.map(
-                                        (
-                                            coverage
-                                        ) => {
-                                            const isSelected =
-                                                form.coverage_type ===
-                                                coverage.value;
+                                {settingsLoading ? (
+                                    <div className="text-center p-4">
+                                        <div className="spinner-border text-danger mb-3" />
 
-                                            return (
-                                                <div
-                                                    className="col-12 col-md-6"
-                                                    key={
-                                                        coverage.value
-                                                    }
-                                                >
-                                                    <button
-                                                        type="button"
-                                                        className={`card w-100 h-100 text-start rounded-4 ${
-                                                            isSelected
-                                                                ? 'border-danger shadow-sm bg-danger-subtle'
-                                                                : 'border shadow-none'
-                                                        }`}
-                                                        onClick={() =>
-                                                            handleCoverageChange(
-                                                                coverage.value
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            submitting
+                                        <p className="text-muted mb-0">
+                                            Memuat ketersediaan layanan...
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="row g-3">
+                                        {coverageOptionsWithAvailability.map(
+                                            (
+                                                coverage
+                                            ) => {
+                                                const isSelected =
+                                                    form.coverage_type ===
+                                                    coverage.value;
+
+                                                const isClosed =
+                                                    !coverage.isActive;
+
+                                                return (
+                                                    <div
+                                                        className="col-12 col-md-6"
+                                                        key={
+                                                            coverage.value
                                                         }
                                                     >
-                                                        <div className="card-body p-3">
-                                                            <div className="d-flex align-items-start gap-3">
-                                                                <div
-                                                                    className={`rounded-3 d-flex align-items-center justify-content-center flex-shrink-0 ${
-                                                                        isSelected
-                                                                            ? 'bg-danger text-white'
-                                                                            : 'bg-light text-danger'
-                                                                    }`}
-                                                                    style={{
-                                                                        width:
-                                                                            44,
+                                                        <button
+                                                            type="button"
+                                                            className={`card w-100 h-100 text-start rounded-4 ${
+                                                                isClosed
+                                                                    ? 'border-secondary bg-light opacity-75'
+                                                                    : isSelected
+                                                                      ? 'border-danger shadow-sm bg-danger-subtle'
+                                                                      : 'border shadow-none'
+                                                            }`}
+                                                            onClick={() =>
+                                                                handleCoverageChange(
+                                                                    coverage
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                submitting
+                                                            }
+                                                            style={{
+                                                                cursor:
+                                                                    isClosed
+                                                                        ? 'not-allowed'
+                                                                        : 'pointer',
+                                                            }}
+                                                        >
+                                                            <div className="card-body p-3">
+                                                                <div className="d-flex align-items-start gap-3">
+                                                                    <div
+                                                                        className={`rounded-3 d-flex align-items-center justify-content-center flex-shrink-0 ${
+                                                                            isClosed
+                                                                                ? 'bg-secondary-subtle text-secondary'
+                                                                                : isSelected
+                                                                                  ? 'bg-danger text-white'
+                                                                                  : 'bg-light text-danger'
+                                                                        }`}
+                                                                        style={{
+                                                                            width:
+                                                                                44,
 
-                                                                        height:
-                                                                            44,
-                                                                    }}
-                                                                >
-                                                                    <i
-                                                                        className={`bi ${coverage.icon}`}
-                                                                    />
-                                                                </div>
-
-                                                                <div className="flex-grow-1">
-                                                                    <div className="d-flex align-items-start justify-content-between gap-2">
-                                                                        <h6 className="fw-bold text-dark mb-1">
-                                                                            {
-                                                                                coverage.label
-                                                                            }
-                                                                        </h6>
-
-                                                                        {isSelected && (
-                                                                            <i className="bi bi-check-circle-fill text-danger" />
-                                                                        )}
+                                                                            height:
+                                                                                44,
+                                                                        }}
+                                                                    >
+                                                                        <i
+                                                                            className={`bi ${
+                                                                                isClosed
+                                                                                    ? 'bi-lock-fill'
+                                                                                    : coverage.icon
+                                                                            }`}
+                                                                        />
                                                                     </div>
 
-                                                                    <p className="small text-muted mb-0">
-                                                                        {
-                                                                            coverage.description
-                                                                        }
-                                                                    </p>
+                                                                    <div className="flex-grow-1">
+                                                                        <div className="d-flex align-items-start justify-content-between gap-2">
+                                                                            <h6 className="fw-bold text-dark mb-1">
+                                                                                {coverage.label}
+                                                                            </h6>
+
+                                                                            {isSelected &&
+                                                                                !isClosed && (
+                                                                                    <i className="bi bi-check-circle-fill text-danger" />
+                                                                                )}
+
+                                                                            {isClosed && (
+                                                                                <span className="badge rounded-pill text-bg-secondary">
+                                                                                    Ditutup
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+
+                                                                        <p className="small text-muted mb-2">
+                                                                            {coverage.description}
+                                                                        </p>
+
+                                                                        {isClosed ? (
+                                                                            <div className="small fw-bold text-secondary">
+                                                                                <i className="bi bi-lock-fill me-1" />
+
+                                                                                Layanan sedang tidak tersedia
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="small fw-bold text-success">
+                                                                                <i className="bi bi-check-circle-fill me-1" />
+
+                                                                                Layanan tersedia
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    </button>
-                                                </div>
-                                            );
-                                        }
-                                    )}
-                                </div>
+                                                        </button>
+                                                    </div>
+                                                );
+                                            }
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </section>
 
@@ -1346,7 +1839,6 @@ export default function HumasServiceRequestPage() {
 
                                 <label className="form-label fw-bold">
                                     Link Bahan atau Referensi
-
                                     <span className="text-muted fw-normal ms-2">
                                         Opsional
                                     </span>
@@ -1402,39 +1894,8 @@ export default function HumasServiceRequestPage() {
                                 </div>
 
                                 <div className="form-text">
-                                    Pastikan akses link telah diatur agar dapat
-                                    dibuka oleh Admin Humas. Link dapat berasal
-                                    dari Google Drive, OneDrive, Dropbox, Canva,
-                                    YouTube, atau website lainnya.
+                                    Pastikan akses link telah diatur agar dapat dibuka oleh Admin Humas.
                                 </div>
-
-                                {form.reference_link &&
-                                    isValidUrl(
-                                        form.reference_link
-                                    ) && (
-                                        <div className="alert alert-success rounded-4 mt-3 mb-0">
-                                            <div className="d-flex align-items-center justify-content-between gap-3 flex-wrap">
-                                                <div>
-                                                    <i className="bi bi-check-circle-fill me-2" />
-
-                                                    Link terdeteksi valid.
-                                                </div>
-
-                                                <a
-                                                    href={normalizeUrl(
-                                                        form.reference_link
-                                                    )}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="btn btn-sm btn-outline-success rounded-pill"
-                                                >
-                                                    <i className="bi bi-box-arrow-up-right me-2" />
-
-                                                    Uji Link
-                                                </a>
-                                            </div>
-                                        </div>
-                                    )}
                             </div>
                         </section>
 
@@ -1479,8 +1940,7 @@ export default function HumasServiceRequestPage() {
                                         </p>
 
                                         <p className="small text-muted mb-0">
-                                            PDF, DOC, DOCX, JPG, JPEG, atau PNG.
-                                            Maksimal 10 MB.
+                                            PDF, DOC, DOCX, JPG, JPEG, atau PNG. Maksimal 10 MB.
                                         </p>
 
                                         <input
@@ -1515,9 +1975,7 @@ export default function HumasServiceRequestPage() {
 
                                             <div className="flex-grow-1 min-w-0">
                                                 <div className="fw-bold text-truncate">
-                                                    {
-                                                        articleDraft.name
-                                                    }
+                                                    {articleDraft.name}
                                                 </div>
 
                                                 <div className="small text-muted">
@@ -1564,8 +2022,7 @@ export default function HumasServiceRequestPage() {
                         <div
                             className="position-sticky"
                             style={{
-                                top:
-                                    110,
+                                top: 110,
                             }}
                         >
                             <section className="card border-0 shadow-sm rounded-5 mb-4">
@@ -1588,21 +2045,6 @@ export default function HumasServiceRequestPage() {
 
                                         <div className="border-bottom pb-3">
                                             <div className="small text-muted mb-1">
-                                                Unit/Prodi
-                                            </div>
-
-                                            <div className="fw-semibold">
-                                                {form.unit_name ===
-                                                'Lainnya'
-                                                    ? form.other_unit_name ||
-                                                      'Lainnya'
-                                                    : form.unit_name ||
-                                                      '-'}
-                                            </div>
-                                        </div>
-
-                                        <div className="border-bottom pb-3">
-                                            <div className="small text-muted mb-1">
                                                 Jenis Layanan
                                             </div>
 
@@ -1614,24 +2056,29 @@ export default function HumasServiceRequestPage() {
 
                                         <div className="border-bottom pb-3">
                                             <div className="small text-muted mb-1">
-                                                Pelaksanaan
+                                                Aturan Pengajuan
                                             </div>
 
                                             <div className="fw-semibold">
-                                                {form.event_date ||
-                                                    '-'}
+                                                {settingsLoading
+                                                    ? 'Memuat...'
+                                                    : getRuleLabel(
+                                                          minimumSubmissionDays
+                                                      )}
                                             </div>
                                         </div>
 
                                         <div className="border-bottom pb-3">
                                             <div className="small text-muted mb-1">
-                                                Link Bahan
+                                                Pelaksanaan
                                             </div>
 
-                                            <div className="fw-semibold text-truncate">
-                                                {form.reference_link
-                                                    ? 'Sudah dicantumkan'
-                                                    : 'Tidak ada'}
+                                            <div className="fw-semibold">
+                                                {form.event_date
+                                                    ? formatDate(
+                                                          form.event_date
+                                                      )
+                                                    : '-'}
                                             </div>
                                         </div>
 
@@ -1654,7 +2101,11 @@ export default function HumasServiceRequestPage() {
                                             type="submit"
                                             className="btn btn-danger btn-lg rounded-pill"
                                             disabled={
-                                                submitting
+                                                submitting ||
+                                                settingsLoading ||
+                                                Boolean(
+                                                    settingsError
+                                                )
                                             }
                                         >
                                             {submitting ? (
@@ -1688,7 +2139,7 @@ export default function HumasServiceRequestPage() {
                                         </button>
 
                                         <Link
-                                            to="/admin/my-requests"
+                                            to={`${basePath}/my-requests`}
                                             className="btn btn-light border rounded-pill"
                                         >
                                             <i className="bi bi-clock-history me-2" />
@@ -1702,73 +2153,28 @@ export default function HumasServiceRequestPage() {
                             <section className="card border-0 shadow-sm rounded-5">
                                 <div className="card-body p-4">
                                     <h5 className="fw-bold mb-3">
-                                        Alur Request
+                                        Ketentuan Pengajuan
                                     </h5>
 
-                                    <div className="d-grid gap-3">
-                                        <div className="d-flex align-items-start gap-3">
-                                            <span className="badge text-bg-danger rounded-pill">
-                                                1
-                                            </span>
+                                    <div className="alert alert-danger-subtle rounded-4 mb-3">
+                                        <div className="fw-bold mb-1">
+                                            <i className="bi bi-calendar-check me-2" />
 
-                                            <div>
-                                                <div className="fw-semibold">
-                                                    Request dikirim
-                                                </div>
-
-                                                <div className="small text-muted">
-                                                    Data dan bahan masuk ke Admin Humas.
-                                                </div>
-                                            </div>
+                                            {getRuleLabel(
+                                                minimumSubmissionDays
+                                            )}
                                         </div>
 
-                                        <div className="d-flex align-items-start gap-3">
-                                            <span className="badge text-bg-danger rounded-pill">
-                                                2
-                                            </span>
-
-                                            <div>
-                                                <div className="fw-semibold">
-                                                    Pemeriksaan admin
-                                                </div>
-
-                                                <div className="small text-muted">
-                                                    Admin menyetujui atau menolak.
-                                                </div>
-                                            </div>
+                                        <div className="small">
+                                            {minimumSubmissionDays ===
+                                            0
+                                                ? 'Pengajuan dapat dilakukan untuk kegiatan pada hari yang sama.'
+                                                : `Pengajuan harus dilakukan minimal ${minimumSubmissionDays} hari sebelum kegiatan.`}
                                         </div>
+                                    </div>
 
-                                        <div className="d-flex align-items-start gap-3">
-                                            <span className="badge text-bg-danger rounded-pill">
-                                                3
-                                            </span>
-
-                                            <div>
-                                                <div className="fw-semibold">
-                                                    Layanan diproses
-                                                </div>
-
-                                                <div className="small text-muted">
-                                                    PIC mengerjakan layanan.
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="d-flex align-items-start gap-3">
-                                            <span className="badge text-bg-danger rounded-pill">
-                                                4
-                                            </span>
-
-                                            <div>
-                                                <div className="fw-semibold">
-                                                    Hasil diberikan
-                                                </div>
-
-                                                <div className="small text-muted">
-                                                    File atau link hasil muncul pada riwayat user.
-                                                </div>
-                                            </div>
-                                        </div>
+                                    <div className="small text-muted">
+                                        Aturan dapat berubah sesuai kebijakan Super Administrator. Ketersediaan masing-masing layanan dapat dibuka atau ditutup oleh Admin.
                                     </div>
                                 </div>
                             </section>
@@ -1776,29 +2182,6 @@ export default function HumasServiceRequestPage() {
                     </div>
                 </div>
             </form>
-
-            <section className="card border-0 shadow-sm rounded-5 mt-4">
-                <div className="card-body p-4 p-lg-5 text-center">
-                    <h5 className="fw-bold mb-2">
-                        Terima Kasih
-                    </h5>
-
-                    <p className="text-muted mb-2">
-                        Setelah mengisi formulir,
-                        silakan melakukan tindak lanjut
-                        kepada PIC layanan terkait.
-                    </p>
-
-                    <div className="fw-bold text-danger">
-                        Salam HEI — Harmony,
-                        Excellence, Integrity
-                    </div>
-
-                    <div className="small text-muted mt-1">
-                        Humas Telkom University Kampus Surabaya
-                    </div>
-                </div>
-            </section>
         </div>
     );
 }

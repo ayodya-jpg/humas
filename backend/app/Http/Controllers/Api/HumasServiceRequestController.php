@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\HumasServiceAvailability;
 use App\Models\HumasServiceRequest;
+use App\Models\ServiceSubmissionSetting;
 use App\Models\User;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -41,13 +43,6 @@ class HumasServiceRequestController extends Controller
         'Lainnya',
     ];
 
-    /*
-     * Jenis layanan yang dapat dibuat untuk pengajuan BARU.
-     *
-     * SOCIAL MEDIA tidak lagi digunakan untuk pengajuan baru.
-     * Record lama dengan value SOCIAL MEDIA tetap aman karena
-     * data lama tidak diubah.
-     */
     private const COVERAGE_TYPES = [
         'REQUEST DESIGN INSTAGRAM',
         'DOKUMENTASI',
@@ -201,6 +196,25 @@ class HumasServiceRequestController extends Controller
             );
         }
 
+        HumasServiceAvailability::ensureDefaults();
+
+        /*
+         * Ambil aturan H-n Layanan Humas dari
+         * service_submission_settings.
+         */
+        $minimumSubmissionDays =
+            ServiceSubmissionSetting::minimumDays(
+                ServiceSubmissionSetting::SERVICE_HUMAS
+            );
+
+        $minimumEventDate =
+            now()
+                ->startOfDay()
+                ->addDays(
+                    $minimumSubmissionDays
+                )
+                ->toDateString();
+
         $validated =
             $request->validate([
                 'applicant_name' => [
@@ -258,6 +272,9 @@ class HumasServiceRequestController extends Controller
                 'event_date' => [
                     'required',
                     'date',
+
+                    'after_or_equal:' .
+                        $minimumEventDate,
                 ],
 
                 'reference_link' => [
@@ -266,12 +283,6 @@ class HumasServiceRequestController extends Controller
                     'max:2000',
                 ],
 
-                /*
-                 * Nama field tetap article_draft agar kompatibel
-                 * dengan struktur database lama.
-                 *
-                 * Secara bisnis sekarang disebut Lampiran / Brief.
-                 */
                 'article_draft' => [
                     'required',
                     'file',
@@ -318,6 +329,15 @@ class HumasServiceRequestController extends Controller
                 'event_date.required' =>
                     'Tanggal pelaksanaan kegiatan wajib diisi.',
 
+                'event_date.date' =>
+                    'Format tanggal kegiatan tidak valid.',
+
+                'event_date.after_or_equal' =>
+                    $minimumSubmissionDays ===
+                    0
+                        ? 'Tanggal kegiatan tidak boleh sebelum hari ini.'
+                        : "Pengajuan layanan Humas harus dilakukan minimal H-{$minimumSubmissionDays} sebelum tanggal kegiatan.",
+
                 'reference_link.url' =>
                     'Link bahan atau referensi harus berupa URL yang valid.',
 
@@ -330,6 +350,36 @@ class HumasServiceRequestController extends Controller
                 'article_draft.max' =>
                     'Ukuran lampiran maksimal 10 MB.',
             ]);
+
+        /*
+         * Validasi layanan sedang buka.
+         */
+        $serviceAvailability =
+            HumasServiceAvailability::query()
+                ->where(
+                    'coverage_type',
+                    $validated[
+                        'coverage_type'
+                    ]
+                )
+                ->first();
+
+        if (
+            !$serviceAvailability ||
+            !$serviceAvailability
+                ->is_active
+        ) {
+            return response()->json([
+                'success' =>
+                    false,
+
+                'message' =>
+                    'Layanan Humas yang dipilih sedang ditutup dan belum dapat menerima pengajuan baru.',
+
+                'data' =>
+                    null,
+            ], 422);
+        }
 
         $articleDraftPath =
             null;
@@ -817,23 +867,14 @@ class HumasServiceRequestController extends Controller
                 'result_link.url' =>
                     'Link hasil pekerjaan harus berupa URL yang valid.',
 
-                'result_link.max' =>
-                    'Link hasil pekerjaan maksimal 2.000 karakter.',
-
                 'result_file.required_without' =>
                     'Unggah file hasil atau masukkan link hasil pekerjaan.',
-
-                'result_file.file' =>
-                    'File hasil tidak valid.',
 
                 'result_file.mimes' =>
                     'File hasil harus berformat PDF, DOC, DOCX, JPG, JPEG, PNG, atau ZIP.',
 
                 'result_file.max' =>
                     'Ukuran file hasil maksimal 20 MB.',
-
-                'result_note.max' =>
-                    'Catatan hasil maksimal 3.000 karakter.',
             ]);
 
         $resultFilePath =
@@ -1035,8 +1076,7 @@ class HumasServiceRequestController extends Controller
             $request->user();
 
         return (
-            $user !==
-                null &&
+            $user !== null &&
             $this->userHasPermission(
                 $user,
                 'approval.humas.process'

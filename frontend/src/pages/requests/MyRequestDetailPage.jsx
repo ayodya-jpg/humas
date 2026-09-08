@@ -15,38 +15,74 @@ import api from '../../api/axios';
 
 import MerchandiseRevisionForm from '../../components/MerchandiseRevisionForm';
 
+const TYPE_BORROW =
+    'borrow';
+
+const TYPE_ASSET_REQUEST =
+    'asset_request';
+
 const TYPE_CONFIG = {
     merchandise: {
-        label: 'Merchandise',
-        title: 'Detail Pengajuan Merchandise',
+        label:
+            'Merchandise',
+
+        title:
+            'Detail Pengajuan Merchandise',
+
         description:
             'Informasi lengkap pengajuan paket merchandise.',
-        icon: 'bi-gift-fill',
-        color: 'primary',
-        endpoint: (id) =>
-            `/orders/${id}`,
+
+        icon:
+            'bi-gift-fill',
+
+        color:
+            'primary',
+
+        endpoint:
+            (id) =>
+                `/orders/${id}`,
     },
 
     humas: {
-        label: 'Layanan Humas',
-        title: 'Detail Request Layanan Humas',
+        label:
+            'Layanan Humas',
+
+        title:
+            'Detail Request Layanan Humas',
+
         description:
             'Informasi lengkap kebutuhan layanan Humas.',
-        icon: 'bi-camera-reels-fill',
-        color: 'danger',
-        endpoint: (id) =>
-            `/humas-service-requests/${id}`,
+
+        icon:
+            'bi-camera-reels-fill',
+
+        color:
+            'danger',
+
+        endpoint:
+            (id) =>
+                `/humas-service-requests/${id}`,
     },
 
     borrowing: {
-        label: 'Peminjaman SEKPiM',
-        title: 'Detail Peminjaman SEKPiM',
+        label:
+            'Layanan SEKPiM',
+
+        title:
+            'Detail Pengajuan SEKPiM',
+
         description:
-            'Informasi lengkap pengajuan peminjaman perlengkapan.',
-        icon: 'bi-box-seam-fill',
-        color: 'success',
-        endpoint: (id) =>
-            `/borrow-requests/${id}`,
+            'Informasi lengkap pengajuan barang SEKPiM.',
+
+        icon:
+            'bi-box-seam-fill',
+
+        color:
+            'success',
+
+        endpoint:
+            (id) =>
+                `/borrow-requests/${id}`,
     },
 };
 
@@ -99,7 +135,7 @@ const STATUS_CONFIG = {
             'bi-check-circle-fill',
 
         description:
-            'Pengajuan telah disetujui dan masuk proses pelayanan.',
+            'Pengajuan telah disetujui dan menunggu proses penyerahan barang.',
     },
 
     rejected: {
@@ -150,7 +186,7 @@ const STATUS_CONFIG = {
             'bi-box-arrow-up-right',
 
         description:
-            'Barang telah diserahkan dan sedang digunakan.',
+            'Barang telah diserahkan dan sedang digunakan oleh pemohon.',
     },
 
     returned: {
@@ -167,7 +203,7 @@ const STATUS_CONFIG = {
             'bi-box-arrow-in-down-left',
 
         description:
-            'Barang telah dikembalikan kepada petugas.',
+            'Barang telah dikembalikan dan proses peminjaman selesai.',
     },
 };
 
@@ -221,7 +257,7 @@ const COVERAGE_TYPE_CONFIG = {
     },
 
     /*
-     * Data lama.
+     * Legacy.
      */
     'SOCIAL MEDIA': {
         label:
@@ -232,299 +268,428 @@ const COVERAGE_TYPE_CONFIG = {
     },
 };
 
-const getCurrentUser = () => {
-    try {
-        return JSON.parse(
-            localStorage.getItem(
-                'admin_user'
-            ) || '{}'
+/*
+|--------------------------------------------------------------------------
+| USER
+|--------------------------------------------------------------------------
+*/
+
+const getCurrentUser =
+    () => {
+        try {
+            return JSON.parse(
+                localStorage.getItem(
+                    'admin_user'
+                ) ||
+                    '{}'
+            );
+        } catch {
+            return {};
+        }
+    };
+
+/*
+|--------------------------------------------------------------------------
+| DATE
+|--------------------------------------------------------------------------
+*/
+
+const formatDate =
+    (
+        date
+    ) => {
+        if (
+            !date
+        ) {
+            return '-';
+        }
+
+        if (
+            typeof date ===
+                'string' &&
+            /^\d{4}-\d{2}-\d{2}$/.test(
+                date
+            )
+        ) {
+            const [
+                year,
+                month,
+                day,
+            ] =
+                date
+                    .split('-')
+                    .map(
+                        Number
+                    );
+
+            return new Date(
+                year,
+                month - 1,
+                day
+            ).toLocaleDateString(
+                'id-ID',
+                {
+                    day:
+                        '2-digit',
+
+                    month:
+                        'long',
+
+                    year:
+                        'numeric',
+                }
+            );
+        }
+
+        const parsedDate =
+            new Date(
+                date
+            );
+
+        if (
+            Number.isNaN(
+                parsedDate.getTime()
+            )
+        ) {
+            return '-';
+        }
+
+        return parsedDate
+            .toLocaleDateString(
+                'id-ID',
+                {
+                    day:
+                        '2-digit',
+
+                    month:
+                        'long',
+
+                    year:
+                        'numeric',
+                }
+            );
+    };
+
+const formatDateTime =
+    (
+        date
+    ) => {
+        if (
+            !date
+        ) {
+            return '-';
+        }
+
+        const parsedDate =
+            new Date(
+                date
+            );
+
+        if (
+            Number.isNaN(
+                parsedDate.getTime()
+            )
+        ) {
+            return '-';
+        }
+
+        return parsedDate
+            .toLocaleString(
+                'id-ID',
+                {
+                    day:
+                        '2-digit',
+
+                    month:
+                        'long',
+
+                    year:
+                        'numeric',
+
+                    hour:
+                        '2-digit',
+
+                    minute:
+                        '2-digit',
+
+                    hour12:
+                        false,
+                }
+            );
+    };
+
+const formatNumber =
+    (
+        value
+    ) => {
+        return new Intl.NumberFormat(
+            'id-ID'
+        ).format(
+            Number(
+                value ||
+                    0
+            )
         );
-    } catch {
-        return {};
-    }
-};
+    };
 
-const formatDate = (
-    date
-) => {
-    if (!date) {
-        return '-';
-    }
+/*
+|--------------------------------------------------------------------------
+| URL
+|--------------------------------------------------------------------------
+*/
 
-    if (
-        typeof date ===
-            'string' &&
-        /^\d{4}-\d{2}-\d{2}$/.test(
-            date
-        )
-    ) {
-        const [
-            year,
-            month,
-            day,
-        ] = date
-            .split('-')
-            .map(Number);
+const normalizeExternalUrl =
+    (
+        value
+    ) => {
+        if (
+            !value
+        ) {
+            return null;
+        }
 
-        return new Date(
-            year,
-            month - 1,
-            day
-        ).toLocaleDateString(
-            'id-ID',
-            {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric',
-            }
-        );
-    }
+        const normalizedValue =
+            String(
+                value
+            ).trim();
 
-    const parsedDate =
-        new Date(
-            date
-        );
+        if (
+            !normalizedValue
+        ) {
+            return null;
+        }
 
-    if (
-        Number.isNaN(
-            parsedDate.getTime()
-        )
-    ) {
-        return '-';
-    }
+        if (
+            /^https?:\/\//i.test(
+                normalizedValue
+            )
+        ) {
+            return normalizedValue;
+        }
 
-    return parsedDate
-        .toLocaleDateString(
-            'id-ID',
-            {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric',
-            }
-        );
-};
+        return `https://${normalizedValue}`;
+    };
 
-const formatDateTime = (
-    date
-) => {
-    if (!date) {
-        return '-';
-    }
+const getFileUrl =
+    (
+        value
+    ) => {
+        if (
+            !value
+        ) {
+            return null;
+        }
 
-    const parsedDate =
-        new Date(
-            date
-        );
+        if (
+            value.startsWith(
+                'http://'
+            ) ||
+            value.startsWith(
+                'https://'
+            )
+        ) {
+            return value;
+        }
 
-    if (
-        Number.isNaN(
-            parsedDate.getTime()
-        )
-    ) {
-        return '-';
-    }
+        const apiBaseUrl =
+            import.meta.env
+                .VITE_API_URL ||
+            'http://127.0.0.1:8000/api';
 
-    return parsedDate
-        .toLocaleString(
-            'id-ID',
-            {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-            }
-        );
-};
+        const backendBaseUrl =
+            apiBaseUrl.replace(
+                /\/api\/?$/,
+                ''
+            );
 
-const formatNumber = (
-    value
-) => {
-    return new Intl.NumberFormat(
-        'id-ID'
-    ).format(
-        Number(
-            value || 0
-        )
-    );
-};
+        if (
+            value.startsWith(
+                '/storage/'
+            )
+        ) {
+            return `${backendBaseUrl}${value}`;
+        }
 
-const normalizeExternalUrl = (
-    value
-) => {
-    if (!value) {
-        return null;
-    }
+        if (
+            value.startsWith(
+                'storage/'
+            )
+        ) {
+            return `${backendBaseUrl}/${value}`;
+        }
 
-    const normalizedValue =
-        String(
-            value
-        ).trim();
+        return `${backendBaseUrl}/storage/${value}`;
+    };
 
-    if (!normalizedValue) {
-        return null;
-    }
+/*
+|--------------------------------------------------------------------------
+| HUMAS
+|--------------------------------------------------------------------------
+*/
 
-    if (
-        /^https?:\/\//i.test(
-            normalizedValue
-        )
-    ) {
-        return normalizedValue;
-    }
-
-    return `https://${normalizedValue}`;
-};
-
-const getFileUrl = (
-    value
-) => {
-    if (!value) {
-        return null;
-    }
-
-    if (
-        value.startsWith(
-            'http://'
-        ) ||
-        value.startsWith(
-            'https://'
-        )
-    ) {
-        return value;
-    }
-
-    const apiBaseUrl =
-        import.meta.env
-            .VITE_API_URL ||
-        'http://127.0.0.1:8000/api';
-
-    const backendBaseUrl =
-        apiBaseUrl.replace(
-            /\/api\/?$/,
-            ''
-        );
-
-    if (
-        value.startsWith(
-            '/storage/'
-        )
-    ) {
-        return `${backendBaseUrl}${value}`;
-    }
-
-    if (
-        value.startsWith(
-            'storage/'
-        )
-    ) {
-        return `${backendBaseUrl}/${value}`;
-    }
-
-    return `${backendBaseUrl}/storage/${value}`;
-};
-
-const getResolvedUnitName = (
-    requestData
-) => {
-    if (
+const getResolvedUnitName =
+    (
         requestData
-            ?.resolved_unit_name
-    ) {
-        return requestData
-            .resolved_unit_name;
-    }
+    ) => {
+        if (
+            requestData
+                ?.resolved_unit_name
+        ) {
+            return requestData
+                .resolved_unit_name;
+        }
 
-    if (
-        requestData
-            ?.unit_name ===
-        'Lainnya'
-    ) {
+        if (
+            requestData
+                ?.unit_name ===
+            'Lainnya'
+        ) {
+            return (
+                requestData
+                    .other_unit_name ||
+                'Lainnya'
+            );
+        }
+
         return (
             requestData
-                .other_unit_name ||
-            'Lainnya'
+                ?.unit_name ||
+            requestData
+                ?.requester_unit ||
+            requestData
+                ?.user
+                ?.unit_name ||
+            '-'
         );
-    }
+    };
 
-    return (
-        requestData
-            ?.unit_name ||
-        requestData
-            ?.requester_unit ||
-        requestData
-            ?.user
-            ?.unit_name ||
-        '-'
-    );
-};
-
-const getCoverageParts = (
-    coverageType
-) => {
-    if (!coverageType) {
-        return [];
-    }
-
-    return String(
+const getCoverageParts =
+    (
         coverageType
-    )
-        .split(
-            /[;,]/
-        )
-        .map(
-            (item) =>
-                item
-                    .trim()
-                    .toUpperCase()
-        )
-        .filter(Boolean);
-};
+    ) => {
+        if (
+            !coverageType
+        ) {
+            return [];
+        }
 
-const getCoverageLabels = (
-    coverageType
-) => {
-    const parts =
-        getCoverageParts(
+        return String(
             coverageType
-        );
-
-    if (
-        parts.length ===
-        0
-    ) {
-        return '-';
-    }
-
-    return parts
-        .map(
-            (item) =>
-                COVERAGE_TYPE_CONFIG[
+        )
+            .split(
+                /[;,]/
+            )
+            .map(
+                (
                     item
-                ]?.label ||
-                item
-        )
-        .join(
-            '; '
+                ) =>
+                    item
+                        .trim()
+                        .toUpperCase()
+            )
+            .filter(
+                Boolean
+            );
+    };
+
+const getCoverageLabels =
+    (
+        coverageType
+    ) => {
+        const parts =
+            getCoverageParts(
+                coverageType
+            );
+
+        if (
+            parts.length ===
+            0
+        ) {
+            return '-';
+        }
+
+        return parts
+            .map(
+                (
+                    item
+                ) =>
+                    COVERAGE_TYPE_CONFIG[
+                        item
+                    ]?.label ||
+                    item
+            )
+            .join(
+                '; '
+            );
+    };
+
+const getCoverageIcon =
+    (
+        coverageType
+    ) => {
+        const firstPart =
+            getCoverageParts(
+                coverageType
+            )[0];
+
+        return (
+            COVERAGE_TYPE_CONFIG[
+                firstPart
+            ]?.icon ||
+            'bi-camera-reels-fill'
         );
-};
+    };
 
-const getCoverageIcon = (
-    coverageType
-) => {
-    const firstPart =
-        getCoverageParts(
-            coverageType
-        )[0];
+/*
+|--------------------------------------------------------------------------
+| SEKPiM
+|--------------------------------------------------------------------------
+*/
 
-    return (
-        COVERAGE_TYPE_CONFIG[
-            firstPart
-        ]?.icon ||
-        'bi-camera-reels-fill'
-    );
-};
+const getSekpimRequestType =
+    (
+        requestData
+    ) => {
+        /*
+         * Data lama yang belum memiliki request_type
+         * dianggap Peminjaman Barang.
+         */
+        return (
+            requestData
+                ?.request_type ||
+            TYPE_BORROW
+        );
+    };
+
+const getSekpimTypeLabel =
+    (
+        requestData
+    ) => {
+        return getSekpimRequestType(
+            requestData
+        ) ===
+        TYPE_ASSET_REQUEST
+            ? 'Request Barang'
+            : 'Peminjaman Barang';
+    };
+
+const getSekpimTypeIcon =
+    (
+        requestData
+    ) => {
+        return getSekpimRequestType(
+            requestData
+        ) ===
+        TYPE_ASSET_REQUEST
+            ? 'bi-box2-heart-fill'
+            : 'bi-box-arrow-up-right';
+    };
+
+/*
+|--------------------------------------------------------------------------
+| INFO COMPONENT
+|--------------------------------------------------------------------------
+*/
 
 const InfoItem = ({
     label,
@@ -556,8 +721,11 @@ const InfoItem = ({
                     <div
                         className="rounded-circle bg-white text-danger d-flex align-items-center justify-content-center flex-shrink-0"
                         style={{
-                            width: 42,
-                            height: 42,
+                            width:
+                                42,
+
+                            height:
+                                42,
                         }}
                     >
                         <i
@@ -567,7 +735,9 @@ const InfoItem = ({
 
                     <div className="min-w-0 flex-grow-1">
                         <div className="small text-muted fw-bold mb-1">
-                            {label}
+                            {
+                                label
+                            }
                         </div>
 
                         {linkUrl ? (
@@ -579,7 +749,9 @@ const InfoItem = ({
                                 rel="noreferrer"
                                 className="fw-bold text-danger text-break text-decoration-none"
                             >
-                                {value}
+                                {
+                                    value
+                                }
 
                                 <i className="bi bi-box-arrow-up-right ms-2" />
                             </a>
@@ -603,6 +775,12 @@ const InfoItem = ({
         </div>
     );
 };
+
+/*
+|--------------------------------------------------------------------------
+| FILE COMPONENT
+|--------------------------------------------------------------------------
+*/
 
 const FileCard = ({
     label,
@@ -632,7 +810,9 @@ const FileCard = ({
 
                     <div className="min-w-0 flex-grow-1">
                         <div className="small text-muted fw-bold mb-1">
-                            {label}
+                            {
+                                label
+                            }
                         </div>
 
                         <div className="fw-bold text-truncate">
@@ -665,6 +845,12 @@ const FileCard = ({
     );
 };
 
+/*
+|--------------------------------------------------------------------------
+| REVISION HISTORY
+|--------------------------------------------------------------------------
+*/
+
 const RevisionHistoryCard = ({
     histories,
 }) => {
@@ -693,7 +879,9 @@ const RevisionHistoryCard = ({
                     </div>
 
                     <span className="badge rounded-pill text-bg-info px-3 py-2">
-                        {histories.length}{' '}
+                        {
+                            histories.length
+                        }{' '}
                         revisi
                     </span>
                 </div>
@@ -720,7 +908,8 @@ const RevisionHistoryCard = ({
 
                                     <div className="small text-muted">
                                         {formatDateTime(
-                                            history.requested_at
+                                            history
+                                                .requested_at
                                         )}
                                     </div>
                                 </div>
@@ -730,11 +919,13 @@ const RevisionHistoryCard = ({
                                     style={{
                                         whiteSpace:
                                             'pre-line',
+
                                         lineHeight:
                                             1.7,
                                     }}
                                 >
-                                    {history.revision_note ||
+                                    {history
+                                        .revision_note ||
                                         '-'}
                                 </div>
 
@@ -761,9 +952,11 @@ const RevisionHistoryCard = ({
                                         </div>
 
                                         <div className="fw-bold">
-                                            {history.resubmitted_at
+                                            {history
+                                                .resubmitted_at
                                                 ? formatDateTime(
-                                                      history.resubmitted_at
+                                                      history
+                                                          .resubmitted_at
                                                   )
                                                 : 'Belum dikirim ulang'}
                                         </div>
@@ -778,11 +971,18 @@ const RevisionHistoryCard = ({
     );
 };
 
+/*
+|--------------------------------------------------------------------------
+| PAGE
+|--------------------------------------------------------------------------
+*/
+
 export default function MyRequestDetailPage() {
     const {
         type,
         id,
-    } = useParams();
+    } =
+        useParams();
 
     const navigate =
         useNavigate();
@@ -795,7 +995,8 @@ export default function MyRequestDetailPage() {
         );
 
     const basePath =
-        currentUser.role ===
+        currentUser
+            .role ===
         'user'
             ? '/user'
             : '/admin';
@@ -809,22 +1010,37 @@ export default function MyRequestDetailPage() {
     const [
         requestData,
         setRequestData,
-    ] = useState(null);
+    ] =
+        useState(
+            null
+        );
 
     const [
         loading,
         setLoading,
-    ] = useState(true);
+    ] =
+        useState(
+            true
+        );
 
     const [
         errorMessage,
         setErrorMessage,
-    ] = useState('');
+    ] =
+        useState(
+            ''
+        );
 
     const typeConfig =
         TYPE_CONFIG[
             type
         ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD DETAIL
+    |--------------------------------------------------------------------------
+    */
 
     const fetchDetail =
         useCallback(
@@ -907,10 +1123,115 @@ export default function MyRequestDetailPage() {
         ]
     );
 
+    /*
+    |--------------------------------------------------------------------------
+    | SEKPiM DERIVED
+    |--------------------------------------------------------------------------
+    */
+
+    const sekpimRequestType =
+        type ===
+        'borrowing'
+            ? getSekpimRequestType(
+                  requestData
+              )
+            : null;
+
+    const isSekpimBorrow =
+        type ===
+            'borrowing' &&
+        sekpimRequestType ===
+            TYPE_BORROW;
+
+    const isSekpimAssetRequest =
+        type ===
+            'borrowing' &&
+        sekpimRequestType ===
+            TYPE_ASSET_REQUEST;
+
+    const sekpimTypeLabel =
+        type ===
+        'borrowing'
+            ? getSekpimTypeLabel(
+                  requestData
+              )
+            : null;
+
+    /*
+    |--------------------------------------------------------------------------
+    | DISPLAY TYPE
+    |--------------------------------------------------------------------------
+    */
+
+    const displayTypeConfig =
+        useMemo(
+            () => {
+                if (
+                    type !==
+                    'borrowing'
+                ) {
+                    return typeConfig;
+                }
+
+                if (
+                    isSekpimAssetRequest
+                ) {
+                    return {
+                        ...typeConfig,
+
+                        label:
+                            'Request Barang',
+
+                        title:
+                            'Detail Request Barang SEKPiM',
+
+                        description:
+                            'Informasi lengkap Request Barang SEKPiM.',
+
+                        icon:
+                            'bi-box2-heart-fill',
+
+                        color:
+                            'info',
+                    };
+                }
+
+                return {
+                    ...typeConfig,
+
+                    label:
+                        'Peminjaman Barang',
+
+                    title:
+                        'Detail Peminjaman Barang SEKPiM',
+
+                    description:
+                        'Informasi lengkap Peminjaman Barang SEKPiM.',
+
+                    icon:
+                        'bi-box-arrow-up-right',
+
+                    color:
+                        'success',
+                };
+            },
+            [
+                type,
+                typeConfig,
+                isSekpimAssetRequest,
+            ]
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATUS
+    |--------------------------------------------------------------------------
+    */
+
     const statusConfig =
         useMemo(
             () => {
-                return (
+                const baseStatus =
                     STATUS_CONFIG[
                         requestData
                             ?.status
@@ -933,14 +1254,51 @@ export default function MyRequestDetailPage() {
 
                         description:
                             'Status pengajuan tidak diketahui.',
-                    }
-                );
+                    };
+
+                if (
+                    type ===
+                        'borrowing' &&
+                    isSekpimAssetRequest &&
+                    requestData
+                        ?.status ===
+                        'completed'
+                ) {
+                    return {
+                        ...baseStatus,
+
+                        label:
+                            'Barang Telah Diserahkan',
+
+                        shortLabel:
+                            'Selesai',
+
+                        badgeClass:
+                            'text-bg-success',
+
+                        icon:
+                            'bi-check2-all',
+
+                        description:
+                            'Request Barang telah selesai dan barang telah diserahkan kepada pemohon.',
+                    };
+                }
+
+                return baseStatus;
             },
             [
                 requestData
                     ?.status,
+                type,
+                isSekpimAssetRequest,
             ]
         );
+
+    /*
+    |--------------------------------------------------------------------------
+    | REQUEST CODE
+    |--------------------------------------------------------------------------
+    */
 
     const requestCode =
         useMemo(
@@ -961,7 +1319,8 @@ export default function MyRequestDetailPage() {
                         requestData
                             .code ||
                         `MER-${String(
-                            requestData.id
+                            requestData
+                                .id
                         ).padStart(
                             4,
                             '0'
@@ -979,7 +1338,8 @@ export default function MyRequestDetailPage() {
                         requestData
                             .code ||
                         `HMS-${String(
-                            requestData.id
+                            requestData
+                                .id
                         ).padStart(
                             4,
                             '0'
@@ -992,19 +1352,37 @@ export default function MyRequestDetailPage() {
                         .borrow_code ||
                     requestData
                         .code ||
-                    `BRW-${String(
-                        requestData.id
-                    ).padStart(
-                        4,
-                        '0'
-                    )}`
+                    (
+                        isSekpimAssetRequest
+                            ? `REQ-${String(
+                                  requestData
+                                      .id
+                              ).padStart(
+                                  4,
+                                  '0'
+                              )}`
+                            : `BRW-${String(
+                                  requestData
+                                      .id
+                              ).padStart(
+                                  4,
+                                  '0'
+                              )}`
+                    )
                 );
             },
             [
                 requestData,
                 type,
+                isSekpimAssetRequest,
             ]
         );
+
+    /*
+    |--------------------------------------------------------------------------
+    | TITLE
+    |--------------------------------------------------------------------------
+    */
 
     const requestTitle =
         useMemo(
@@ -1028,6 +1406,17 @@ export default function MyRequestDetailPage() {
                     );
                 }
 
+                if (
+                    type ===
+                    'borrowing'
+                ) {
+                    return (
+                        requestData
+                            .purpose ||
+                        sekpimTypeLabel
+                    );
+                }
+
                 return (
                     requestData
                         .title ||
@@ -1035,9 +1424,7 @@ export default function MyRequestDetailPage() {
                         .event_name ||
                     requestData
                         .activity_name ||
-                    requestData
-                        .purpose ||
-                    typeConfig
+                    displayTypeConfig
                         ?.label ||
                     'Pengajuan'
                 );
@@ -1045,9 +1432,16 @@ export default function MyRequestDetailPage() {
             [
                 requestData,
                 type,
-                typeConfig,
+                displayTypeConfig,
+                sekpimTypeLabel,
             ]
         );
+
+    /*
+    |--------------------------------------------------------------------------
+    | TIMELINE
+    |--------------------------------------------------------------------------
+    */
 
     const timelineItems =
         useMemo(
@@ -1215,7 +1609,11 @@ export default function MyRequestDetailPage() {
                     });
                 }
 
+                /*
+                 * Khusus Peminjaman Barang.
+                 */
                 if (
+                    isSekpimBorrow &&
                     [
                         'borrowed',
                         'returned',
@@ -1226,10 +1624,10 @@ export default function MyRequestDetailPage() {
                 ) {
                     items.push({
                         label:
-                            'Barang Diserahkan',
+                            'Barang Dipinjam',
 
                         description:
-                            'Barang telah diserahkan kepada pemohon.',
+                            'Barang telah diserahkan kepada pemohon dan sedang digunakan.',
 
                         date:
                             requestData
@@ -1245,46 +1643,77 @@ export default function MyRequestDetailPage() {
                     });
                 }
 
+                /*
+                 * Complete umum.
+                 */
                 if (
                     requestData
                         .status ===
                     'completed'
                 ) {
-                    items.push({
-                        label:
-                            'Layanan Selesai',
+                    if (
+                        isSekpimAssetRequest
+                    ) {
+                        items.push({
+                            label:
+                                'Barang Diserahkan',
 
-                        description:
-                            type ===
-                            'humas'
-                                ? 'Hasil pekerjaan Humas telah tersedia.'
-                                : 'Seluruh proses pelayanan telah diselesaikan.',
+                            description:
+                                'Barang telah diserahkan kepada pemohon dan Request Barang telah selesai.',
 
-                        date:
-                            requestData
-                                .completed_at ||
-                            requestData
-                                .updated_at,
+                            date:
+                                requestData
+                                    .completed_at ||
+                                requestData
+                                    .updated_at,
 
-                        icon:
-                            'bi-check2-all',
+                            icon:
+                                'bi-box2-heart-fill',
 
-                        status:
-                            'done',
-                    });
+                            status:
+                                'done',
+                        });
+                    } else {
+                        items.push({
+                            label:
+                                'Layanan Selesai',
+
+                            description:
+                                type ===
+                                'humas'
+                                    ? 'Hasil pekerjaan Humas telah tersedia.'
+                                    : 'Seluruh proses pelayanan telah diselesaikan.',
+
+                            date:
+                                requestData
+                                    .completed_at ||
+                                requestData
+                                    .updated_at,
+
+                            icon:
+                                'bi-check2-all',
+
+                            status:
+                                'done',
+                        });
+                    }
                 }
 
+                /*
+                 * Khusus Peminjaman Barang.
+                 */
                 if (
+                    isSekpimBorrow &&
                     requestData
                         .status ===
-                    'returned'
+                        'returned'
                 ) {
                     items.push({
                         label:
                             'Barang Dikembalikan',
 
                         description:
-                            'Barang telah dikembalikan kepada petugas.',
+                            'Barang telah dikembalikan kepada petugas dan peminjaman selesai.',
 
                         date:
                             requestData
@@ -1305,8 +1734,16 @@ export default function MyRequestDetailPage() {
             [
                 requestData,
                 type,
+                isSekpimBorrow,
+                isSekpimAssetRequest,
             ]
         );
+
+    /*
+    |--------------------------------------------------------------------------
+    | INVALID TYPE
+    |--------------------------------------------------------------------------
+    */
 
     if (
         !typeConfig
@@ -1341,6 +1778,12 @@ export default function MyRequestDetailPage() {
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | LOADING
+    |--------------------------------------------------------------------------
+    */
+
     if (
         loading
     ) {
@@ -1363,6 +1806,12 @@ export default function MyRequestDetailPage() {
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ERROR
+    |--------------------------------------------------------------------------
+    */
+
     if (
         errorMessage ||
         !requestData
@@ -1374,8 +1823,11 @@ export default function MyRequestDetailPage() {
                         <div
                             className="mx-auto mb-3 rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center"
                             style={{
-                                width: 86,
-                                height: 86,
+                                width:
+                                    86,
+
+                                height:
+                                    86,
                             }}
                         >
                             <i className="bi bi-exclamation-circle-fill fs-1" />
@@ -1421,18 +1873,27 @@ export default function MyRequestDetailPage() {
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | DATA
+    |--------------------------------------------------------------------------
+    */
+
     const userData =
-        requestData.user ||
+        requestData
+            .user ||
         {};
 
     const orderItems =
-        requestData.items ||
+        requestData
+            .items ||
         requestData
             .order_items ||
         [];
 
     const borrowItems =
-        requestData.items ||
+        requestData
+            .items ||
         requestData
             .borrow_items ||
         requestData
@@ -1478,30 +1939,41 @@ export default function MyRequestDetailPage() {
             .return_evidence_path ||
         null;
 
+    /*
+    |--------------------------------------------------------------------------
+    | VIEW
+    |--------------------------------------------------------------------------
+    */
+
     return (
         <div className="container-fluid px-0">
+            {/* HERO */}
+
             <section className="card border-0 shadow-sm rounded-5 mb-4">
                 <div className="card-body p-4 p-lg-5">
                     <div className="d-flex flex-wrap align-items-start justify-content-between gap-4">
                         <div className="d-flex align-items-start gap-3">
                             <div
-                                className={`rounded-4 bg-${typeConfig.color}-subtle text-${typeConfig.color} d-flex align-items-center justify-content-center flex-shrink-0`}
+                                className={`rounded-4 bg-${displayTypeConfig.color}-subtle text-${displayTypeConfig.color} d-flex align-items-center justify-content-center flex-shrink-0`}
                                 style={{
-                                    width: 72,
-                                    height: 72,
+                                    width:
+                                        72,
+
+                                    height:
+                                        72,
                                 }}
                             >
                                 <i
-                                    className={`bi ${typeConfig.icon} fs-2`}
+                                    className={`bi ${displayTypeConfig.icon} fs-2`}
                                 />
                             </div>
 
                             <div>
                                 <span
-                                    className={`badge rounded-pill bg-${typeConfig.color}-subtle text-${typeConfig.color} px-3 py-2 mb-3`}
+                                    className={`badge rounded-pill bg-${displayTypeConfig.color}-subtle text-${displayTypeConfig.color} px-3 py-2 mb-3`}
                                 >
                                     {
-                                        typeConfig.label
+                                        displayTypeConfig.label
                                     }
                                 </span>
 
@@ -1547,7 +2019,10 @@ export default function MyRequestDetailPage() {
                 </div>
             </section>
 
-            {requestData.status ===
+            {/* REJECT */}
+
+            {requestData
+                .status ===
                 'rejected' && (
                 <section className="alert alert-danger border-0 rounded-5 shadow-sm p-4 mb-4">
                     <div className="d-flex align-items-start gap-3">
@@ -1576,9 +2051,12 @@ export default function MyRequestDetailPage() {
                 </section>
             )}
 
+            {/* MERCHANDISE REVISION */}
+
             {type ===
                 'merchandise' &&
-                requestData.status ===
+                requestData
+                    .status ===
                     'revision' && (
                 <section className="alert alert-info border-0 rounded-5 shadow-sm p-4 mb-4">
                     <div className="d-flex align-items-start gap-3">
@@ -1609,7 +2087,8 @@ export default function MyRequestDetailPage() {
 
             {type ===
                 'merchandise' &&
-                requestData.status ===
+                requestData
+                    .status ===
                     'revision' && (
                 <MerchandiseRevisionForm
                     order={
@@ -1621,9 +2100,12 @@ export default function MyRequestDetailPage() {
                 />
             )}
 
+            {/* HUMAS RESULT */}
+
             {type ===
                 'humas' &&
-                requestData.status ===
+                requestData
+                    .status ===
                     'completed' && (
                 <section className="card border-0 shadow-sm rounded-5 mb-4">
                     <div className="card-body p-4">
@@ -1678,7 +2160,7 @@ export default function MyRequestDetailPage() {
                                 <div className="p-3 rounded-4 border bg-white h-100">
                                     <div className="d-flex align-items-center gap-3">
                                         <div className="icon-box bg-success-subtle text-success">
-                                            <i className="bi-link-45deg" />
+                                            <i className="bi bi-link-45deg" />
                                         </div>
 
                                         <div className="flex-grow-1">
@@ -1735,33 +2217,52 @@ export default function MyRequestDetailPage() {
                 </section>
             )}
 
+            {/* SEKPiM EVIDENCE */}
+
             {type ===
                 'borrowing' &&
                 (
                     handoverEvidenceUrl ||
-                    returnEvidenceUrl
+                    (
+                        isSekpimBorrow &&
+                        returnEvidenceUrl
+                    )
                 ) && (
                 <section className="card border-0 shadow-sm rounded-5 mb-4">
                     <div className="card-body p-4">
                         <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
                             <div>
                                 <h4 className="fw-black mb-1">
-                                    Bukti Proses Peminjaman
+                                    {isSekpimBorrow
+                                        ? 'Bukti Proses Peminjaman'
+                                        : 'Bukti Penyerahan Barang'}
                                 </h4>
 
                                 <p className="text-muted mb-0">
-                                    Bukti serah terima dan pengembalian yang diunggah admin.
+                                    {isSekpimBorrow
+                                        ? 'Bukti serah terima dan pengembalian yang diunggah admin.'
+                                        : 'Bukti penyerahan Request Barang yang diunggah admin.'}
                                 </p>
                             </div>
 
-                            <div className="icon-box bg-success-subtle text-success">
+                            <div
+                                className={`icon-box ${
+                                    isSekpimBorrow
+                                        ? 'bg-success-subtle text-success'
+                                        : 'bg-info-subtle text-info'
+                                }`}
+                            >
                                 <i className="bi bi-folder-check" />
                             </div>
                         </div>
 
                         <div className="row g-3">
                             <FileCard
-                                label="Bukti Serah Terima"
+                                label={
+                                    isSekpimBorrow
+                                        ? 'Bukti Serah Terima'
+                                        : 'Bukti Penyerahan Barang'
+                                }
                                 fileName={
                                     requestData
                                         .handover_evidence_name
@@ -1769,29 +2270,43 @@ export default function MyRequestDetailPage() {
                                 fileUrl={
                                     handoverEvidenceUrl
                                 }
-                                icon="bi-box-arrow-up-right"
-                                color="success"
+                                icon={
+                                    isSekpimBorrow
+                                        ? 'bi-box-arrow-up-right'
+                                        : 'bi-box2-heart-fill'
+                                }
+                                color={
+                                    isSekpimBorrow
+                                        ? 'success'
+                                        : 'info'
+                                }
                             />
 
-                            <FileCard
-                                label="Bukti Pengembalian"
-                                fileName={
-                                    requestData
-                                        .return_evidence_name
-                                }
-                                fileUrl={
-                                    returnEvidenceUrl
-                                }
-                                icon="bi-box-arrow-in-down-left"
-                                color="success"
-                            />
+                            {isSekpimBorrow && (
+                                <FileCard
+                                    label="Bukti Pengembalian"
+                                    fileName={
+                                        requestData
+                                            .return_evidence_name
+                                    }
+                                    fileUrl={
+                                        returnEvidenceUrl
+                                    }
+                                    icon="bi-box-arrow-in-down-left"
+                                    color="success"
+                                />
+                            )}
                         </div>
                     </div>
                 </section>
             )}
 
             <div className="row g-4">
+                {/* LEFT */}
+
                 <div className="col-xl-8">
+                    {/* INFO */}
+
                     <section className="card border-0 shadow-sm rounded-5 mb-4">
                         <div className="card-body p-4">
                             <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
@@ -1806,10 +2321,10 @@ export default function MyRequestDetailPage() {
                                 </div>
 
                                 <div
-                                    className={`icon-box bg-${typeConfig.color}-subtle text-${typeConfig.color}`}
+                                    className={`icon-box bg-${displayTypeConfig.color}-subtle text-${displayTypeConfig.color}`}
                                 >
                                     <i
-                                        className={`bi ${typeConfig.icon}`}
+                                        className={`bi ${displayTypeConfig.icon}`}
                                     />
                                 </div>
                             </div>
@@ -1830,7 +2345,9 @@ export default function MyRequestDetailPage() {
                                 />
 
                                 {type !==
-                                    'merchandise' && (
+                                    'merchandise' &&
+                                    type !==
+                                        'borrowing' && (
                                     <InfoItem
                                         label="Unit / Bagian"
                                         value={
@@ -1839,6 +2356,8 @@ export default function MyRequestDetailPage() {
                                         icon="bi-building-fill"
                                     />
                                 )}
+
+                                {/* MERCHANDISE */}
 
                                 {type ===
                                     'merchandise' && (
@@ -1929,6 +2448,8 @@ export default function MyRequestDetailPage() {
                                     </>
                                 )}
 
+                                {/* HUMAS */}
+
                                 {type ===
                                     'humas' && (
                                     <>
@@ -1994,29 +2515,74 @@ export default function MyRequestDetailPage() {
                                     </>
                                 )}
 
+                                {/* SEKPiM */}
+
                                 {type ===
                                     'borrowing' && (
                                     <>
+                                        <InfoItem
+                                            label="Jenis Pengajuan"
+                                            value={
+                                                sekpimTypeLabel
+                                            }
+                                            icon={getSekpimTypeIcon(
+                                                requestData
+                                            )}
+                                        />
+
+                                        <InfoItem
+                                            label="Nama PIC"
+                                            value={
+                                                requestData
+                                                    .pic_name
+                                            }
+                                            icon="bi-person-badge-fill"
+                                        />
+
+                                        <InfoItem
+                                            label="Nomor PIC"
+                                            value={
+                                                requestData
+                                                    .pic_phone
+                                            }
+                                            icon="bi-whatsapp"
+                                        />
+
+                                        <InfoItem
+                                            label="Tanggal Kegiatan"
+                                            value={formatDate(
+                                                requestData
+                                                    .activity_date
+                                            )}
+                                            icon="bi-calendar-event-fill"
+                                        />
+
                                         <InfoItem
                                             label="Tanggal Pengambilan"
                                             value={formatDate(
                                                 requestData
                                                     .borrow_date
                                             )}
-                                            icon="bi-calendar-plus-fill"
+                                            icon="bi-calendar-check-fill"
                                         />
 
-                                        <InfoItem
-                                            label="Tanggal Pengembalian"
-                                            value={formatDate(
-                                                requestData
-                                                    .return_date
-                                            )}
-                                            icon="bi-calendar-minus-fill"
-                                        />
+                                        {isSekpimBorrow && (
+                                            <InfoItem
+                                                label="Tanggal Pengembalian"
+                                                value={formatDate(
+                                                    requestData
+                                                        .return_date
+                                                )}
+                                                icon="bi-calendar-minus-fill"
+                                            />
+                                        )}
 
                                         <InfoItem
-                                            label="Tujuan Peminjaman"
+                                            label={
+                                                isSekpimBorrow
+                                                    ? 'Keperluan Peminjaman'
+                                                    : 'Keperluan Request Barang'
+                                            }
                                             value={
                                                 requestData
                                                     .purpose
@@ -2030,9 +2596,12 @@ export default function MyRequestDetailPage() {
                         </div>
                     </section>
 
+                    {/* REVISION HISTORY */}
+
                     {type ===
                         'merchandise' &&
-                        revisionHistories.length >
+                        revisionHistories
+                            .length >
                             0 && (
                         <RevisionHistoryCard
                             histories={
@@ -2041,9 +2610,12 @@ export default function MyRequestDetailPage() {
                         />
                     )}
 
+                    {/* MERCHANDISE ITEMS */}
+
                     {type ===
                         'merchandise' &&
-                        orderItems.length >
+                        orderItems
+                            .length >
                             0 && (
                         <section className="card border-0 shadow-sm rounded-5 mb-4">
                             <div className="card-body p-4">
@@ -2106,22 +2678,50 @@ export default function MyRequestDetailPage() {
                         </section>
                     )}
 
+                    {/* SEKPiM ITEMS */}
+
                     {type ===
                         'borrowing' &&
-                        borrowItems.length >
+                        borrowItems
+                            .length >
                             0 && (
                         <section className="card border-0 shadow-sm rounded-5 mb-4">
                             <div className="card-body p-4">
-                                <h4 className="fw-black mb-4">
-                                    Perlengkapan Dipinjam
-                                </h4>
+                                <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
+                                    <div>
+                                        <h4 className="fw-black mb-1">
+                                            {isSekpimBorrow
+                                                ? 'Barang Dipinjam'
+                                                : 'Barang yang Diminta'}
+                                        </h4>
+
+                                        <p className="text-muted mb-0">
+                                            {isSekpimBorrow
+                                                ? 'Daftar barang yang diajukan untuk dipinjam.'
+                                                : 'Daftar barang yang diajukan pada Request Barang.'}
+                                        </p>
+                                    </div>
+
+                                    <span
+                                        className={`badge rounded-pill px-3 py-2 ${
+                                            isSekpimBorrow
+                                                ? 'bg-success-subtle text-success'
+                                                : 'bg-info-subtle text-info'
+                                        }`}
+                                    >
+                                        {
+                                            borrowItems.length
+                                        }{' '}
+                                        item
+                                    </span>
+                                </div>
 
                                 <div className="table-responsive">
                                     <table className="table align-middle">
                                         <thead className="table-light">
                                             <tr>
                                                 <th>
-                                                    Perlengkapan
+                                                    Barang
                                                 </th>
 
                                                 <th className="text-center">
@@ -2151,7 +2751,7 @@ export default function MyRequestDetailPage() {
                                                                         .product_name ||
                                                                     item
                                                                         .name ||
-                                                                    'Perlengkapan'}
+                                                                    'Barang'}
                                                             </div>
                                                         </td>
 
@@ -2171,6 +2771,8 @@ export default function MyRequestDetailPage() {
                         </section>
                     )}
 
+                    {/* DOCUMENT */}
+
                     <section className="card border-0 shadow-sm rounded-5">
                         <div className="card-body p-4">
                             <h4 className="fw-black mb-1">
@@ -2178,7 +2780,7 @@ export default function MyRequestDetailPage() {
                             </h4>
 
                             <p className="text-muted mb-4">
-                                Lampiran yang dikirim bersama pengajuan.
+                                Lampiran dan bukti yang tersedia pada pengajuan.
                             </p>
 
                             <div className="row g-3">
@@ -2224,7 +2826,11 @@ export default function MyRequestDetailPage() {
                                     'borrowing' && (
                                     <>
                                         <FileCard
-                                            label="Bukti Serah Terima"
+                                            label={
+                                                isSekpimBorrow
+                                                    ? 'Bukti Serah Terima'
+                                                    : 'Bukti Penyerahan Barang'
+                                            }
                                             fileName={
                                                 requestData
                                                     .handover_evidence_name
@@ -2232,28 +2838,40 @@ export default function MyRequestDetailPage() {
                                             fileUrl={
                                                 handoverEvidenceUrl
                                             }
-                                            icon="bi-box-arrow-up-right"
-                                            color="success"
+                                            icon={
+                                                isSekpimBorrow
+                                                    ? 'bi-box-arrow-up-right'
+                                                    : 'bi-box2-heart-fill'
+                                            }
+                                            color={
+                                                isSekpimBorrow
+                                                    ? 'success'
+                                                    : 'info'
+                                            }
                                         />
 
-                                        <FileCard
-                                            label="Bukti Pengembalian"
-                                            fileName={
-                                                requestData
-                                                    .return_evidence_name
-                                            }
-                                            fileUrl={
-                                                returnEvidenceUrl
-                                            }
-                                            icon="bi-box-arrow-in-down-left"
-                                            color="success"
-                                        />
+                                        {isSekpimBorrow && (
+                                            <FileCard
+                                                label="Bukti Pengembalian"
+                                                fileName={
+                                                    requestData
+                                                        .return_evidence_name
+                                                }
+                                                fileUrl={
+                                                    returnEvidenceUrl
+                                                }
+                                                icon="bi-box-arrow-in-down-left"
+                                                color="success"
+                                            />
+                                        )}
                                     </>
                                 )}
                             </div>
                         </div>
                     </section>
                 </div>
+
+                {/* RIGHT */}
 
                 <div className="col-xl-4">
                     <section className="card border-0 shadow-sm rounded-5 mb-4">
@@ -2270,8 +2888,11 @@ export default function MyRequestDetailPage() {
                                 <div
                                     className={`mx-auto mb-3 rounded-circle d-flex align-items-center justify-content-center ${statusConfig.badgeClass}`}
                                     style={{
-                                        width: 70,
-                                        height: 70,
+                                        width:
+                                            70,
+
+                                        height:
+                                            70,
                                     }}
                                 >
                                     <i
@@ -2309,6 +2930,59 @@ export default function MyRequestDetailPage() {
                                                 .pickup_date
                                         )}
                                     </div>
+                                </div>
+                            )}
+
+                            {type ===
+                                'borrowing' &&
+                                requestData
+                                    .borrow_date && (
+                                <div
+                                    className={`p-3 rounded-4 mb-4 ${
+                                        isSekpimBorrow
+                                            ? 'bg-success-subtle'
+                                            : 'bg-info-subtle'
+                                    }`}
+                                >
+                                    <div className="small text-muted mb-1">
+                                        Jadwal Pengambilan Barang
+                                    </div>
+
+                                    <div
+                                        className={`fw-black ${
+                                            isSekpimBorrow
+                                                ? 'text-success'
+                                                : 'text-info'
+                                        }`}
+                                    >
+                                        <i className="bi bi-calendar-check-fill me-2" />
+
+                                        {formatDate(
+                                            requestData
+                                                .borrow_date
+                                        )}
+                                    </div>
+
+                                    {isSekpimBorrow &&
+                                        requestData
+                                            .return_date && (
+                                            <>
+                                                <hr />
+
+                                                <div className="small text-muted mb-1">
+                                                    Jadwal Pengembalian
+                                                </div>
+
+                                                <div className="fw-black text-success">
+                                                    <i className="bi bi-calendar-minus-fill me-2" />
+
+                                                    {formatDate(
+                                                        requestData
+                                                            .return_date
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
                                 </div>
                             )}
 

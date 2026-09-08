@@ -19,409 +19,519 @@ import {
     showErrorAlert,
     showLoadingAlert,
     showSuccessAlert,
-    showTextareaAlert,
+    showWarningAlert,
 } from '../../utils/sweetAlert';
+
+const TYPE_BORROW =
+    'borrow';
+
+const TYPE_ASSET_REQUEST =
+    'asset_request';
 
 const STATUS_CONFIG = {
     pending: {
-        label: 'Menunggu',
+        label:
+            'Menunggu',
+
         badgeClass:
             'bg-warning-subtle text-warning-emphasis',
+
         icon:
             'bi-hourglass-split',
     },
 
     approved: {
-        label: 'Disetujui',
+        label:
+            'Disetujui',
+
         badgeClass:
             'bg-primary-subtle text-primary',
+
         icon:
             'bi-check-circle-fill',
     },
 
     rejected: {
-        label: 'Ditolak',
+        label:
+            'Ditolak',
+
         badgeClass:
             'bg-danger-subtle text-danger',
+
         icon:
             'bi-x-circle-fill',
     },
 
-    completed: {
-        label: 'Selesai',
+    borrowed: {
+        label:
+            'Sedang Dipinjam',
+
+        badgeClass:
+            'bg-info-subtle text-info-emphasis',
+
+        icon:
+            'bi-box-arrow-up-right',
+    },
+
+    returned: {
+        label:
+            'Dikembalikan',
+
         badgeClass:
             'bg-success-subtle text-success',
+
+        icon:
+            'bi-box-arrow-in-down-left',
+    },
+
+    completed: {
+        label:
+            'Selesai',
+
+        badgeClass:
+            'bg-success-subtle text-success',
+
         icon:
             'bi-check2-all',
     },
 };
 
-const COVERAGE_CONFIG = {
-    'SOCIAL MEDIA': {
-        label: 'Social Media',
-        icon: 'bi-instagram',
-    },
+/*
+|--------------------------------------------------------------------------
+| USER / PERMISSION
+|--------------------------------------------------------------------------
+*/
 
-    DOKUMENTASI: {
-        label: 'Dokumentasi',
-        icon: 'bi-camera-fill',
-    },
+const getCurrentUser =
+    () => {
+        try {
+            return JSON.parse(
+                localStorage.getItem(
+                    'admin_user'
+                ) ||
+                    '{}'
+            );
+        } catch {
+            return {};
+        }
+    };
 
-    'PUBLIKASI WEBSITE': {
-        label: 'Publikasi Website',
-        icon: 'bi-globe2',
-    },
-
-    'PUBLIKASI MEDIA MASSA': {
-        label: 'Publikasi Media Massa',
-        icon: 'bi-newspaper',
-    },
-
-    YOUTUBE: {
-        label: 'YouTube',
-        icon: 'bi-youtube',
-    },
-
-    'VIDEO REELS': {
-        label: 'Video Reels',
-        icon: 'bi-play-btn-fill',
-    },
-};
-
-const getCurrentUser = () => {
-    try {
-        return JSON.parse(
-            localStorage.getItem(
-                'admin_user'
-            ) || '{}'
-        );
-    } catch {
-        return {};
-    }
-};
-
-const normalizePermissions = (
-    permissions
-) => {
-    if (
-        !Array.isArray(
-            permissions
-        )
-    ) {
-        return [];
-    }
-
-    return [
-        ...new Set(
-            permissions.filter(
-                Boolean
+const normalizePermissions =
+    (
+        permissions
+    ) => {
+        if (
+            !Array.isArray(
+                permissions
             )
-        ),
-    ];
-};
+        ) {
+            return [];
+        }
 
-const hasPermission = (
-    currentUser,
-    permission
-) => {
-    if (
-        currentUser?.role ===
-        'superadmin'
-    ) {
-        return true;
-    }
+        return [
+            ...new Set(
+                permissions.filter(
+                    Boolean
+                )
+            ),
+        ];
+    };
 
-    return normalizePermissions(
-        currentUser?.permissions
-    ).includes(
+const hasPermission =
+    (
+        currentUser,
         permission
-    );
-};
+    ) => {
+        if (
+            currentUser
+                ?.role ===
+            'superadmin'
+        ) {
+            return true;
+        }
 
-const formatDate = (
-    dateValue
-) => {
-    if (
-        !dateValue
-    ) {
-        return '-';
-    }
-
-    if (
-        typeof dateValue ===
-            'string' &&
-        /^\d{4}-\d{2}-\d{2}$/.test(
-            dateValue
-        )
-    ) {
-        const [
-            year,
-            month,
-            day,
-        ] = dateValue
-            .split('-')
-            .map(Number);
-
-        return new Date(
-            year,
-            month - 1,
-            day
-        ).toLocaleDateString(
-            'id-ID',
-            {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric',
-            }
+        return normalizePermissions(
+            currentUser
+                ?.permissions
+        ).includes(
+            permission
         );
-    }
+    };
 
-    const parsedDate =
-        new Date(
-            dateValue
-        );
+/*
+|--------------------------------------------------------------------------
+| FORMAT
+|--------------------------------------------------------------------------
+*/
 
-    if (
-        Number.isNaN(
-            parsedDate.getTime()
-        )
-    ) {
-        return '-';
-    }
-
-    return parsedDate
-        .toLocaleDateString(
-            'id-ID',
-            {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric',
-            }
-        );
-};
-
-const formatDateTime = (
-    dateValue
-) => {
-    if (
-        !dateValue
-    ) {
-        return '-';
-    }
-
-    const parsedDate =
-        new Date(
-            dateValue
-        );
-
-    if (
-        Number.isNaN(
-            parsedDate.getTime()
-        )
-    ) {
-        return '-';
-    }
-
-    return parsedDate
-        .toLocaleString(
-            'id-ID',
-            {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-            }
-        );
-};
-
-const normalizeExternalUrl = (
-    value
-) => {
-    if (
-        !value
-    ) {
-        return null;
-    }
-
-    const normalizedValue =
-        String(
-            value
-        ).trim();
-
-    if (
-        !normalizedValue
-    ) {
-        return null;
-    }
-
-    if (
-        /^https?:\/\//i.test(
-            normalizedValue
-        )
-    ) {
-        return normalizedValue;
-    }
-
-    return `https://${normalizedValue}`;
-};
-
-const extractErrorMessage = (
-    error
-) => {
-    const responseData =
-        error?.response?.data;
-
-    if (
-        responseData?.errors
-    ) {
-        const firstError =
-            Object.values(
-                responseData.errors
-            )?.[0]?.[0];
+const formatDate =
+    (
+        date
+    ) => {
+        if (
+            !date
+        ) {
+            return '-';
+        }
 
         if (
-            firstError
+            typeof date ===
+                'string' &&
+            /^\d{4}-\d{2}-\d{2}$/.test(
+                date
+            )
         ) {
-            return firstError;
+            const [
+                year,
+                month,
+                day,
+            ] =
+                date
+                    .split('-')
+                    .map(
+                        Number
+                    );
+
+            return new Date(
+                year,
+                month - 1,
+                day
+            ).toLocaleDateString(
+                'id-ID',
+                {
+                    day:
+                        '2-digit',
+
+                    month:
+                        'long',
+
+                    year:
+                        'numeric',
+                }
+            );
         }
-    }
 
-    return (
-        responseData?.message ||
-        'Terjadi kesalahan ketika memproses request.'
-    );
-};
+        const parsedDate =
+            new Date(
+                date
+            );
 
-const getCoverageParts = (
-    coverageType
-) => {
-    if (
-        !coverageType
-    ) {
-        return [];
-    }
+        if (
+            Number.isNaN(
+                parsedDate.getTime()
+            )
+        ) {
+            return '-';
+        }
 
-    return String(
-        coverageType
-    )
-        .split(
-            /[;,]/
-        )
-        .map(
-            (item) =>
-                item.trim()
-        )
-        .filter(
-            Boolean
-        );
-};
+        return parsedDate
+            .toLocaleDateString(
+                'id-ID',
+                {
+                    day:
+                        '2-digit',
 
-const getCoverageLabel = (
-    coverageType
-) => {
-    const parts =
-        getCoverageParts(
-            coverageType
-        );
+                    month:
+                        'long',
 
-    if (
-        parts.length ===
-        0
-    ) {
-        return '-';
-    }
+                    year:
+                        'numeric',
+                }
+            );
+    };
 
-    return parts
-        .map(
-            (item) =>
-                COVERAGE_CONFIG[
-                    item
-                ]?.label ||
-                item
-        )
-        .join(
-            '; '
-        );
-};
+const formatDateTime =
+    (
+        date
+    ) => {
+        if (
+            !date
+        ) {
+            return '-';
+        }
 
-const getCoverageIcon = (
-    coverageType
-) => {
-    const firstCoverage =
-        getCoverageParts(
-            coverageType
-        )[0];
+        const parsedDate =
+            new Date(
+                date
+            );
 
-    return (
-        COVERAGE_CONFIG[
-            firstCoverage
-        ]?.icon ||
-        'bi-camera-reels-fill'
-    );
-};
+        if (
+            Number.isNaN(
+                parsedDate.getTime()
+            )
+        ) {
+            return '-';
+        }
 
-const formatFileSize = (
-    bytes
-) => {
-    if (
-        !Number.isFinite(
-            bytes
-        ) ||
-        bytes <= 0
-    ) {
-        return '-';
-    }
+        return parsedDate
+            .toLocaleString(
+                'id-ID',
+                {
+                    day:
+                        '2-digit',
 
-    const units = [
-        'B',
-        'KB',
-        'MB',
-        'GB',
-    ];
+                    month:
+                        'long',
 
-    const unitIndex =
-        Math.min(
-            Math.floor(
-                Math.log(
-                    bytes
-                ) /
+                    year:
+                        'numeric',
+
+                    hour:
+                        '2-digit',
+
+                    minute:
+                        '2-digit',
+
+                    hour12:
+                        false,
+                }
+            );
+    };
+
+const formatFileSize =
+    (
+        bytes
+    ) => {
+        if (
+            !Number.isFinite(
+                bytes
+            ) ||
+            bytes <=
+                0
+        ) {
+            return '-';
+        }
+
+        const units = [
+            'B',
+            'KB',
+            'MB',
+            'GB',
+        ];
+
+        const index =
+            Math.min(
+                Math.floor(
                     Math.log(
-                        1024
-                    )
-            ),
-            units.length -
-                1
+                        bytes
+                    ) /
+                        Math.log(
+                            1024
+                        )
+                ),
+
+                units.length -
+                    1
+            );
+
+        const size =
+            bytes /
+            1024 **
+                index;
+
+        return `${size.toFixed(
+            index ===
+            0
+                ? 0
+                : 2
+        )} ${
+            units[
+                index
+            ]
+        }`;
+    };
+
+/*
+|--------------------------------------------------------------------------
+| ERROR
+|--------------------------------------------------------------------------
+*/
+
+const getBackendErrorMessage =
+    (
+        error,
+        fallbackMessage
+    ) => {
+        const responseData =
+            error
+                ?.response
+                ?.data;
+
+        if (
+            responseData
+                ?.errors
+        ) {
+            const firstError =
+                Object.values(
+                    responseData
+                        .errors
+                )
+                    .flat()
+                    .find(
+                        Boolean
+                    );
+
+            if (
+                firstError
+            ) {
+                return firstError;
+            }
+        }
+
+        return (
+            responseData
+                ?.message ||
+            fallbackMessage
         );
+    };
 
-    const size =
-        bytes /
-        1024 **
-            unitIndex;
+/*
+|--------------------------------------------------------------------------
+| FILE VALIDATION
+|--------------------------------------------------------------------------
+*/
 
-    return `${size.toFixed(
-        unitIndex === 0
-            ? 0
-            : 2
-    )} ${units[unitIndex]}`;
-};
+const validateEvidenceFile =
+    (
+        file
+    ) => {
+        if (
+            !file
+        ) {
+            return {
+                valid:
+                    false,
 
-const DetailItem = ({
+                message:
+                    'File bukti belum dipilih.',
+            };
+        }
+
+        const allowedExtensions = [
+            'pdf',
+            'jpg',
+            'jpeg',
+            'png',
+        ];
+
+        const extension =
+            file
+                .name
+                .split('.')
+                .pop()
+                ?.toLowerCase();
+
+        if (
+            !extension ||
+            !allowedExtensions.includes(
+                extension
+            )
+        ) {
+            return {
+                valid:
+                    false,
+
+                message:
+                    'File harus berformat PDF, JPG, JPEG, atau PNG.',
+            };
+        }
+
+        const maxSize =
+            10 *
+            1024 *
+            1024;
+
+        if (
+            file
+                .size >
+            maxSize
+        ) {
+            return {
+                valid:
+                    false,
+
+                message:
+                    'Ukuran file maksimal 10 MB.',
+            };
+        }
+
+        return {
+            valid:
+                true,
+
+            message:
+                '',
+        };
+    };
+
+/*
+|--------------------------------------------------------------------------
+| REQUEST TYPE
+|--------------------------------------------------------------------------
+*/
+
+const getRequestType =
+    (
+        borrowRequest
+    ) => {
+        return (
+            borrowRequest
+                ?.request_type ||
+            TYPE_BORROW
+        );
+    };
+
+const getRequestTypeLabel =
+    (
+        requestType
+    ) => {
+        if (
+            requestType ===
+            TYPE_ASSET_REQUEST
+        ) {
+            return 'Request Barang';
+        }
+
+        return 'Peminjaman Barang';
+    };
+
+const getRequestTypeIcon =
+    (
+        requestType
+    ) => {
+        if (
+            requestType ===
+            TYPE_ASSET_REQUEST
+        ) {
+            return 'bi-box2-heart-fill';
+        }
+
+        return 'bi-box-arrow-up-right';
+    };
+
+/*
+|--------------------------------------------------------------------------
+| COMPONENTS
+|--------------------------------------------------------------------------
+*/
+
+const InfoBox = ({
     label,
     value,
     icon =
         'bi-info-circle',
-    children,
 }) => {
     return (
         <div className="p-3 rounded-4 bg-light h-100">
             <div className="d-flex align-items-start gap-3">
                 <div
-                    className="rounded-circle bg-white text-danger d-flex align-items-center justify-content-center flex-shrink-0"
+                    className="rounded-circle bg-white text-success d-flex align-items-center justify-content-center flex-shrink-0"
                     style={{
-                        width: 42,
-                        height: 42,
+                        width:
+                            42,
+
+                        height:
+                            42,
                     }}
                 >
                     <i
@@ -429,16 +539,17 @@ const DetailItem = ({
                     />
                 </div>
 
-                <div className="min-w-0 flex-grow-1">
+                <div className="min-w-0">
                     <div className="small text-muted mb-1">
-                        {label}
+                        {
+                            label
+                        }
                     </div>
 
-                    {children || (
-                        <div className="fw-bold text-break">
-                            {value || '-'}
-                        </div>
-                    )}
+                    <div className="fw-bold text-break">
+                        {value ||
+                            '-'}
+                    </div>
                 </div>
             </div>
         </div>
@@ -449,8 +560,10 @@ const TimelineItem = ({
     label,
     value,
     icon,
-    active = false,
-    rejected = false,
+    active =
+        false,
+    rejected =
+        false,
 }) => {
     let statusClass =
         'done';
@@ -481,21 +594,168 @@ const TimelineItem = ({
 
             <div className="request-timeline-content">
                 <div className="fw-black mb-1">
-                    {label}
+                    {
+                        label
+                    }
                 </div>
 
                 <div className="small text-muted">
-                    {value || '-'}
+                    {value ||
+                        '-'}
                 </div>
             </div>
         </div>
     );
 };
 
-export default function HumasServiceApprovalDetailPage() {
+const SelectedFileCard = ({
+    file,
+    label,
+    onRemove,
+    disabled =
+        false,
+}) => {
+    if (
+        !file
+    ) {
+        return null;
+    }
+
+    return (
+        <div className="mt-3 p-3 rounded-4 border bg-light">
+            <div className="d-flex align-items-start gap-3">
+                <div
+                    className="rounded-circle bg-white text-success d-flex align-items-center justify-content-center flex-shrink-0"
+                    style={{
+                        width:
+                            42,
+
+                        height:
+                            42,
+                    }}
+                >
+                    <i className="bi bi-paperclip" />
+                </div>
+
+                <div className="flex-grow-1 min-w-0">
+                    <div className="small text-muted">
+                        {
+                            label
+                        }
+                    </div>
+
+                    <div className="fw-black text-break">
+                        {
+                            file.name
+                        }
+                    </div>
+
+                    <div className="small text-muted mt-1">
+                        {formatFileSize(
+                            file.size
+                        )}
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    className="btn btn-sm btn-outline-danger rounded-circle flex-shrink-0"
+                    onClick={
+                        onRemove
+                    }
+                    disabled={
+                        disabled
+                    }
+                    title="Hapus file"
+                >
+                    <i className="bi bi-x-lg" />
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const EvidenceCard = ({
+    title,
+    description,
+    fileName,
+    mime,
+    url,
+    icon,
+}) => {
+    if (
+        !url
+    ) {
+        return null;
+    }
+
+    return (
+        <div className="border rounded-4 p-4 bg-light">
+            <div className="d-flex align-items-center gap-3 flex-wrap">
+                <div
+                    className="rounded-4 bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0"
+                    style={{
+                        width:
+                            54,
+
+                        height:
+                            54,
+                    }}
+                >
+                    <i
+                        className={`bi ${icon} fs-4`}
+                    />
+                </div>
+
+                <div className="flex-grow-1 min-w-0">
+                    <div className="small text-muted mb-1">
+                        {
+                            title
+                        }
+                    </div>
+
+                    <div className="fw-black text-break">
+                        {fileName ||
+                            description}
+                    </div>
+
+                    {mime && (
+                        <div className="small text-muted mt-1">
+                            {
+                                mime
+                            }
+                        </div>
+                    )}
+                </div>
+
+                <a
+                    href={
+                        url
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-outline-success rounded-pill"
+                >
+                    <i className="bi bi-eye-fill me-2" />
+
+                    Buka Bukti
+                </a>
+            </div>
+        </div>
+    );
+};
+
+/*
+|--------------------------------------------------------------------------
+| PAGE
+|--------------------------------------------------------------------------
+*/
+
+export default function BorrowingApprovalDetailPage() {
     const {
         id,
-    } = useParams();
+    } =
+        useParams();
 
     const navigate =
         useNavigate();
@@ -510,59 +770,64 @@ export default function HumasServiceApprovalDetailPage() {
     const canProcess =
         hasPermission(
             currentUser,
-            'approval.humas.process'
+            'approval.borrowing.process'
         );
 
     const [
-        requestData,
-        setRequestData,
-    ] = useState(
-        null
-    );
+        borrowRequest,
+        setBorrowRequest,
+    ] =
+        useState(
+            null
+        );
+
+    const [
+        adminNote,
+        setAdminNote,
+    ] =
+        useState(
+            ''
+        );
+
+    const [
+        handoverEvidence,
+        setHandoverEvidence,
+    ] =
+        useState(
+            null
+        );
+
+    const [
+        returnEvidence,
+        setReturnEvidence,
+    ] =
+        useState(
+            null
+        );
 
     const [
         loading,
         setLoading,
-    ] = useState(
-        true
-    );
+    ] =
+        useState(
+            true
+        );
 
     const [
         processing,
         setProcessing,
-    ] = useState(
-        false
-    );
+    ] =
+        useState(
+            false
+        );
 
-    const [
-        errorMessage,
-        setErrorMessage,
-    ] = useState(
-        ''
-    );
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD DETAIL
+    |--------------------------------------------------------------------------
+    */
 
-    const [
-        resultLink,
-        setResultLink,
-    ] = useState(
-        ''
-    );
-
-    const [
-        resultNote,
-        setResultNote,
-    ] = useState(
-        ''
-    );
-
-    const [
-        resultFile,
-        setResultFile,
-    ] = useState(
-        null
-    );
-
-    const loadDetail =
+    const fetchBorrowRequest =
         useCallback(
             async () => {
                 try {
@@ -570,49 +835,59 @@ export default function HumasServiceApprovalDetailPage() {
                         true
                     );
 
-                    setErrorMessage(
-                        ''
-                    );
-
                     const response =
                         await api.get(
-                            `/humas-service-requests/${id}`
+                            `/borrow-requests/${id}`
                         );
 
-                    const data =
+                    const responseData =
                         response
                             ?.data
                             ?.data ||
                         null;
 
-                    setRequestData(
-                        data
+                    setBorrowRequest(
+                        responseData
                     );
 
-                    setResultLink(
-                        data?.result_link ||
+                    setAdminNote(
+                        responseData
+                            ?.admin_note ||
                             ''
                     );
 
-                    setResultNote(
-                        data?.result_note ||
-                            ''
+                    setHandoverEvidence(
+                        null
+                    );
+
+                    setReturnEvidence(
+                        null
                     );
                 } catch (
                     error
                 ) {
                     console.error(
-                        'Fetch Humas detail error:',
+                        'Fetch SEKPiM detail error:',
                         error
                             ?.response
                             ?.data ||
                             error
                     );
 
-                    setErrorMessage(
-                        extractErrorMessage(
-                            error
+                    await showErrorAlert(
+                        'Gagal Memuat Detail',
+                        getBackendErrorMessage(
+                            error,
+                            'Detail pengajuan SEKPiM gagal dimuat.'
                         )
+                    );
+
+                    navigate(
+                        '/admin/borrow-requests',
+                        {
+                            replace:
+                                true,
+                        }
                     );
                 } finally {
                     setLoading(
@@ -622,141 +897,48 @@ export default function HumasServiceApprovalDetailPage() {
             },
             [
                 id,
+                navigate,
             ]
         );
 
     useEffect(
         () => {
-            loadDetail();
+            fetchBorrowRequest();
         },
         [
-            loadDetail,
+            fetchBorrowRequest,
         ]
     );
 
-    const statusConfig =
-        useMemo(
-            () => {
-                return (
-                    STATUS_CONFIG[
-                        requestData
-                            ?.status
-                    ] || {
-                        label:
-                            requestData
-                                ?.status ||
-                            'Tidak diketahui',
+    /*
+    |--------------------------------------------------------------------------
+    | REQUEST TYPE
+    |--------------------------------------------------------------------------
+    */
 
-                        badgeClass:
-                            'bg-secondary-subtle text-secondary',
-
-                        icon:
-                            'bi-info-circle-fill',
-                    }
-                );
-            },
-            [
-                requestData
-                    ?.status,
-            ]
+    const requestType =
+        getRequestType(
+            borrowRequest
         );
 
-    const coverageLabel =
-        useMemo(
-            () =>
-                getCoverageLabel(
-                    requestData
-                        ?.coverage_type
-                ),
-            [
-                requestData
-                    ?.coverage_type,
-            ]
+    const isBorrow =
+        requestType ===
+        TYPE_BORROW;
+
+    const isAssetRequest =
+        requestType ===
+        TYPE_ASSET_REQUEST;
+
+    const requestTypeLabel =
+        getRequestTypeLabel(
+            requestType
         );
 
-    const coverageIcon =
-        useMemo(
-            () =>
-                getCoverageIcon(
-                    requestData
-                        ?.coverage_type
-                ),
-            [
-                requestData
-                    ?.coverage_type,
-            ]
-        );
-
-    const resolvedUnitName =
-        useMemo(
-            () => {
-                if (
-                    !requestData
-                ) {
-                    return '-';
-                }
-
-                if (
-                    requestData
-                        .resolved_unit_name
-                ) {
-                    return requestData
-                        .resolved_unit_name;
-                }
-
-                if (
-                    requestData
-                        .unit_name ===
-                    'Lainnya'
-                ) {
-                    return (
-                        requestData
-                            .other_unit_name ||
-                        'Lainnya'
-                    );
-                }
-
-                return (
-                    requestData
-                        .unit_name ||
-                    requestData
-                        .requester_unit ||
-                    requestData
-                        .user
-                        ?.unit_name ||
-                    '-'
-                );
-            },
-            [
-                requestData,
-            ]
-        );
-
-    const referenceUrl =
-        useMemo(
-            () =>
-                normalizeExternalUrl(
-                    requestData
-                        ?.reference_link
-                ),
-            [
-                requestData
-                    ?.reference_link,
-            ]
-        );
-
-    const resultUrl =
-        useMemo(
-            () =>
-                normalizeExternalUrl(
-                    requestData
-                        ?.result_link
-                ),
-            [
-                requestData
-                    ?.result_link,
-            ]
-        );
+    /*
+    |--------------------------------------------------------------------------
+    | ACCESS
+    |--------------------------------------------------------------------------
+    */
 
     const ensureProcessAccess =
         async () => {
@@ -768,117 +950,62 @@ export default function HumasServiceApprovalDetailPage() {
 
             await showErrorAlert(
                 'Akses Ditolak',
-                'Akun hanya memiliki izin melihat approval dan tidak dapat memproses request liputan.'
+                'Akun hanya memiliki izin melihat approval dan tidak dapat memproses pengajuan SEKPiM.'
             );
 
             return false;
         };
 
-    const processAction =
+    const validateStatus =
         async (
-            action,
-            payload,
-            successTitle
+            expectedStatus,
+            message
         ) => {
             if (
-                !(await ensureProcessAccess())
+                borrowRequest
+                    ?.status ===
+                expectedStatus
             ) {
-                return;
+                return true;
             }
 
-            try {
-                setProcessing(
-                    true
-                );
+            await showWarningAlert(
+                'Status Tidak Sesuai',
+                message
+            );
 
-                showLoadingAlert(
-                    'Memproses Request',
-                    'Mohon tunggu sebentar.'
-                );
-
-                const response =
-                    await api.put(
-                        `/humas-service-requests/${id}/${action}`,
-                        payload
-                    );
-
-                closeAlert();
-
-                await showSuccessAlert(
-                    successTitle,
-                    response
-                        ?.data
-                        ?.message ||
-                        'Request berhasil diproses.'
-                );
-
-                if (
-                    response
-                        ?.data
-                        ?.data
-                ) {
-                    setRequestData(
-                        response
-                            .data
-                            .data
-                    );
-                } else {
-                    await loadDetail();
-                }
-            } catch (
-                error
-            ) {
-                console.error(
-                    `Process Humas ${action} error:`,
-                    error
-                        ?.response
-                        ?.data ||
-                        error
-                );
-
-                closeAlert();
-
-                await showErrorAlert(
-                    'Proses Gagal',
-                    extractErrorMessage(
-                        error
-                    )
-                );
-            } finally {
-                setProcessing(
-                    false
-                );
-            }
+            return false;
         };
+
+    /*
+    |--------------------------------------------------------------------------
+    | APPROVE
+    |--------------------------------------------------------------------------
+    */
 
     const handleApprove =
         async () => {
             if (
-                !(await ensureProcessAccess())
+                !(await ensureProcessAccess()) ||
+                !(await validateStatus(
+                    'pending',
+                    'Hanya pengajuan berstatus menunggu yang dapat disetujui.'
+                ))
             ) {
-                return;
-            }
-
-            if (
-                requestData
-                    ?.status !==
-                'pending'
-            ) {
-                await showErrorAlert(
-                    'Status Tidak Sesuai',
-                    'Hanya request berstatus menunggu yang dapat disetujui.'
-                );
-
                 return;
             }
 
             const confirmation =
                 await showConfirmAlert({
                     title:
-                        'Setujui Request Liputan?',
+                        isBorrow
+                            ? 'Setujui Peminjaman Barang?'
+                            : 'Setujui Request Barang?',
 
                     text:
-                        'Request akan diteruskan kepada tim Humas untuk diproses.',
+                        isBorrow
+                            ? `Pengajuan ${borrowRequest.borrow_code} akan disetujui. Stok belum dikurangi sampai barang benar-benar diserahkan kepada pemohon.`
+                            : `Request ${borrowRequest.borrow_code} akan disetujui. Stok belum dikurangi sampai barang benar-benar diserahkan kepada pemohon.`,
 
                     confirmButtonText:
                         'Ya, setujui',
@@ -900,85 +1027,192 @@ export default function HumasServiceApprovalDetailPage() {
                 return;
             }
 
-            await processAction(
-                'approve',
-                {},
-                'Request Disetujui'
-            );
+            try {
+                setProcessing(
+                    true
+                );
+
+                showLoadingAlert(
+                    'Memproses Approval',
+                    'Mohon tunggu sebentar.'
+                );
+
+                const response =
+                    await api.put(
+                        `/borrow-requests/${borrowRequest.id}/approve`
+                    );
+
+                closeAlert();
+
+                await showSuccessAlert(
+                    'Approval Berhasil',
+                    response
+                        ?.data
+                        ?.message ||
+                        (
+                            isBorrow
+                                ? 'Peminjaman Barang berhasil disetujui.'
+                                : 'Request Barang berhasil disetujui.'
+                        )
+                );
+
+                await fetchBorrowRequest();
+            } catch (
+                error
+            ) {
+                console.error(
+                    'Approve SEKPiM error:',
+                    error
+                        ?.response
+                        ?.data ||
+                        error
+                );
+
+                closeAlert();
+
+                await showErrorAlert(
+                    'Approval Gagal',
+                    getBackendErrorMessage(
+                        error,
+                        'Pengajuan SEKPiM gagal disetujui.'
+                    )
+                );
+            } finally {
+                setProcessing(
+                    false
+                );
+            }
         };
+
+    /*
+    |--------------------------------------------------------------------------
+    | REJECT
+    |--------------------------------------------------------------------------
+    */
 
     const handleReject =
         async () => {
             if (
-                !(await ensureProcessAccess())
+                !(await ensureProcessAccess()) ||
+                !(await validateStatus(
+                    'pending',
+                    'Hanya pengajuan berstatus menunggu yang dapat ditolak.'
+                ))
             ) {
                 return;
             }
 
+            const normalizedNote =
+                adminNote
+                    .trim();
+
             if (
-                requestData
-                    ?.status !==
-                'pending'
+                normalizedNote
+                    .length <
+                5
             ) {
-                await showErrorAlert(
-                    'Status Tidak Sesuai',
-                    'Hanya request berstatus menunggu yang dapat ditolak.'
+                await showWarningAlert(
+                    'Alasan Belum Lengkap',
+                    'Alasan penolakan minimal lima karakter.'
                 );
 
                 return;
             }
 
-            const result =
-                await showTextareaAlert({
+            const confirmation =
+                await showConfirmAlert({
                     title:
-                        'Tolak Request Liputan?',
+                        isBorrow
+                            ? 'Tolak Peminjaman Barang?'
+                            : 'Tolak Request Barang?',
 
                     text:
-                        'Masukkan alasan penolakan untuk ditampilkan kepada pemohon.',
-
-                    inputLabel:
-                        'Alasan Penolakan',
-
-                    inputPlaceholder:
-                        'Tuliskan alasan penolakan...',
+                        `Pengajuan ${borrowRequest.borrow_code} akan ditolak.`,
 
                     confirmButtonText:
-                        'Ya, tolak request',
+                        'Ya, tolak',
 
                     cancelButtonText:
                         'Batal',
 
+                    icon:
+                        'warning',
+
                     confirmButtonColor:
                         '#dc2626',
-
-                    minimumLength:
-                        5,
-
-                    maximumLength:
-                        2000,
                 });
 
             if (
-                !result
-                    .isConfirmed ||
-                !result.value
+                !confirmation
+                    .isConfirmed
             ) {
                 return;
             }
 
-            await processAction(
-                'reject',
-                {
-                    admin_note:
-                        result
-                            .value
-                            .trim(),
-                },
-                'Request Ditolak'
-            );
+            try {
+                setProcessing(
+                    true
+                );
+
+                showLoadingAlert(
+                    'Menolak Pengajuan',
+                    'Mohon tunggu sebentar.'
+                );
+
+                const response =
+                    await api.put(
+                        `/borrow-requests/${borrowRequest.id}/reject`,
+                        {
+                            admin_note:
+                                normalizedNote,
+                        }
+                    );
+
+                closeAlert();
+
+                await showSuccessAlert(
+                    'Pengajuan Ditolak',
+                    response
+                        ?.data
+                        ?.message ||
+                        'Pengajuan berhasil ditolak.'
+                );
+
+                await fetchBorrowRequest();
+            } catch (
+                error
+            ) {
+                console.error(
+                    'Reject SEKPiM error:',
+                    error
+                        ?.response
+                        ?.data ||
+                        error
+                );
+
+                closeAlert();
+
+                await showErrorAlert(
+                    'Penolakan Gagal',
+                    getBackendErrorMessage(
+                        error,
+                        'Pengajuan SEKPiM gagal ditolak.'
+                    )
+                );
+            } finally {
+                setProcessing(
+                    false
+                );
+            }
         };
 
-    const handleResultFileChange =
+    /*
+    |--------------------------------------------------------------------------
+    | FILE
+    |--------------------------------------------------------------------------
+    */
+
+    const handleHandoverEvidenceChange =
         async (
             event
         ) => {
@@ -991,111 +1225,150 @@ export default function HumasServiceApprovalDetailPage() {
             if (
                 !file
             ) {
-                setResultFile(
+                setHandoverEvidence(
                     null
                 );
 
                 return;
             }
 
-            const allowedExtensions = [
-                'pdf',
-                'doc',
-                'docx',
-                'jpg',
-                'jpeg',
-                'png',
-                'zip',
-            ];
-
-            const extension =
-                file.name
-                    .split('.')
-                    .pop()
-                    ?.toLowerCase();
+            const validation =
+                validateEvidenceFile(
+                    file
+                );
 
             if (
-                !extension ||
-                !allowedExtensions.includes(
-                    extension
-                )
+                !validation
+                    .valid
             ) {
-                event.target.value =
+                event
+                    .target
+                    .value =
                     '';
 
-                setResultFile(
+                setHandoverEvidence(
                     null
                 );
 
                 await showErrorAlert(
-                    'Format File Tidak Didukung',
-                    'File hasil harus berformat PDF, DOC, DOCX, JPG, JPEG, PNG, atau ZIP.'
+                    'File Tidak Valid',
+                    validation
+                        .message
                 );
 
                 return;
             }
 
-            const maxFileSize =
-                20 *
-                1024 *
-                1024;
-
-            if (
-                file.size >
-                maxFileSize
-            ) {
-                event.target.value =
-                    '';
-
-                setResultFile(
-                    null
-                );
-
-                await showErrorAlert(
-                    'File Terlalu Besar',
-                    'Ukuran file hasil maksimal 20 MB.'
-                );
-
-                return;
-            }
-
-            setResultFile(
+            setHandoverEvidence(
                 file
             );
         };
 
-    const handleComplete =
-        async () => {
-            if (
-                !(await ensureProcessAccess())
-            ) {
-                return;
-            }
+    const handleReturnEvidenceChange =
+        async (
+            event
+        ) => {
+            const file =
+                event
+                    .target
+                    .files?.[0] ||
+                null;
 
             if (
-                requestData
-                    ?.status !==
-                'approved'
+                !file
             ) {
-                await showErrorAlert(
-                    'Status Tidak Sesuai',
-                    'Request hanya dapat diselesaikan setelah disetujui.'
+                setReturnEvidence(
+                    null
                 );
 
                 return;
             }
 
-            const normalizedLink =
-                resultLink
-                    .trim();
+            const validation =
+                validateEvidenceFile(
+                    file
+                );
 
             if (
-                !normalizedLink &&
-                !resultFile
+                !validation
+                    .valid
+            ) {
+                event
+                    .target
+                    .value =
+                    '';
+
+                setReturnEvidence(
+                    null
+                );
+
+                await showErrorAlert(
+                    'File Tidak Valid',
+                    validation
+                        .message
+                );
+
+                return;
+            }
+
+            setReturnEvidence(
+                file
+            );
+        };
+
+    /*
+    |--------------------------------------------------------------------------
+    | BORROWED
+    |--------------------------------------------------------------------------
+    */
+
+    const handleBorrowed =
+        async () => {
+            if (
+                !isBorrow
+            ) {
+                await showWarningAlert(
+                    'Jenis Pengajuan Tidak Sesuai',
+                    'Proses Dipinjam hanya tersedia untuk Peminjaman Barang.'
+                );
+
+                return;
+            }
+
+            if (
+                !(await ensureProcessAccess()) ||
+                !(await validateStatus(
+                    'approved',
+                    'Barang hanya dapat ditandai dipinjam setelah pengajuan disetujui.'
+                ))
+            ) {
+                return;
+            }
+
+            if (
+                !handoverEvidence
+            ) {
+                await showWarningAlert(
+                    'Bukti Serah Terima Wajib',
+                    'Upload bukti serah terima barang terlebih dahulu.'
+                );
+
+                return;
+            }
+
+            const validation =
+                validateEvidenceFile(
+                    handoverEvidence
+                );
+
+            if (
+                !validation
+                    .valid
             ) {
                 await showErrorAlert(
-                    'Hasil Belum Lengkap',
-                    'Masukkan link hasil atau unggah file hasil pekerjaan.'
+                    'File Tidak Valid',
+                    validation
+                        .message
                 );
 
                 return;
@@ -1104,13 +1377,327 @@ export default function HumasServiceApprovalDetailPage() {
             const confirmation =
                 await showConfirmAlert({
                     title:
-                        'Selesaikan Request Liputan?',
+                        'Serahkan Barang?',
 
                     text:
-                        'Hasil pekerjaan akan disimpan dan request ditandai selesai.',
+                        `Barang pada ${borrowRequest.borrow_code} akan ditandai telah diserahkan dan sedang dipinjam. Stok akan dikurangi sesuai jumlah barang.`,
 
                     confirmButtonText:
-                        'Ya, selesaikan',
+                        'Ya, serahkan barang',
+
+                    cancelButtonText:
+                        'Batal',
+
+                    icon:
+                        'question',
+
+                    confirmButtonColor:
+                        '#0f766e',
+                });
+
+            if (
+                !confirmation
+                    .isConfirmed
+            ) {
+                return;
+            }
+
+            const formData =
+                new FormData();
+
+            formData.append(
+                '_method',
+                'PUT'
+            );
+
+            formData.append(
+                'handover_evidence',
+                handoverEvidence
+            );
+
+            try {
+                setProcessing(
+                    true
+                );
+
+                showLoadingAlert(
+                    'Menyimpan Serah Terima',
+                    'Bukti sedang diunggah dan stok barang sedang diproses.'
+                );
+
+                const response =
+                    await api.post(
+                        `/borrow-requests/${borrowRequest.id}/borrowed`,
+                        formData
+                    );
+
+                closeAlert();
+
+                await showSuccessAlert(
+                    'Barang Dipinjam',
+                    response
+                        ?.data
+                        ?.message ||
+                        'Barang berhasil diserahkan kepada pemohon.'
+                );
+
+                setHandoverEvidence(
+                    null
+                );
+
+                await fetchBorrowRequest();
+            } catch (
+                error
+            ) {
+                console.error(
+                    'Borrowed action error:',
+                    error
+                        ?.response
+                        ?.data ||
+                        error
+                );
+
+                closeAlert();
+
+                await showErrorAlert(
+                    'Proses Gagal',
+                    getBackendErrorMessage(
+                        error,
+                        'Barang gagal ditandai sedang dipinjam.'
+                    )
+                );
+            } finally {
+                setProcessing(
+                    false
+                );
+            }
+        };
+
+    /*
+    |--------------------------------------------------------------------------
+    | RETURNED
+    |--------------------------------------------------------------------------
+    */
+
+    const handleReturned =
+        async () => {
+            if (
+                !isBorrow
+            ) {
+                await showWarningAlert(
+                    'Jenis Pengajuan Tidak Sesuai',
+                    'Request Barang tidak memiliki proses pengembalian.'
+                );
+
+                return;
+            }
+
+            if (
+                !(await ensureProcessAccess()) ||
+                !(await validateStatus(
+                    'borrowed',
+                    'Barang hanya dapat dikembalikan ketika berstatus sedang dipinjam.'
+                ))
+            ) {
+                return;
+            }
+
+            if (
+                !returnEvidence
+            ) {
+                await showWarningAlert(
+                    'Bukti Pengembalian Wajib',
+                    'Upload bukti pengembalian barang terlebih dahulu.'
+                );
+
+                return;
+            }
+
+            const validation =
+                validateEvidenceFile(
+                    returnEvidence
+                );
+
+            if (
+                !validation
+                    .valid
+            ) {
+                await showErrorAlert(
+                    'File Tidak Valid',
+                    validation
+                        .message
+                );
+
+                return;
+            }
+
+            const confirmation =
+                await showConfirmAlert({
+                    title:
+                        'Terima Pengembalian?',
+
+                    text:
+                        `Barang pada ${borrowRequest.borrow_code} akan ditandai telah dikembalikan. Stok akan ditambahkan kembali.`,
+
+                    confirmButtonText:
+                        'Ya, terima pengembalian',
+
+                    cancelButtonText:
+                        'Batal',
+
+                    icon:
+                        'question',
+
+                    confirmButtonColor:
+                        '#0f766e',
+                });
+
+            if (
+                !confirmation
+                    .isConfirmed
+            ) {
+                return;
+            }
+
+            const formData =
+                new FormData();
+
+            formData.append(
+                '_method',
+                'PUT'
+            );
+
+            formData.append(
+                'return_evidence',
+                returnEvidence
+            );
+
+            try {
+                setProcessing(
+                    true
+                );
+
+                showLoadingAlert(
+                    'Memproses Pengembalian',
+                    'Bukti sedang diunggah dan stok barang sedang dikembalikan.'
+                );
+
+                const response =
+                    await api.post(
+                        `/borrow-requests/${borrowRequest.id}/returned`,
+                        formData
+                    );
+
+                closeAlert();
+
+                await showSuccessAlert(
+                    'Barang Dikembalikan',
+                    response
+                        ?.data
+                        ?.message ||
+                        'Barang berhasil dikembalikan.'
+                );
+
+                setReturnEvidence(
+                    null
+                );
+
+                await fetchBorrowRequest();
+            } catch (
+                error
+            ) {
+                console.error(
+                    'Returned action error:',
+                    error
+                        ?.response
+                        ?.data ||
+                        error
+                );
+
+                closeAlert();
+
+                await showErrorAlert(
+                    'Proses Gagal',
+                    getBackendErrorMessage(
+                        error,
+                        'Barang gagal ditandai sudah dikembalikan.'
+                    )
+                );
+            } finally {
+                setProcessing(
+                    false
+                );
+            }
+        };
+
+    /*
+    |--------------------------------------------------------------------------
+    | COMPLETE ASSET REQUEST
+    |--------------------------------------------------------------------------
+    */
+
+    const handleCompleteAssetRequest =
+        async () => {
+            if (
+                !isAssetRequest
+            ) {
+                await showWarningAlert(
+                    'Jenis Pengajuan Tidak Sesuai',
+                    'Proses ini hanya tersedia untuk Request Barang.'
+                );
+
+                return;
+            }
+
+            if (
+                !(await ensureProcessAccess()) ||
+                !(await validateStatus(
+                    'approved',
+                    'Request Barang hanya dapat diselesaikan setelah disetujui.'
+                ))
+            ) {
+                return;
+            }
+
+            if (
+                !handoverEvidence
+            ) {
+                await showWarningAlert(
+                    'Bukti Penyerahan Wajib',
+                    'Upload bukti penyerahan barang terlebih dahulu.'
+                );
+
+                return;
+            }
+
+            const validation =
+                validateEvidenceFile(
+                    handoverEvidence
+                );
+
+            if (
+                !validation
+                    .valid
+            ) {
+                await showErrorAlert(
+                    'File Tidak Valid',
+                    validation
+                        .message
+                );
+
+                return;
+            }
+
+            const confirmation =
+                await showConfirmAlert({
+                    title:
+                        'Selesaikan Request Barang?',
+
+                    text:
+                        `Barang pada ${borrowRequest.borrow_code} akan ditandai sudah diserahkan kepada pemohon. Stok akan dikurangi permanen dan pengajuan menjadi selesai.`,
+
+                    confirmButtonText:
+                        'Ya, serahkan & selesaikan',
 
                     cancelButtonText:
                         'Batal',
@@ -1137,36 +1724,10 @@ export default function HumasServiceApprovalDetailPage() {
                 'PUT'
             );
 
-            if (
-                normalizedLink
-            ) {
-                formData.append(
-                    'result_link',
-                    normalizeExternalUrl(
-                        normalizedLink
-                    )
-                );
-            }
-
-            if (
-                resultNote
-                    .trim()
-            ) {
-                formData.append(
-                    'result_note',
-                    resultNote
-                        .trim()
-                );
-            }
-
-            if (
-                resultFile
-            ) {
-                formData.append(
-                    'result_file',
-                    resultFile
-                );
-            }
+            formData.append(
+                'handover_evidence',
+                handoverEvidence
+            );
 
             try {
                 setProcessing(
@@ -1174,56 +1735,36 @@ export default function HumasServiceApprovalDetailPage() {
                 );
 
                 showLoadingAlert(
-                    'Menyimpan Hasil',
-                    'Hasil pekerjaan sedang disimpan.'
+                    'Menyelesaikan Request',
+                    'Bukti penyerahan sedang diunggah dan stok sedang diperbarui.'
                 );
 
                 const response =
                     await api.post(
-                        `/humas-service-requests/${id}/complete`,
+                        `/borrow-requests/${borrowRequest.id}/complete`,
                         formData
                     );
 
                 closeAlert();
 
                 await showSuccessAlert(
-                    'Request Selesai',
+                    'Request Barang Selesai',
                     response
                         ?.data
                         ?.message ||
-                        'Request berhasil diselesaikan.'
+                        'Barang berhasil diserahkan dan request telah selesai.'
                 );
 
-                setResultLink(
-                    ''
-                );
-
-                setResultNote(
-                    ''
-                );
-
-                setResultFile(
+                setHandoverEvidence(
                     null
                 );
 
-                if (
-                    response
-                        ?.data
-                        ?.data
-                ) {
-                    setRequestData(
-                        response
-                            .data
-                            .data
-                    );
-                } else {
-                    await loadDetail();
-                }
+                await fetchBorrowRequest();
             } catch (
                 error
             ) {
                 console.error(
-                    'Complete Humas error:',
+                    'Complete asset request error:',
                     error
                         ?.response
                         ?.data ||
@@ -1233,9 +1774,10 @@ export default function HumasServiceApprovalDetailPage() {
                 closeAlert();
 
                 await showErrorAlert(
-                    'Penyelesaian Gagal',
-                    extractErrorMessage(
-                        error
+                    'Proses Gagal',
+                    getBackendErrorMessage(
+                        error,
+                        'Request Barang gagal diselesaikan.'
                     )
                 );
             } finally {
@@ -1245,16 +1787,22 @@ export default function HumasServiceApprovalDetailPage() {
             }
         };
 
+    /*
+    |--------------------------------------------------------------------------
+    | LOADING
+    |--------------------------------------------------------------------------
+    */
+
     if (
         loading
     ) {
         return (
             <div className="card border-0 shadow-sm rounded-5">
                 <div className="card-body p-5 text-center">
-                    <div className="spinner-border text-danger mb-3" />
+                    <div className="spinner-border text-success mb-3" />
 
                     <h5 className="fw-bold mb-1">
-                        Memuat detail request
+                        Memuat detail pengajuan
                     </h5>
 
                     <p className="text-muted mb-0">
@@ -1265,9 +1813,14 @@ export default function HumasServiceApprovalDetailPage() {
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | NOT FOUND
+    |--------------------------------------------------------------------------
+    */
+
     if (
-        errorMessage ||
-        !requestData
+        !borrowRequest
     ) {
         return (
             <div className="card border-0 shadow-sm rounded-5">
@@ -1286,70 +1839,125 @@ export default function HumasServiceApprovalDetailPage() {
                     </div>
 
                     <h4 className="fw-black mb-2">
-                        Detail gagal dimuat
+                        Data tidak ditemukan
                     </h4>
 
                     <p className="text-muted mb-4">
-                        {errorMessage ||
-                            'Data request tidak ditemukan.'}
+                        Detail pengajuan SEKPiM tidak tersedia.
                     </p>
 
-                    <div className="d-flex flex-wrap justify-content-center gap-2">
-                        <button
-                            type="button"
-                            className="btn btn-outline-danger rounded-pill"
-                            onClick={
-                                loadDetail
-                            }
-                        >
-                            <i className="bi bi-arrow-clockwise me-2" />
+                    <Link
+                        to="/admin/borrow-requests"
+                        className="btn btn-success rounded-pill px-4"
+                    >
+                        <i className="bi bi-arrow-left me-2" />
 
-                            Coba Lagi
-                        </button>
-
-                        <button
-                            type="button"
-                            className="btn btn-danger rounded-pill"
-                            onClick={() =>
-                                navigate(
-                                    '/admin/humas-services'
-                                )
-                            }
-                        >
-                            <i className="bi bi-arrow-left me-2" />
-
-                            Kembali ke Approval Humas
-                        </button>
-                    </div>
+                        Kembali ke Approval SEKPiM
+                    </Link>
                 </div>
             </div>
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | DERIVED DATA
+    |--------------------------------------------------------------------------
+    */
+
+    const statusConfig =
+        STATUS_CONFIG[
+            borrowRequest
+                .status
+        ] || {
+            label:
+                borrowRequest
+                    .status ||
+                'Tidak diketahui',
+
+            badgeClass:
+                'bg-secondary-subtle text-secondary',
+
+            icon:
+                'bi-info-circle-fill',
+        };
+
+    const requestItems =
+        Array.isArray(
+            borrowRequest
+                .items
+        )
+            ? borrowRequest
+                  .items
+            : [];
+
+    const requestTitle =
+        borrowRequest
+            .purpose ||
+        (
+            isBorrow
+                ? 'Peminjaman Barang'
+                : 'Request Barang'
+        );
+
+    const handoverEvidenceUrl =
+        borrowRequest
+            .handover_evidence_url;
+
+    const returnEvidenceUrl =
+        borrowRequest
+            .return_evidence_url;
+
+    /*
+    |--------------------------------------------------------------------------
+    | VIEW
+    |--------------------------------------------------------------------------
+    */
+
     return (
         <div className="container-fluid px-0">
+            {/* HEADER */}
+
             <header className="approval-detail-header mb-4">
                 <div className="approval-detail-heading">
                     <Link
-                        to="/admin/humas-services"
+                        to="/admin/borrow-requests"
                         className="approval-detail-back-link"
                     >
                         <i className="bi bi-arrow-left" />
 
                         <span>
-                            Kembali ke Approval Liputan Humas
+                            Kembali ke Approval SEKPiM
                         </span>
                     </Link>
 
                     <h2 className="approval-detail-title">
-                        Detail Request Liputan
+                        Detail {requestTypeLabel}
                     </h2>
 
                     <div className="approval-detail-meta">
                         <span className="fw-bold text-muted">
-                            {requestData
-                                .service_code ||
-                                `HMS-${requestData.id}`}
+                            {borrowRequest
+                                .borrow_code ||
+                                `REQ-${borrowRequest.id}`}
+                        </span>
+
+                        <span
+                            className={`badge rounded-pill px-3 py-2 ${
+                                isBorrow
+                                    ? 'bg-success-subtle text-success'
+                                    : 'bg-primary-subtle text-primary'
+                            }`}
+                        >
+                            <i
+                                className={`bi ${getRequestTypeIcon(
+                                    requestType
+                                )} me-2`}
+                            />
+
+                            {
+                                requestTypeLabel
+                            }
                         </span>
 
                         <span
@@ -1360,7 +1968,8 @@ export default function HumasServiceApprovalDetailPage() {
                             />
 
                             {
-                                statusConfig.label
+                                statusConfig
+                                    .label
                             }
                         </span>
                     </div>
@@ -1373,10 +1982,10 @@ export default function HumasServiceApprovalDetailPage() {
 
                     <strong>
                         {formatDateTime(
-                            requestData
+                            borrowRequest
                                 .submitted_at ||
-                            requestData
-                                .created_at
+                                borrowRequest
+                                    .created_at
                         )}
                     </strong>
                 </div>
@@ -1393,7 +2002,7 @@ export default function HumasServiceApprovalDetailPage() {
                             </div>
 
                             <div className="small">
-                                Akun dapat melihat detail request, tetapi tidak dapat menyetujui, menolak, atau menyelesaikannya.
+                                Akun dapat melihat detail pengajuan, tetapi tidak dapat memproses approval atau serah terima barang.
                             </div>
                         </div>
                     </div>
@@ -1401,33 +2010,69 @@ export default function HumasServiceApprovalDetailPage() {
             )}
 
             <div className="row g-4 align-items-start">
+                {/* LEFT */}
+
                 <div className="col-xl-8">
+                    {/* INFO */}
+
                     <section className="card border-0 shadow-sm rounded-5 mb-4">
                         <div className="card-body p-4 p-lg-5">
                             <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
                                 <div>
                                     <h4 className="fw-black mb-1">
-                                        Informasi Pemohon
+                                        Informasi Pengajuan
                                     </h4>
 
                                     <p className="text-muted mb-0">
-                                        Informasi akun, unit, dan kontak pemohon.
+                                        Informasi pemohon, PIC, jadwal, dan keperluan pengajuan.
                                     </p>
                                 </div>
 
-                                <div className="icon-box bg-danger-subtle text-danger">
-                                    <i className="bi bi-person-vcard-fill" />
+                                <div
+                                    className={`icon-box ${
+                                        isBorrow
+                                            ? 'bg-success-subtle text-success'
+                                            : 'bg-primary-subtle text-primary'
+                                    }`}
+                                >
+                                    <i
+                                        className={`bi ${getRequestTypeIcon(
+                                            requestType
+                                        )}`}
+                                    />
                                 </div>
                             </div>
 
                             <div className="row g-3">
                                 <div className="col-md-6">
-                                    <DetailItem
-                                        label="Nama Lengkap"
+                                    <InfoBox
+                                        label="Jenis Pengajuan"
                                         value={
-                                            requestData
-                                                .applicant_name ||
-                                            requestData
+                                            requestTypeLabel
+                                        }
+                                        icon={getRequestTypeIcon(
+                                            requestType
+                                        )}
+                                    />
+                                </div>
+
+                                <div className="col-md-6">
+                                    <InfoBox
+                                        label="Kode Pengajuan"
+                                        value={
+                                            borrowRequest
+                                                .borrow_code ||
+                                            `REQ-${borrowRequest.id}`
+                                        }
+                                        icon="bi-upc-scan"
+                                    />
+                                </div>
+
+                                <div className="col-md-6">
+                                    <InfoBox
+                                        label="Nama Pemohon"
+                                        value={
+                                            borrowRequest
                                                 .user
                                                 ?.name ||
                                             '-'
@@ -1437,59 +2082,10 @@ export default function HumasServiceApprovalDetailPage() {
                                 </div>
 
                                 <div className="col-md-6">
-                                    <DetailItem
-                                        label="Unit/Program Studi"
+                                    <InfoBox
+                                        label="Email Pemohon"
                                         value={
-                                            resolvedUnitName
-                                        }
-                                        icon="bi-building-fill"
-                                    />
-                                </div>
-
-                                <div className="col-md-6">
-                                    <DetailItem
-                                        label="WhatsApp PIC Acara"
-                                        icon="bi-whatsapp"
-                                    >
-                                        {requestData
-                                            .pic_whatsapp ? (
-                                            <a
-                                                href={`https://wa.me/62${String(
-                                                    requestData
-                                                        .pic_whatsapp
-                                                )
-                                                    .replace(
-                                                        /\D/g,
-                                                        ''
-                                                    )
-                                                    .replace(
-                                                        /^0/,
-                                                        ''
-                                                    )}`}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="fw-bold text-success text-decoration-none"
-                                            >
-                                                {
-                                                    requestData
-                                                        .pic_whatsapp
-                                                }
-
-                                                <i className="bi bi-box-arrow-up-right ms-2" />
-                                            </a>
-                                        ) : (
-                                            <div className="fw-bold">
-                                                -
-                                            </div>
-                                        )}
-                                    </DetailItem>
-                                </div>
-
-                                <div className="col-md-6">
-                                    <DetailItem
-                                        label="Email Akun"
-                                        value={
-                                            requestData
+                                            borrowRequest
                                                 .user
                                                 ?.email ||
                                             '-'
@@ -1497,348 +2093,321 @@ export default function HumasServiceApprovalDetailPage() {
                                         icon="bi-envelope-fill"
                                     />
                                 </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section className="card border-0 shadow-sm rounded-5 mb-4">
-                        <div className="card-body p-4 p-lg-5">
-                            <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
-                                <div>
-                                    <h4 className="fw-black mb-1">
-                                        Detail Kegiatan
-                                    </h4>
-
-                                    <p className="text-muted mb-0">
-                                        Informasi jenis liputan, jadwal, lokasi, dan kebutuhan kegiatan.
-                                    </p>
-                                </div>
-
-                                <div className="icon-box bg-danger-subtle text-danger">
-                                    <i
-                                        className={`bi ${coverageIcon}`}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="row g-3">
-                                <div className="col-md-6">
-                                    <DetailItem
-                                        label="Jenis Liputan"
-                                        icon={
-                                            coverageIcon
-                                        }
-                                        value={
-                                            coverageLabel
-                                        }
-                                    />
-                                </div>
 
                                 <div className="col-md-6">
-                                    <DetailItem
-                                        label="Tanggal Pelaksanaan"
-                                        icon="bi-calendar-event-fill"
-                                        value={formatDate(
-                                            requestData
-                                                .event_date
-                                        )}
-                                    />
-                                </div>
-
-                                <div className="col-12">
-                                    <DetailItem
-                                        label="Lokasi Acara"
-                                        icon="bi-geo-alt-fill"
+                                    <InfoBox
+                                        label="Nama PIC"
                                         value={
-                                            requestData
-                                                .event_location ||
+                                            borrowRequest
+                                                .pic_name ||
                                             '-'
                                         }
+                                        icon="bi-person-badge-fill"
+                                    />
+                                </div>
+
+                                <div className="col-md-6">
+                                    <InfoBox
+                                        label="Nomor PIC"
+                                        value={
+                                            borrowRequest
+                                                .pic_phone ||
+                                            '-'
+                                        }
+                                        icon="bi-whatsapp"
+                                    />
+                                </div>
+
+                                <div className="col-md-6">
+                                    <InfoBox
+                                        label="Tanggal Kegiatan"
+                                        value={formatDate(
+                                            borrowRequest
+                                                .activity_date
+                                        )}
+                                        icon="bi-calendar-event-fill"
+                                    />
+                                </div>
+
+                                <div className="col-md-6">
+                                    <InfoBox
+                                        label="Tanggal Pengambilan"
+                                        value={formatDate(
+                                            borrowRequest
+                                                .borrow_date
+                                        )}
+                                        icon="bi-calendar-check-fill"
+                                    />
+                                </div>
+
+                                {isBorrow && (
+                                    <div className="col-md-6">
+                                        <InfoBox
+                                            label="Tanggal Pengembalian"
+                                            value={formatDate(
+                                                borrowRequest
+                                                    .return_date
+                                            )}
+                                            icon="bi-calendar-minus-fill"
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="col-md-6">
+                                    <InfoBox
+                                        label="Status"
+                                        value={
+                                            statusConfig
+                                                .label
+                                        }
+                                        icon={
+                                            statusConfig
+                                                .icon
+                                        }
                                     />
                                 </div>
 
                                 <div className="col-12">
-                                    <div className="p-4 rounded-4 bg-light border">
-                                        <div className="small text-muted fw-bold mb-2">
+                                    <div className="p-4 rounded-4 border bg-light">
+                                        <div className="small fw-bold text-muted mb-2">
                                             <i className="bi bi-card-text me-2" />
 
-                                            Detail Kegiatan
+                                            Keperluan
                                         </div>
 
                                         <div
                                             style={{
                                                 whiteSpace:
-                                                    'pre-wrap',
+                                                    'pre-line',
 
                                                 lineHeight:
                                                     1.8,
                                             }}
                                         >
-                                            {requestData
-                                                .activity_detail ||
-                                                '-'}
+                                            {borrowRequest
+                                                .purpose ||
+                                                requestTitle}
                                         </div>
-                                    </div>
-                                </div>
-
-                                <div className="col-12">
-                                    <div className="p-4 rounded-4 bg-light border">
-                                        <div className="small text-muted fw-bold mb-3">
-                                            <i className="bi bi-link-45deg me-2" />
-
-                                            Link Referensi
-                                        </div>
-
-                                        {referenceUrl ? (
-                                            <a
-                                                href={
-                                                    referenceUrl
-                                                }
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="btn btn-outline-danger rounded-pill"
-                                            >
-                                                <i className="bi bi-box-arrow-up-right me-2" />
-
-                                                Buka Link Referensi
-                                            </a>
-                                        ) : (
-                                            <div className="fw-bold text-muted">
-                                                Tidak tersedia
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </section>
+
+                    {/* ITEMS */}
 
                     <section className="card border-0 shadow-sm rounded-5 mb-4">
                         <div className="card-body p-4 p-lg-5">
                             <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
                                 <div>
                                     <h4 className="fw-black mb-1">
-                                        Draft Artikel Kegiatan
+                                        Item Barang
                                     </h4>
 
                                     <p className="text-muted mb-0">
-                                        Dokumen pendukung yang dikirim oleh pemohon.
+                                        {isBorrow
+                                            ? 'Daftar barang yang diajukan untuk dipinjam.'
+                                            : 'Daftar barang yang diminta oleh pemohon.'}
                                     </p>
                                 </div>
 
-                                <div className="icon-box bg-danger-subtle text-danger">
-                                    <i className="bi bi-file-earmark-richtext-fill" />
-                                </div>
+                                <span
+                                    className={`badge rounded-pill px-3 py-2 ${
+                                        isBorrow
+                                            ? 'text-bg-success'
+                                            : 'text-bg-primary'
+                                    }`}
+                                >
+                                    {
+                                        requestItems
+                                            .length
+                                    }{' '}
+                                    item
+                                </span>
                             </div>
 
-                            {requestData
-                                .article_draft_url ? (
-                                <div className="border rounded-4 p-3 bg-light">
-                                    <div className="d-flex align-items-center gap-3 flex-wrap">
-                                        <div
-                                            className="rounded-4 bg-white text-danger d-flex align-items-center justify-content-center shadow-sm flex-shrink-0"
-                                            style={{
-                                                width:
-                                                    54,
-
-                                                height:
-                                                    54,
-                                            }}
-                                        >
-                                            <i className="bi bi-file-earmark-text-fill fs-4" />
-                                        </div>
-
-                                        <div className="flex-grow-1 min-w-0">
-                                            <div className="fw-black text-truncate">
-                                                {requestData
-                                                    .article_draft_name ||
-                                                    'Draft Artikel'}
-                                            </div>
-
-                                            <div className="small text-muted">
-                                                {requestData
-                                                    .article_draft_mime ||
-                                                    'Dokumen pendukung'}
-                                            </div>
-                                        </div>
-
-                                        <a
-                                            href={
-                                                requestData
-                                                    .article_draft_url
-                                            }
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="btn btn-danger rounded-pill"
-                                        >
-                                            <i className="bi bi-eye-fill me-2" />
-
-                                            Buka Dokumen
-                                        </a>
-                                    </div>
+                            {requestItems.length ===
+                            0 ? (
+                                <div className="alert alert-warning rounded-4 mb-0">
+                                    Tidak ada item barang pada pengajuan ini.
                                 </div>
                             ) : (
-                                <div className="alert alert-warning rounded-4 mb-0">
-                                    Draft artikel tidak tersedia.
+                                <div className="table-responsive rounded-4 border">
+                                    <table className="table align-middle mb-0">
+                                        <thead className="table-light">
+                                            <tr>
+                                                <th className="ps-4 py-3">
+                                                    Barang
+                                                </th>
+
+                                                <th className="py-3">
+                                                    Kategori
+                                                </th>
+
+                                                <th className="text-end py-3">
+                                                    Jumlah
+                                                </th>
+
+                                                <th className="text-end pe-4 py-3">
+                                                    Stok Saat Ini
+                                                </th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody>
+                                            {requestItems.map(
+                                                (
+                                                    item,
+                                                    index
+                                                ) => (
+                                                    <tr
+                                                        key={
+                                                            item.id ||
+                                                            index
+                                                        }
+                                                    >
+                                                        <td className="ps-4 py-3">
+                                                            <div className="fw-black">
+                                                                {item
+                                                                    .product
+                                                                    ?.name ||
+                                                                    '-'}
+                                                            </div>
+
+                                                            {item
+                                                                .product
+                                                                ?.description && (
+                                                                <div className="small text-muted mt-1">
+                                                                    {
+                                                                        item
+                                                                            .product
+                                                                            .description
+                                                                    }
+                                                                </div>
+                                                            )}
+                                                        </td>
+
+                                                        <td className="py-3">
+                                                            {item
+                                                                .product
+                                                                ?.category
+                                                                ?.name ||
+                                                                '-'}
+                                                        </td>
+
+                                                        <td className="text-end py-3 fw-black">
+                                                            {Number(
+                                                                item
+                                                                    .quantity ||
+                                                                    0
+                                                            )}
+                                                        </td>
+
+                                                        <td className="text-end pe-4 py-3">
+                                                            {item
+                                                                .product
+                                                                ?.stock ??
+                                                                '-'}
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             )}
                         </div>
                     </section>
 
-                    {requestData
-                        .status ===
-                        'completed' && (
-                        <section className="card border-0 shadow-sm rounded-5">
+                    {/* EVIDENCE */}
+
+                    {(handoverEvidenceUrl ||
+                        returnEvidenceUrl) && (
+                        <section className="card border-0 shadow-sm rounded-5 mb-4">
                             <div className="card-body p-4 p-lg-5">
-                                <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
-                                    <div>
-                                        <h4 className="fw-black mb-1">
-                                            Hasil Pekerjaan
-                                        </h4>
+                                <h4 className="fw-black mb-1">
+                                    Bukti Proses
+                                </h4>
 
-                                        <p className="text-muted mb-0">
-                                            Hasil pekerjaan yang diberikan oleh tim Humas.
-                                        </p>
-                                    </div>
+                                <p className="text-muted mb-4">
+                                    Evidence yang telah diunggah selama proses pengajuan.
+                                </p>
 
-                                    <div className="icon-box bg-success-subtle text-success">
-                                        <i className="bi bi-cloud-check-fill" />
-                                    </div>
+                                <div className="d-flex flex-column gap-3">
+                                    <EvidenceCard
+                                        title={
+                                            isBorrow
+                                                ? 'Bukti Serah Terima'
+                                                : 'Bukti Penyerahan Barang'
+                                        }
+                                        description="Bukti penyerahan barang"
+                                        fileName={
+                                            borrowRequest
+                                                .handover_evidence_name
+                                        }
+                                        mime={
+                                            borrowRequest
+                                                .handover_evidence_mime
+                                        }
+                                        url={
+                                            handoverEvidenceUrl
+                                        }
+                                        icon={
+                                            isBorrow
+                                                ? 'bi-box-arrow-up-right'
+                                                : 'bi-box2-heart-fill'
+                                        }
+                                    />
+
+                                    {isBorrow && (
+                                        <EvidenceCard
+                                            title="Bukti Pengembalian"
+                                            description="Bukti pengembalian barang"
+                                            fileName={
+                                                borrowRequest
+                                                    .return_evidence_name
+                                            }
+                                            mime={
+                                                borrowRequest
+                                                    .return_evidence_mime
+                                            }
+                                            url={
+                                                returnEvidenceUrl
+                                            }
+                                            icon="bi-box-arrow-in-down-left"
+                                        />
+                                    )}
                                 </div>
-
-                                {!resultUrl &&
-                                !requestData
-                                    .result_file_url ? (
-                                    <div className="alert alert-warning rounded-4 mb-0">
-                                        Request sudah selesai, tetapi hasil pekerjaan belum tersedia.
-                                    </div>
-                                ) : (
-                                    <div className="d-flex flex-column gap-3">
-                                        {resultUrl && (
-                                            <div className="border rounded-4 p-4 bg-success-subtle">
-                                                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                                                    <div className="min-w-0 flex-grow-1">
-                                                        <div className="small text-muted mb-1">
-                                                            Link Hasil
-                                                        </div>
-
-                                                        <div
-                                                            className="fw-bold text-break"
-                                                            style={{
-                                                                maxWidth:
-                                                                    600,
-                                                            }}
-                                                        >
-                                                            {
-                                                                requestData
-                                                                    .result_link
-                                                            }
-                                                        </div>
-                                                    </div>
-
-                                                    <a
-                                                        href={
-                                                            resultUrl
-                                                        }
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="btn btn-success rounded-pill"
-                                                    >
-                                                        <i className="bi bi-box-arrow-up-right me-2" />
-
-                                                        Buka Hasil
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {requestData
-                                            .result_file_url && (
-                                            <div className="border rounded-4 p-4 bg-light">
-                                                <div className="d-flex align-items-center gap-3 flex-wrap">
-                                                    <div
-                                                        className="rounded-4 bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0"
-                                                        style={{
-                                                            width:
-                                                                54,
-
-                                                            height:
-                                                                54,
-                                                        }}
-                                                    >
-                                                        <i className="bi bi-file-earmark-check-fill fs-4" />
-                                                    </div>
-
-                                                    <div className="flex-grow-1 min-w-0">
-                                                        <div className="small text-muted mb-1">
-                                                            File Hasil
-                                                        </div>
-
-                                                        <div className="fw-black text-break">
-                                                            {requestData
-                                                                .result_file_name ||
-                                                                'File Hasil Humas'}
-                                                        </div>
-
-                                                        {requestData
-                                                            .result_file_mime && (
-                                                            <div className="small text-muted mt-1">
-                                                                {
-                                                                    requestData
-                                                                        .result_file_mime
-                                                                }
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    <a
-                                                        href={
-                                                            requestData
-                                                                .result_file_url
-                                                        }
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="btn btn-outline-success rounded-pill"
-                                                    >
-                                                        <i className="bi bi-eye-fill me-2" />
-
-                                                        Buka File
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {requestData
-                                            .result_note && (
-                                            <div className="bg-white border rounded-4 p-4">
-                                                <div className="small text-muted fw-bold mb-2">
-                                                    <i className="bi bi-chat-left-text-fill me-2" />
-
-                                                    Catatan Hasil
-                                                </div>
-
-                                                <div
-                                                    style={{
-                                                        whiteSpace:
-                                                            'pre-wrap',
-
-                                                        lineHeight:
-                                                            1.7,
-                                                    }}
-                                                >
-                                                    {
-                                                        requestData
-                                                            .result_note
-                                                    }
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
                             </div>
                         </section>
                     )}
+
+                    {/* NOTE */}
+
+                    <section className="card border-0 shadow-sm rounded-5">
+                        <div className="card-body p-4 p-lg-5">
+                            <h4 className="fw-black mb-3">
+                                Catatan Admin
+                            </h4>
+
+                            <div
+                                className={`p-4 rounded-4 border ${
+                                    borrowRequest
+                                        .status ===
+                                    'rejected'
+                                        ? 'bg-danger-subtle'
+                                        : 'bg-light'
+                                }`}
+                            >
+                                {borrowRequest
+                                    .admin_note ||
+                                    'Belum ada catatan admin.'}
+                            </div>
+                        </div>
+                    </section>
                 </div>
+
+                {/* RIGHT */}
 
                 <div className="col-xl-4">
                     <div
@@ -1848,6 +2417,8 @@ export default function HumasServiceApprovalDetailPage() {
                                 110,
                         }}
                     >
+                        {/* TIMELINE */}
+
                         <section className="card border-0 shadow-sm rounded-5 mb-4">
                             <div className="card-body p-4">
                                 <h4 className="fw-black mb-1">
@@ -1855,39 +2426,78 @@ export default function HumasServiceApprovalDetailPage() {
                                 </h4>
 
                                 <p className="text-muted mb-4">
-                                    Perkembangan proses request liputan.
+                                    Perkembangan proses {requestTypeLabel.toLowerCase()}.
                                 </p>
 
                                 <div className="request-timeline">
                                     <TimelineItem
                                         label="Dikirim"
                                         value={formatDateTime(
-                                            requestData
+                                            borrowRequest
                                                 .submitted_at ||
-                                            requestData
-                                                .created_at
+                                                borrowRequest
+                                                    .created_at
                                         )}
                                         icon="bi-send-check-fill"
                                     />
 
-                                    {requestData
+                                    {borrowRequest
                                         .approved_at && (
                                         <TimelineItem
                                             label="Disetujui"
                                             value={formatDateTime(
-                                                requestData
+                                                borrowRequest
                                                     .approved_at
                                             )}
                                             icon="bi-check-circle-fill"
                                         />
                                     )}
 
-                                    {requestData
+                                    {isBorrow &&
+                                        borrowRequest
+                                            .borrowed_at && (
+                                            <TimelineItem
+                                                label="Barang Dipinjam"
+                                                value={formatDateTime(
+                                                    borrowRequest
+                                                        .borrowed_at
+                                                )}
+                                                icon="bi-box-arrow-up-right"
+                                            />
+                                        )}
+
+                                    {isBorrow &&
+                                        borrowRequest
+                                            .returned_at && (
+                                            <TimelineItem
+                                                label="Barang Dikembalikan"
+                                                value={formatDateTime(
+                                                    borrowRequest
+                                                        .returned_at
+                                                )}
+                                                icon="bi-box-arrow-in-down-left"
+                                            />
+                                        )}
+
+                                    {isAssetRequest &&
+                                        borrowRequest
+                                            .completed_at && (
+                                            <TimelineItem
+                                                label="Barang Diserahkan"
+                                                value={formatDateTime(
+                                                    borrowRequest
+                                                        .completed_at
+                                                )}
+                                                icon="bi-check2-all"
+                                            />
+                                        )}
+
+                                    {borrowRequest
                                         .rejected_at && (
                                         <TimelineItem
                                             label="Ditolak"
                                             value={formatDateTime(
-                                                requestData
+                                                borrowRequest
                                                     .rejected_at
                                             )}
                                             icon="bi-x-circle-fill"
@@ -1895,64 +2505,48 @@ export default function HumasServiceApprovalDetailPage() {
                                         />
                                     )}
 
-                                    {requestData
-                                        .completed_at && (
-                                        <TimelineItem
-                                            label="Selesai"
-                                            value={formatDateTime(
-                                                requestData
-                                                    .completed_at
-                                            )}
-                                            icon="bi-check2-all"
-                                        />
-                                    )}
-
-                                    {requestData
+                                    {borrowRequest
                                         .status ===
                                         'pending' && (
                                         <TimelineItem
                                             label="Menunggu Pemeriksaan"
-                                            value="Admin sedang memeriksa request liputan."
+                                            value="Admin sedang memeriksa pengajuan."
                                             icon="bi-hourglass-split"
                                             active
                                         />
                                     )}
 
-                                    {requestData
+                                    {borrowRequest
                                         .status ===
                                         'approved' && (
                                         <TimelineItem
-                                            label="Dalam Proses"
-                                            value="Request sedang dikerjakan oleh tim Humas."
-                                            icon="bi-camera-reels-fill"
+                                            label="Menunggu Penyerahan"
+                                            value={
+                                                isBorrow
+                                                    ? 'Peminjaman sudah disetujui dan menunggu barang diserahkan.'
+                                                    : 'Request sudah disetujui dan menunggu barang diserahkan.'
+                                            }
+                                            icon="bi-box-seam-fill"
                                             active
                                         />
                                     )}
+
+                                    {isBorrow &&
+                                        borrowRequest
+                                            .status ===
+                                            'borrowed' && (
+                                            <TimelineItem
+                                                label="Sedang Digunakan"
+                                                value="Barang sedang dipinjam dan belum dikembalikan."
+                                                icon="bi-clock-history"
+                                                active
+                                            />
+                                        )}
                                 </div>
-
-                                {requestData
-                                    .admin_note && (
-                                    <div className="alert alert-danger rounded-4 mt-4 mb-0">
-                                        <div className="fw-black mb-2">
-                                            Catatan Admin
-                                        </div>
-
-                                        <div
-                                            className="small"
-                                            style={{
-                                                whiteSpace:
-                                                    'pre-wrap',
-                                            }}
-                                        >
-                                            {
-                                                requestData
-                                                    .admin_note
-                                            }
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </section>
+
+                        {/* ACTION */}
 
                         <section className="card border-0 shadow-sm rounded-5">
                             <div className="card-body p-4">
@@ -1961,291 +2555,269 @@ export default function HumasServiceApprovalDetailPage() {
                                 </h4>
 
                                 <p className="text-muted mb-4">
-                                    Proses request berdasarkan status saat ini.
+                                    Proses pengajuan berdasarkan jenis dan status saat ini.
                                 </p>
 
                                 {!canProcess ? (
-                                    <div className="p-4 rounded-4 bg-light border text-center">
-                                        <i className="bi bi-shield-lock-fill fs-2 text-secondary" />
+                                    <div className="alert alert-info border-0 rounded-4 mb-0">
+                                        <i className="bi bi-eye-fill me-2" />
 
-                                        <h6 className="fw-black mt-3 mb-2">
-                                            Mode hanya lihat
-                                        </h6>
+                                        Akun hanya dapat melihat data.
+                                    </div>
+                                ) : borrowRequest
+                                      .status ===
+                                  'pending' ? (
+                                    <>
+                                        <label className="form-label fw-bold">
+                                            Alasan Penolakan
+                                        </label>
 
-                                        <p className="small text-muted mb-0">
-                                            Akun tidak memiliki permission proses approval Liputan Humas.
-                                        </p>
+                                        <textarea
+                                            className="form-control rounded-4 mb-2"
+                                            rows="5"
+                                            maxLength="2000"
+                                            placeholder="Diisi apabila pengajuan akan ditolak."
+                                            value={
+                                                adminNote
+                                            }
+                                            onChange={(
+                                                event
+                                            ) =>
+                                                setAdminNote(
+                                                    event
+                                                        .target
+                                                        .value
+                                                )
+                                            }
+                                            disabled={
+                                                processing
+                                            }
+                                        />
+
+                                        <div className="small text-muted text-end mb-3">
+                                            {
+                                                adminNote
+                                                    .length
+                                            }
+                                            /2000 karakter
+                                        </div>
+
+                                        <div className="d-grid gap-2">
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary rounded-pill"
+                                                onClick={
+                                                    handleApprove
+                                                }
+                                                disabled={
+                                                    processing
+                                                }
+                                            >
+                                                <i className="bi bi-check-lg me-2" />
+
+                                                Setujui {requestTypeLabel}
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-danger rounded-pill"
+                                                onClick={
+                                                    handleReject
+                                                }
+                                                disabled={
+                                                    processing
+                                                }
+                                            >
+                                                <i className="bi bi-x-lg me-2" />
+
+                                                Tolak {requestTypeLabel}
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : borrowRequest
+                                      .status ===
+                                      'approved' &&
+                                  isBorrow ? (
+                                    <>
+                                        <div className="alert alert-success border-0 rounded-4">
+                                            Peminjaman telah disetujui. Upload bukti saat barang diserahkan.
+                                        </div>
+
+                                        <label className="form-label fw-bold">
+                                            Bukti Serah Terima
+                                        </label>
+
+                                        <input
+                                            type="file"
+                                            className="form-control"
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            onChange={
+                                                handleHandoverEvidenceChange
+                                            }
+                                        />
+
+                                        <SelectedFileCard
+                                            file={
+                                                handoverEvidence
+                                            }
+                                            label="Bukti Serah Terima"
+                                            onRemove={() =>
+                                                setHandoverEvidence(
+                                                    null
+                                                )
+                                            }
+                                            disabled={
+                                                processing
+                                            }
+                                        />
+
+                                        <button
+                                            type="button"
+                                            className="btn btn-success rounded-pill w-100 mt-4"
+                                            onClick={
+                                                handleBorrowed
+                                            }
+                                            disabled={
+                                                processing
+                                            }
+                                        >
+                                            <i className="bi bi-box-arrow-up-right me-2" />
+
+                                            Simpan Bukti &amp; Tandai Dipinjam
+                                        </button>
+                                    </>
+                                ) : borrowRequest
+                                      .status ===
+                                      'approved' &&
+                                  isAssetRequest ? (
+                                    <>
+                                        <div className="alert alert-primary border-0 rounded-4">
+                                            Request Barang telah disetujui. Upload bukti ketika barang diserahkan.
+                                        </div>
+
+                                        <label className="form-label fw-bold">
+                                            Bukti Penyerahan Barang
+                                        </label>
+
+                                        <input
+                                            type="file"
+                                            className="form-control"
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            onChange={
+                                                handleHandoverEvidenceChange
+                                            }
+                                        />
+
+                                        <SelectedFileCard
+                                            file={
+                                                handoverEvidence
+                                            }
+                                            label="Bukti Penyerahan"
+                                            onRemove={() =>
+                                                setHandoverEvidence(
+                                                    null
+                                                )
+                                            }
+                                            disabled={
+                                                processing
+                                            }
+                                        />
+
+                                        <div className="alert alert-warning border-0 rounded-4 mt-3">
+                                            Stok akan berkurang permanen setelah Request Barang diselesaikan.
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            className="btn btn-success rounded-pill w-100"
+                                            onClick={
+                                                handleCompleteAssetRequest
+                                            }
+                                            disabled={
+                                                processing
+                                            }
+                                        >
+                                            <i className="bi bi-check2-all me-2" />
+
+                                            Simpan Bukti &amp; Tandai Selesai
+                                        </button>
+                                    </>
+                                ) : borrowRequest
+                                      .status ===
+                                      'borrowed' &&
+                                  isBorrow ? (
+                                    <>
+                                        <div className="alert alert-warning border-0 rounded-4">
+                                            Barang sedang dipinjam. Upload bukti setelah barang dikembalikan.
+                                        </div>
+
+                                        <label className="form-label fw-bold">
+                                            Bukti Pengembalian
+                                        </label>
+
+                                        <input
+                                            type="file"
+                                            className="form-control"
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            onChange={
+                                                handleReturnEvidenceChange
+                                            }
+                                        />
+
+                                        <SelectedFileCard
+                                            file={
+                                                returnEvidence
+                                            }
+                                            label="Bukti Pengembalian"
+                                            onRemove={() =>
+                                                setReturnEvidence(
+                                                    null
+                                                )
+                                            }
+                                            disabled={
+                                                processing
+                                            }
+                                        />
+
+                                        <button
+                                            type="button"
+                                            className="btn btn-success rounded-pill w-100 mt-4"
+                                            onClick={
+                                                handleReturned
+                                            }
+                                            disabled={
+                                                processing
+                                            }
+                                        >
+                                            <i className="bi bi-box-arrow-in-down-left me-2" />
+
+                                            Simpan Bukti &amp; Tandai Dikembalikan
+                                        </button>
+                                    </>
+                                ) : [
+                                      'rejected',
+                                      'returned',
+                                      'completed',
+                                  ].includes(
+                                      borrowRequest
+                                          .status
+                                  ) ? (
+                                    <div className="alert alert-light border rounded-4 mb-0">
+                                        Pengajuan sudah berstatus{' '}
+
+                                        <strong>
+                                            {
+                                                statusConfig
+                                                    .label
+                                            }
+                                        </strong>
+
+                                        {' '}dan tidak memiliki tindakan lanjutan.
                                     </div>
                                 ) : (
-                                    <>
-                                        {requestData
-                                            .status ===
-                                            'pending' && (
-                                            <div className="d-grid gap-2">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-primary rounded-pill"
-                                                    onClick={
-                                                        handleApprove
-                                                    }
-                                                    disabled={
-                                                        processing
-                                                    }
-                                                >
-                                                    <i className="bi bi-check-lg me-2" />
-
-                                                    Setujui Request
-                                                </button>
-
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-outline-danger rounded-pill"
-                                                    onClick={
-                                                        handleReject
-                                                    }
-                                                    disabled={
-                                                        processing
-                                                    }
-                                                >
-                                                    <i className="bi bi-x-lg me-2" />
-
-                                                    Tolak Request
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {requestData
-                                            .status ===
-                                            'approved' && (
-                                            <>
-                                                <div className="p-3 rounded-4 bg-primary-subtle mb-4">
-                                                    <div className="d-flex gap-3">
-                                                        <i className="bi bi-info-circle-fill text-primary fs-5" />
-
-                                                        <div>
-                                                            <div className="fw-black text-primary mb-1">
-                                                                Request Sedang Diproses
-                                                            </div>
-
-                                                            <div className="small text-muted">
-                                                                Masukkan link hasil atau unggah file hasil sebelum request ditandai selesai.
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="mb-3">
-                                                    <label className="form-label fw-bold">
-                                                        Link Hasil
-                                                    </label>
-
-                                                    <input
-                                                        type="text"
-                                                        className="form-control rounded-4"
-                                                        placeholder="https://drive.google.com/... atau link publikasi"
-                                                        value={
-                                                            resultLink
-                                                        }
-                                                        onChange={(
-                                                            event
-                                                        ) =>
-                                                            setResultLink(
-                                                                event
-                                                                    .target
-                                                                    .value
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            processing
-                                                        }
-                                                    />
-
-                                                    <div className="form-text">
-                                                        Opsional jika file hasil sudah diunggah.
-                                                    </div>
-                                                </div>
-
-                                                <div className="mb-3">
-                                                    <label className="form-label fw-bold">
-                                                        File Hasil
-                                                    </label>
-
-                                                    <input
-                                                        type="file"
-                                                        className="form-control rounded-4"
-                                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip"
-                                                        onChange={
-                                                            handleResultFileChange
-                                                        }
-                                                        disabled={
-                                                            processing
-                                                        }
-                                                    />
-
-                                                    <div className="form-text">
-                                                        PDF, DOC, DOCX, JPG, JPEG, PNG atau ZIP. Maksimal 20 MB.
-                                                    </div>
-
-                                                    {resultFile && (
-                                                        <div className="mt-3 p-3 border rounded-4 bg-light">
-                                                            <div className="d-flex align-items-start gap-3">
-                                                                <div
-                                                                    className="rounded-circle bg-white text-danger d-flex align-items-center justify-content-center flex-shrink-0"
-                                                                    style={{
-                                                                        width:
-                                                                            42,
-
-                                                                        height:
-                                                                            42,
-                                                                    }}
-                                                                >
-                                                                    <i className="bi bi-paperclip" />
-                                                                </div>
-
-                                                                <div className="min-w-0 flex-grow-1">
-                                                                    <div className="small text-muted">
-                                                                        File dipilih
-                                                                    </div>
-
-                                                                    <div className="fw-black text-break">
-                                                                        {
-                                                                            resultFile
-                                                                                .name
-                                                                        }
-                                                                    </div>
-
-                                                                    <div className="small text-muted mt-1">
-                                                                        {formatFileSize(
-                                                                            resultFile
-                                                                                .size
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-
-                                                                <button
-                                                                    type="button"
-                                                                    className="btn btn-sm btn-outline-danger rounded-circle flex-shrink-0"
-                                                                    onClick={() =>
-                                                                        setResultFile(
-                                                                            null
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        processing
-                                                                    }
-                                                                    title="Hapus file"
-                                                                >
-                                                                    <i className="bi bi-x-lg" />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div className="mb-4">
-                                                    <label className="form-label fw-bold">
-                                                        Catatan Hasil
-                                                    </label>
-
-                                                    <textarea
-                                                        className="form-control rounded-4"
-                                                        rows={
-                                                            4
-                                                        }
-                                                        maxLength={
-                                                            3000
-                                                        }
-                                                        placeholder="Tambahkan catatan hasil pekerjaan jika diperlukan..."
-                                                        value={
-                                                            resultNote
-                                                        }
-                                                        onChange={(
-                                                            event
-                                                        ) =>
-                                                            setResultNote(
-                                                                event
-                                                                    .target
-                                                                    .value
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            processing
-                                                        }
-                                                    />
-
-                                                    <div className="form-text text-end">
-                                                        {
-                                                            resultNote
-                                                                .length
-                                                        }
-                                                        /3000
-                                                    </div>
-                                                </div>
-
-                                                <div className="alert alert-light border rounded-4 small">
-                                                    <i className="bi bi-info-circle me-2 text-primary" />
-
-                                                    Minimal isi{' '}
-
-                                                    <strong>
-                                                        Link Hasil
-                                                    </strong>{' '}
-
-                                                    atau{' '}
-
-                                                    <strong>
-                                                        File Hasil
-                                                    </strong>
-                                                    .
-                                                </div>
-
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-success rounded-pill w-100"
-                                                    onClick={
-                                                        handleComplete
-                                                    }
-                                                    disabled={
-                                                        processing
-                                                    }
-                                                >
-                                                    {processing ? (
-                                                        <>
-                                                            <span className="spinner-border spinner-border-sm me-2" />
-
-                                                            Menyimpan...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <i className="bi bi-check2-all me-2" />
-
-                                                            Simpan Hasil &amp; Tandai Selesai
-                                                        </>
-                                                    )}
-                                                </button>
-                                            </>
-                                        )}
-
-                                        {[
-                                            'rejected',
-                                            'completed',
-                                        ].includes(
-                                            requestData
-                                                .status
-                                        ) && (
-                                            <div className="alert alert-light border rounded-4 mb-0">
-                                                Request berstatus{' '}
-
-                                                <strong>
-                                                    {
-                                                        statusConfig.label
-                                                    }
-                                                </strong>{' '}
-
-                                                dan tidak memiliki tindakan lanjutan.
-                                            </div>
-                                        )}
-                                    </>
+                                    <div className="alert alert-secondary rounded-4 mb-0">
+                                        Status pengajuan tidak dikenali.
+                                    </div>
                                 )}
                             </div>
                         </section>

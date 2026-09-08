@@ -1,4 +1,5 @@
 import {
+    useCallback,
     useEffect,
     useMemo,
     useState,
@@ -13,6 +14,9 @@ import {
     showSuccessAlert,
     showWarningAlert,
 } from '../../utils/sweetAlert';
+
+const SERVICE_KEY =
+    'merchandise';
 
 const formatDateInput = (
     date
@@ -46,19 +50,88 @@ const getTodayDate =
         );
     };
 
-const getMinimumActivityDate =
-    () => {
-        const date =
-            new Date();
+const formatDate = (
+    value
+) => {
+    if (
+        !value
+    ) {
+        return '-';
+    }
 
-        date.setDate(
-            date.getDate() + 4
+    if (
+        typeof value ===
+            'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(
+            value
+        )
+    ) {
+        const [
+            year,
+            month,
+            day,
+        ] =
+            value
+                .split('-')
+                .map(
+                    Number
+                );
+
+        return new Date(
+            year,
+            month - 1,
+            day
+        ).toLocaleDateString(
+            'id-ID',
+            {
+                day:
+                    '2-digit',
+
+                month:
+                    'long',
+
+                year:
+                    'numeric',
+            }
+        );
+    }
+
+    const parsedDate =
+        new Date(
+            value
         );
 
-        return formatDateInput(
-            date
+    if (
+        Number.isNaN(
+            parsedDate.getTime()
+        )
+    ) {
+        return '-';
+    }
+
+    return parsedDate
+        .toLocaleDateString(
+            'id-ID',
+            {
+                day:
+                    '2-digit',
+
+                month:
+                    'long',
+
+                year:
+                    'numeric',
+            }
         );
-    };
+};
+
+const getRuleLabel = (
+    days
+) => {
+    return `H-${Number(
+        days || 0
+    )}`;
+};
 
 const initialForm = {
     event_name: '',
@@ -76,16 +149,73 @@ const initialForm = {
     user_note: '',
 };
 
+const getBackendErrorMessage =
+    (
+        error,
+        fallbackMessage =
+            'Pengajuan merchandise gagal dikirim.'
+    ) => {
+        const responseData =
+            error
+                ?.response
+                ?.data;
+
+        if (
+            responseData
+                ?.errors
+        ) {
+            const firstError =
+                Object.values(
+                    responseData.errors
+                )
+                    .flat()
+                    .find(
+                        Boolean
+                    );
+
+            if (
+                firstError
+            ) {
+                return firstError;
+            }
+        }
+
+        if (
+            responseData
+                ?.message
+        ) {
+            return responseData
+                .message;
+        }
+
+        if (
+            responseData
+                ?.data &&
+            typeof responseData
+                .data ===
+                'string'
+        ) {
+            return responseData
+                .data;
+        }
+
+        return fallbackMessage;
+    };
+
 export default function MerchandiseRequestPage() {
     const [
         products,
         setProducts,
-    ] = useState([]);
+    ] = useState(
+        []
+    );
 
     const [
         cart,
         setCart,
-    ] = useState([]);
+    ] = useState(
+        []
+    );
 
     const [
         form,
@@ -115,6 +245,31 @@ export default function MerchandiseRequestPage() {
         false
     );
 
+    const [
+        settingLoading,
+        setSettingLoading,
+    ] = useState(
+        true
+    );
+
+    const [
+        settingError,
+        setSettingError,
+    ] = useState(
+        ''
+    );
+
+    const [
+        submissionSetting,
+        setSubmissionSetting,
+    ] = useState({
+        min_submission_days:
+            4,
+
+        minimum_date:
+            '',
+    });
+
     const todayDate =
         useMemo(
             () =>
@@ -122,75 +277,202 @@ export default function MerchandiseRequestPage() {
             []
         );
 
+    const minimumSubmissionDays =
+        Number(
+            submissionSetting
+                .min_submission_days ??
+                4
+        );
+
     const minimumActivityDate =
-        useMemo(
-            () =>
-                getMinimumActivityDate(),
+        submissionSetting
+            .minimum_date ||
+        '';
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD SETTING
+    |--------------------------------------------------------------------------
+    */
+
+    const fetchSubmissionSetting =
+        useCallback(
+            async () => {
+                try {
+                    setSettingLoading(
+                        true
+                    );
+
+                    setSettingError(
+                        ''
+                    );
+
+                    const response =
+                        await api.get(
+                            '/humas-settings'
+                        );
+
+                    const data =
+                        response
+                            ?.data
+                            ?.data ||
+                        {};
+
+                    const setting =
+                        data
+                            ?.submission_settings
+                            ?.[SERVICE_KEY];
+
+                    if (
+                        !setting
+                    ) {
+                        throw new Error(
+                            'Pengaturan Merchandise tidak ditemukan.'
+                        );
+                    }
+
+                    setSubmissionSetting({
+                        min_submission_days:
+                            Number(
+                                setting
+                                    ?.min_submission_days ??
+                                    4
+                            ),
+
+                        minimum_date:
+                            setting
+                                ?.minimum_date ||
+                            '',
+                    });
+                } catch (
+                    error
+                ) {
+                    console.error(
+                        'Fetch Merchandise setting error:',
+                        error
+                            ?.response
+                            ?.data ||
+                            error
+                    );
+
+                    setSettingError(
+                        getBackendErrorMessage(
+                            error,
+                            error
+                                ?.message ||
+                                'Pengaturan batas pengajuan Merchandise gagal dimuat.'
+                        )
+                    );
+                } finally {
+                    setSettingLoading(
+                        false
+                    );
+                }
+            },
             []
         );
 
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUCTS
+    |--------------------------------------------------------------------------
+    */
+
     const fetchProducts =
-        async () => {
-            try {
-                setLoading(
-                    true
-                );
-
-                const response =
-                    await api.get(
-                        '/products'
+        useCallback(
+            async () => {
+                try {
+                    setLoading(
+                        true
                     );
 
-                const productData =
-                    response.data
-                        .data ||
-                    [];
+                    const response =
+                        await api.get(
+                            '/products'
+                        );
 
-                const merchandiseProducts =
-                    productData.filter(
+                    const productData =
+                        response
+                            ?.data
+                            ?.data ||
+                        [];
+
+                    const merchandiseProducts =
                         (
-                            product
-                        ) => {
-                            return (
-                                product.status ===
-                                    'active' &&
-                                [
-                                    'checkout',
-                                    'both',
-                                ].includes(
-                                    product.type
-                                )
-                            );
-                        }
+                            Array.isArray(
+                                productData
+                            )
+                                ? productData
+                                : []
+                        ).filter(
+                            (
+                                product
+                            ) => {
+                                return (
+                                    product
+                                        .status ===
+                                        'active' &&
+                                    [
+                                        'checkout',
+                                        'both',
+                                    ].includes(
+                                        product
+                                            .type
+                                    )
+                                );
+                            }
+                        );
+
+                    setProducts(
+                        merchandiseProducts
+                    );
+                } catch (
+                    error
+                ) {
+                    console.error(
+                        'Fetch merchandise error:',
+                        error
+                            ?.response
+                            ?.data ||
+                            error
                     );
 
-                setProducts(
-                    merchandiseProducts
-                );
-            } catch (
-                error
-            ) {
-                console.error(
-                    error
-                );
+                    await showErrorAlert(
+                        'Gagal Memuat Data',
+                        getBackendErrorMessage(
+                            error,
+                            'Data merchandise gagal dimuat dari server.'
+                        )
+                    );
 
-                showErrorAlert(
-                    'Gagal Memuat Data',
-                    'Data merchandise gagal dimuat dari server.'
-                );
-            } finally {
-                setLoading(
-                    false
-                );
-            }
-        };
+                    setProducts(
+                        []
+                    );
+                } finally {
+                    setLoading(
+                        false
+                    );
+                }
+            },
+            []
+        );
 
     useEffect(
         () => {
             fetchProducts();
+            fetchSubmissionSetting();
         },
-        []
+        [
+            fetchProducts,
+            fetchSubmissionSetting,
+        ]
     );
+
+    /*
+    |--------------------------------------------------------------------------
+    | CART
+    |--------------------------------------------------------------------------
+    */
 
     const selectedItems =
         useMemo(
@@ -205,8 +487,10 @@ export default function MerchandiseRequestPage() {
                                     (
                                         item
                                     ) =>
-                                        item.id ===
-                                        cartItem.product_id
+                                        item
+                                            .id ===
+                                        cartItem
+                                            .product_id
                                 );
 
                             return {
@@ -237,7 +521,11 @@ export default function MerchandiseRequestPage() {
                         item
                     ) =>
                         total +
-                        item.quantity,
+                        Number(
+                            item
+                                .quantity ||
+                                0
+                        ),
                     0
                 );
             },
@@ -247,14 +535,18 @@ export default function MerchandiseRequestPage() {
         );
 
     const handleAddToCart =
-        (
+        async (
             product
         ) => {
             if (
-                product.stock <=
+                Number(
+                    product
+                        .stock ||
+                        0
+                ) <=
                 0
             ) {
-                showWarningAlert(
+                await showWarningAlert(
                     'Stok Habis',
                     'Produk ini tidak memiliki stok tersedia.'
                 );
@@ -262,45 +554,64 @@ export default function MerchandiseRequestPage() {
                 return;
             }
 
+            const existingItem =
+                cart.find(
+                    (
+                        item
+                    ) =>
+                        item
+                            .product_id ===
+                        product.id
+                );
+
+            if (
+                existingItem &&
+                existingItem
+                    .quantity >=
+                    Number(
+                        product
+                            .stock ||
+                            0
+                    )
+            ) {
+                await showWarningAlert(
+                    'Stok Tidak Cukup',
+                    `Stok ${product.name} hanya tersedia ${product.stock}.`
+                );
+
+                return;
+            }
+
             setCart(
                 (
-                    prevCart
+                    previousCart
                 ) => {
-                    const existingItem =
-                        prevCart.find(
+                    const existing =
+                        previousCart.find(
                             (
                                 item
                             ) =>
-                                item.product_id ===
+                                item
+                                    .product_id ===
                                 product.id
                         );
 
                     if (
-                        existingItem
+                        existing
                     ) {
-                        if (
-                            existingItem.quantity >=
-                            product.stock
-                        ) {
-                            showWarningAlert(
-                                'Stok Tidak Cukup',
-                                `Stok ${product.name} hanya tersedia ${product.stock}.`
-                            );
-
-                            return prevCart;
-                        }
-
-                        return prevCart.map(
+                        return previousCart.map(
                             (
                                 item
                             ) =>
-                                item.product_id ===
+                                item
+                                    .product_id ===
                                 product.id
                                     ? {
                                           ...item,
 
                                           quantity:
-                                              item.quantity +
+                                              item
+                                                  .quantity +
                                               1,
                                       }
                                     : item
@@ -308,7 +619,8 @@ export default function MerchandiseRequestPage() {
                     }
 
                     return [
-                        ...prevCart,
+                        ...previousCart,
+
                         {
                             product_id:
                                 product.id,
@@ -327,20 +639,22 @@ export default function MerchandiseRequestPage() {
         ) => {
             setCart(
                 (
-                    prevCart
+                    previousCart
                 ) =>
-                    prevCart
+                    previousCart
                         .map(
                             (
                                 item
                             ) =>
-                                item.product_id ===
+                                item
+                                    .product_id ===
                                 productId
                                     ? {
                                           ...item,
 
                                           quantity:
-                                              item.quantity -
+                                              item
+                                                  .quantity -
                                               1,
                                       }
                                     : item
@@ -349,40 +663,67 @@ export default function MerchandiseRequestPage() {
                             (
                                 item
                             ) =>
-                                item.quantity >
+                                item
+                                    .quantity >
                                 0
                         )
             );
         };
 
     const handleIncreaseQty =
-        (
+        async (
             product
         ) => {
+            const existingItem =
+                cart.find(
+                    (
+                        item
+                    ) =>
+                        item
+                            .product_id ===
+                        product.id
+                );
+
+            if (
+                !existingItem
+            ) {
+                await handleAddToCart(
+                    product
+                );
+
+                return;
+            }
+
+            if (
+                existingItem
+                    .quantity >=
+                Number(
+                    product
+                        .stock ||
+                        0
+                )
+            ) {
+                await showWarningAlert(
+                    'Stok Tidak Cukup',
+                    `Stok ${product.name} hanya tersedia ${product.stock}.`
+                );
+
+                return;
+            }
+
             setCart(
                 (
-                    prevCart
+                    previousCart
                 ) =>
-                    prevCart.map(
+                    previousCart.map(
                         (
                             item
                         ) => {
                             if (
-                                item.product_id !==
+                                item
+                                    .product_id !==
                                 product.id
                             ) {
-                                return item;
-                            }
-
-                            if (
-                                item.quantity >=
-                                product.stock
-                            ) {
-                                showWarningAlert(
-                                    'Stok Tidak Cukup',
-                                    `Stok ${product.name} hanya tersedia ${product.stock}.`
-                                );
-
                                 return item;
                             }
 
@@ -390,7 +731,8 @@ export default function MerchandiseRequestPage() {
                                 ...item,
 
                                 quantity:
-                                    item.quantity +
+                                    item
+                                        .quantity +
                                     1,
                             };
                         }
@@ -404,17 +746,24 @@ export default function MerchandiseRequestPage() {
         ) => {
             setCart(
                 (
-                    prevCart
+                    previousCart
                 ) =>
-                    prevCart.filter(
+                    previousCart.filter(
                         (
                             item
                         ) =>
-                            item.product_id !==
+                            item
+                                .product_id !==
                             productId
                     )
             );
         };
+
+    /*
+    |--------------------------------------------------------------------------
+    | FORM
+    |--------------------------------------------------------------------------
+    */
 
     const handleChange =
         (
@@ -428,28 +777,27 @@ export default function MerchandiseRequestPage() {
 
             setForm(
                 (
-                    prevForm
+                    previousForm
                 ) => {
                     const nextForm = {
-                        ...prevForm,
+                        ...previousForm,
+
                         [name]:
                             value,
                     };
 
-                    /*
-                     * Jika tanggal kegiatan berubah
-                     * menjadi sebelum pickup yang sudah
-                     * dipilih, reset pickup.
-                     */
                     if (
                         name ===
                             'activity_date' &&
-                        prevForm.pickup_date &&
+                        previousForm
+                            .pickup_date &&
                         value &&
-                        prevForm.pickup_date >
+                        previousForm
+                            .pickup_date >
                             value
                     ) {
-                        nextForm.pickup_date =
+                        nextForm
+                            .pickup_date =
                             '';
                     }
 
@@ -459,11 +807,12 @@ export default function MerchandiseRequestPage() {
         };
 
     const handleFileChange =
-        (
+        async (
             event
         ) => {
             const file =
-                event.target
+                event
+                    .target
                     .files?.[0];
 
             if (
@@ -493,7 +842,7 @@ export default function MerchandiseRequestPage() {
                     file.type
                 )
             ) {
-                showWarningAlert(
+                await showWarningAlert(
                     'Format File Tidak Sesuai',
                     'File lampiran hanya boleh PDF, JPG, JPEG, atau PNG.'
                 );
@@ -512,7 +861,7 @@ export default function MerchandiseRequestPage() {
                 file.size >
                 maxSize
             ) {
-                showWarningAlert(
+                await showWarningAlert(
                     'Ukuran File Terlalu Besar',
                     'Ukuran file maksimal 5 MB.'
                 );
@@ -532,53 +881,39 @@ export default function MerchandiseRequestPage() {
             );
         };
 
-    const getBackendErrorMessage =
-        (
-            error
-        ) => {
-            const responseData =
-                error.response
-                    ?.data;
-
-            if (
-                responseData
-                    ?.errors
-            ) {
-                const firstError =
-                    Object.values(
-                        responseData.errors
-                    )?.[0]?.[0];
-
-                if (
-                    firstError
-                ) {
-                    return firstError;
-                }
-            }
-
-            if (
-                responseData
-                    ?.message
-            ) {
-                return responseData.message;
-            }
-
-            if (
-                responseData
-                    ?.data &&
-                typeof responseData.data ===
-                    'string'
-            ) {
-                return responseData.data;
-            }
-
-            return 'Pengajuan merchandise gagal dikirim.';
-        };
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDATION
+    |--------------------------------------------------------------------------
+    */
 
     const validateSchedule =
         async () => {
             if (
-                !form.activity_date
+                settingLoading
+            ) {
+                await showWarningAlert(
+                    'Pengaturan Masih Dimuat',
+                    'Tunggu sampai aturan batas pengajuan berhasil dimuat.'
+                );
+
+                return false;
+            }
+
+            if (
+                settingError
+            ) {
+                await showWarningAlert(
+                    'Pengaturan Belum Tersedia',
+                    'Aturan batas pengajuan gagal dimuat. Silakan muat ulang halaman.'
+                );
+
+                return false;
+            }
+
+            if (
+                !form
+                    .activity_date
             ) {
                 await showWarningAlert(
                     'Tanggal Kegiatan Belum Diisi',
@@ -589,19 +924,27 @@ export default function MerchandiseRequestPage() {
             }
 
             if (
-                form.activity_date <
-                minimumActivityDate
+                minimumActivityDate &&
+                form
+                    .activity_date <
+                    minimumActivityDate
             ) {
                 await showWarningAlert(
                     'Pengajuan Terlalu Dekat',
-                    'Pengajuan merchandise wajib dilakukan minimal H-4 sebelum tanggal kegiatan.'
+                    minimumSubmissionDays ===
+                    0
+                        ? 'Tanggal kegiatan tidak boleh sebelum hari ini.'
+                        : `Pengajuan Merchandise wajib dilakukan minimal H-${minimumSubmissionDays}. Tanggal kegiatan paling cepat ${formatDate(
+                              minimumActivityDate
+                          )}.`
                 );
 
                 return false;
             }
 
             if (
-                !form.pickup_date
+                !form
+                    .pickup_date
             ) {
                 await showWarningAlert(
                     'Tanggal Pengambilan Belum Diisi',
@@ -612,7 +955,8 @@ export default function MerchandiseRequestPage() {
             }
 
             if (
-                form.pickup_date <
+                form
+                    .pickup_date <
                 todayDate
             ) {
                 await showWarningAlert(
@@ -624,8 +968,10 @@ export default function MerchandiseRequestPage() {
             }
 
             if (
-                form.pickup_date >
-                form.activity_date
+                form
+                    .pickup_date >
+                form
+                    .activity_date
             ) {
                 await showWarningAlert(
                     'Tanggal Pengambilan Tidak Valid',
@@ -638,6 +984,12 @@ export default function MerchandiseRequestPage() {
             return true;
         };
 
+    /*
+    |--------------------------------------------------------------------------
+    | SUBMIT
+    |--------------------------------------------------------------------------
+    */
+
     const handleSubmit =
         async (
             event
@@ -648,7 +1000,7 @@ export default function MerchandiseRequestPage() {
                 selectedItems.length ===
                 0
             ) {
-                showWarningAlert(
+                await showWarningAlert(
                     'Keranjang Kosong',
                     'Tambahkan minimal satu merchandise ke keranjang.'
                 );
@@ -665,7 +1017,7 @@ export default function MerchandiseRequestPage() {
             if (
                 !proofFile
             ) {
-                showWarningAlert(
+                await showWarningAlert(
                     'Lampiran Belum Diunggah',
                     'Upload file bukti undangan atau lampiran terlebih dahulu.'
                 );
@@ -688,47 +1040,63 @@ export default function MerchandiseRequestPage() {
 
                 payload.append(
                     'event_name',
-                    form.event_name
+                    form
+                        .event_name
+                        .trim()
                 );
 
                 payload.append(
                     'pic_name',
-                    form.pic_name
+                    form
+                        .pic_name
+                        .trim()
                 );
 
                 payload.append(
                     'pic_phone',
-                    form.pic_phone
+                    form
+                        .pic_phone
+                        .trim()
                 );
 
                 payload.append(
                     'activity_date',
-                    form.activity_date
+                    form
+                        .activity_date
                 );
 
                 payload.append(
                     'pickup_date',
-                    form.pickup_date
+                    form
+                        .pickup_date
                 );
 
                 payload.append(
                     'institution_name',
-                    form.institution_name
+                    form
+                        .institution_name
+                        .trim()
                 );
 
                 payload.append(
                     'guest_name',
-                    form.guest_name
+                    form
+                        .guest_name
+                        .trim()
                 );
 
                 payload.append(
                     'guest_position',
-                    form.guest_position
+                    form
+                        .guest_position
+                        .trim()
                 );
 
                 payload.append(
                     'user_note',
-                    form.user_note
+                    form
+                        .user_note
+                        .trim()
                 );
 
                 payload.append(
@@ -743,26 +1111,32 @@ export default function MerchandiseRequestPage() {
                     ) => {
                         payload.append(
                             `items[${index}][product_id]`,
-                            item.product_id
+                            item
+                                .product_id
                         );
 
                         payload.append(
                             `items[${index}][quantity]`,
-                            item.quantity
+                            item
+                                .quantity
                         );
                     }
                 );
 
-                await api.post(
-                    '/orders',
-                    payload
-                );
+                const response =
+                    await api.post(
+                        '/orders',
+                        payload
+                    );
 
                 closeAlert();
 
                 await showSuccessAlert(
                     'Pengajuan Berhasil',
-                    'Pengajuan merchandise berhasil dikirim.'
+                    response
+                        ?.data
+                        ?.message ||
+                        'Pengajuan merchandise berhasil dikirim.'
                 );
 
                 setForm(
@@ -785,29 +1159,40 @@ export default function MerchandiseRequestPage() {
                 if (
                     fileInput
                 ) {
-                    fileInput.value =
+                    fileInput
+                        .value =
                         '';
                 }
 
-                fetchProducts();
+                await Promise.all([
+                    fetchProducts(),
+                    fetchSubmissionSetting(),
+                ]);
             } catch (
                 error
             ) {
                 console.error(
                     'Checkout merchandise error:',
-                    error.response
+                    error
+                        ?.response
                         ?.data ||
                         error
                 );
 
                 closeAlert();
 
-                showErrorAlert(
+                await showErrorAlert(
                     'Pengajuan Gagal',
                     getBackendErrorMessage(
                         error
                     )
                 );
+
+                /*
+                 * Refresh aturan jika Superadmin baru
+                 * saja mengubah H-n.
+                 */
+                await fetchSubmissionSetting();
             } finally {
                 setSubmitting(
                     false
@@ -837,13 +1222,42 @@ export default function MerchandiseRequestPage() {
             if (
                 fileInput
             ) {
-                fileInput.value =
+                fileInput
+                    .value =
                     '';
             }
         };
 
     return (
         <div className="container-fluid px-0">
+            {settingError && (
+                <div className="alert alert-danger border-0 shadow-sm rounded-4 mb-4">
+                    <div className="d-flex align-items-start gap-3">
+                        <i className="bi bi-exclamation-triangle-fill fs-4" />
+
+                        <div className="flex-grow-1">
+                            <div className="fw-bold">
+                                Aturan pengajuan gagal dimuat
+                            </div>
+
+                            <div className="small mt-1">
+                                {settingError}
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger rounded-pill"
+                            onClick={
+                                fetchSubmissionSetting
+                            }
+                        >
+                            Muat Ulang
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className="row g-4">
                 <div className="col-xl-8">
                     <section
@@ -872,10 +1286,7 @@ export default function MerchandiseRequestPage() {
                                         1.8,
                                 }}
                             >
-                                Pilih merchandise, isi informasi PIC,
-                                jadwal pengambilan, data tamu, dan
-                                informasi kegiatan sebelum dikirim ke
-                                admin.
+                                Pilih merchandise, isi informasi PIC, jadwal pengambilan, data tamu, dan informasi kegiatan sebelum dikirim ke admin.
                             </p>
 
                             <div
@@ -888,7 +1299,11 @@ export default function MerchandiseRequestPage() {
                                 <i className="bi bi-calendar-check-fill" />
 
                                 <span className="small fw-bold">
-                                    Pengajuan wajib minimal H-4 sebelum kegiatan
+                                    {settingLoading
+                                        ? 'Memuat ketentuan waktu...'
+                                        : `Pengajuan minimal ${getRuleLabel(
+                                              minimumSubmissionDays
+                                          )} sebelum kegiatan`}
                                 </span>
                             </div>
                         </div>
@@ -941,15 +1356,18 @@ export default function MerchandiseRequestPage() {
                                             (
                                                 item
                                             ) =>
-                                                item.product_id ===
-                                                product.id
+                                                item
+                                                    .product_id ===
+                                                product
+                                                    .id
                                         );
 
                                     return (
                                         <div
                                             className="col-12 col-md-6 col-xxl-4"
                                             key={
-                                                product.id
+                                                product
+                                                    .id
                                             }
                                         >
                                             <div className="card border-0 shadow-sm rounded-5 overflow-hidden h-100">
@@ -963,10 +1381,12 @@ export default function MerchandiseRequestPage() {
                                                     {product.image ? (
                                                         <img
                                                             src={
-                                                                product.image
+                                                                product
+                                                                    .image
                                                             }
                                                             alt={
-                                                                product.name
+                                                                product
+                                                                    .name
                                                             }
                                                             className="w-100 h-100 object-fit-cover"
                                                         />
@@ -980,14 +1400,16 @@ export default function MerchandiseRequestPage() {
                                                 <div className="card-body p-4 d-flex flex-column">
                                                     <div className="mb-3">
                                                         <span className="badge rounded-pill text-bg-primary mb-3">
-                                                            {product.category
+                                                            {product
+                                                                .category
                                                                 ?.name ||
                                                                 'Merchandise'}
                                                         </span>
 
                                                         <h5 className="fw-black mb-2">
                                                             {
-                                                                product.name
+                                                                product
+                                                                    .name
                                                             }
                                                         </h5>
 
@@ -998,7 +1420,8 @@ export default function MerchandiseRequestPage() {
                                                                     1.7,
                                                             }}
                                                         >
-                                                            {product.description ||
+                                                            {product
+                                                                .description ||
                                                                 'Tidak ada deskripsi.'}
                                                         </p>
                                                     </div>
@@ -1011,7 +1434,8 @@ export default function MerchandiseRequestPage() {
 
                                                             <strong className="fs-4">
                                                                 {
-                                                                    product.stock
+                                                                    product
+                                                                        .stock
                                                                 }
                                                             </strong>
                                                         </div>
@@ -1023,7 +1447,8 @@ export default function MerchandiseRequestPage() {
                                                                     className="btn btn-primary rounded-pill"
                                                                     onClick={() =>
                                                                         handleDecreaseQty(
-                                                                            product.id
+                                                                            product
+                                                                                .id
                                                                         )
                                                                     }
                                                                 >
@@ -1032,7 +1457,8 @@ export default function MerchandiseRequestPage() {
 
                                                                 <div className="form-control text-center fw-bold rounded-pill">
                                                                     {
-                                                                        cartItem.quantity
+                                                                        cartItem
+                                                                            .quantity
                                                                     }
                                                                 </div>
 
@@ -1058,7 +1484,11 @@ export default function MerchandiseRequestPage() {
                                                                     )
                                                                 }
                                                                 disabled={
-                                                                    product.stock <=
+                                                                    Number(
+                                                                        product
+                                                                            .stock ||
+                                                                            0
+                                                                    ) <=
                                                                     0
                                                                 }
                                                             >
@@ -1095,7 +1525,8 @@ export default function MerchandiseRequestPage() {
                                         </h4>
 
                                         <p className="text-muted mb-0">
-                                            {totalQty} item dipilih
+                                            {totalQty}{' '}
+                                            item dipilih
                                         </p>
                                     </div>
 
@@ -1121,7 +1552,8 @@ export default function MerchandiseRequestPage() {
                                             ) => (
                                                 <div
                                                     key={
-                                                        item.product_id
+                                                        item
+                                                            .product_id
                                                     }
                                                     className="p-3 rounded-4 border"
                                                 >
@@ -1138,7 +1570,8 @@ export default function MerchandiseRequestPage() {
                                                             <p className="text-muted small mb-0">
                                                                 Qty:{' '}
                                                                 {
-                                                                    item.quantity
+                                                                    item
+                                                                        .quantity
                                                                 }
                                                             </p>
                                                         </div>
@@ -1148,7 +1581,8 @@ export default function MerchandiseRequestPage() {
                                                             className="btn btn-outline-danger btn-sm rounded-pill"
                                                             onClick={() =>
                                                                 handleRemoveItem(
-                                                                    item.product_id
+                                                                    item
+                                                                        .product_id
                                                                 )
                                                             }
                                                         >
@@ -1170,8 +1604,7 @@ export default function MerchandiseRequestPage() {
                                 </h4>
 
                                 <p className="text-muted mb-4">
-                                    Lengkapi data kegiatan, PIC,
-                                    pengambilan merchandise, dan informasi tamu.
+                                    Lengkapi data kegiatan, PIC, pengambilan merchandise, dan informasi tamu.
                                 </p>
 
                                 <form
@@ -1189,7 +1622,8 @@ export default function MerchandiseRequestPage() {
                                             name="event_name"
                                             className="form-control rounded-pill"
                                             value={
-                                                form.event_name
+                                                form
+                                                    .event_name
                                             }
                                             onChange={
                                                 handleChange
@@ -1209,7 +1643,8 @@ export default function MerchandiseRequestPage() {
                                             className="form-control rounded-pill"
                                             placeholder="Nama penanggung jawab kegiatan"
                                             value={
-                                                form.pic_name
+                                                form
+                                                    .pic_name
                                             }
                                             onChange={
                                                 handleChange
@@ -1229,7 +1664,8 @@ export default function MerchandiseRequestPage() {
                                             className="form-control rounded-pill"
                                             placeholder="Contoh: 081234567890"
                                             value={
-                                                form.pic_phone
+                                                form
+                                                    .pic_phone
                                             }
                                             onChange={
                                                 handleChange
@@ -1252,13 +1688,21 @@ export default function MerchandiseRequestPage() {
                                             name="activity_date"
                                             className="form-control rounded-pill"
                                             min={
-                                                minimumActivityDate
+                                                minimumActivityDate ||
+                                                undefined
                                             }
                                             value={
-                                                form.activity_date
+                                                form
+                                                    .activity_date
                                             }
                                             onChange={
                                                 handleChange
+                                            }
+                                            disabled={
+                                                settingLoading ||
+                                                Boolean(
+                                                    settingError
+                                                )
                                             }
                                             required
                                         />
@@ -1266,7 +1710,13 @@ export default function MerchandiseRequestPage() {
                                         <div className="form-text text-primary fw-semibold">
                                             <i className="bi bi-info-circle me-1" />
 
-                                            Pengajuan minimal H-4 dari tanggal kegiatan.
+                                            {settingLoading
+                                                ? 'Memuat aturan pengajuan...'
+                                                : `Pengajuan minimal ${getRuleLabel(
+                                                      minimumSubmissionDays
+                                                  )}. Tanggal kegiatan paling cepat ${formatDate(
+                                                      minimumActivityDate
+                                                  )}.`}
                                         </div>
                                     </div>
 
@@ -1283,17 +1733,20 @@ export default function MerchandiseRequestPage() {
                                                 todayDate
                                             }
                                             max={
-                                                form.activity_date ||
+                                                form
+                                                    .activity_date ||
                                                 undefined
                                             }
                                             value={
-                                                form.pickup_date
+                                                form
+                                                    .pickup_date
                                             }
                                             onChange={
                                                 handleChange
                                             }
                                             disabled={
-                                                !form.activity_date
+                                                !form
+                                                    .activity_date
                                             }
                                             required
                                         />
@@ -1313,7 +1766,8 @@ export default function MerchandiseRequestPage() {
                                             name="institution_name"
                                             className="form-control rounded-pill"
                                             value={
-                                                form.institution_name
+                                                form
+                                                    .institution_name
                                             }
                                             onChange={
                                                 handleChange
@@ -1332,7 +1786,8 @@ export default function MerchandiseRequestPage() {
                                             name="guest_name"
                                             className="form-control rounded-pill"
                                             value={
-                                                form.guest_name
+                                                form
+                                                    .guest_name
                                             }
                                             onChange={
                                                 handleChange
@@ -1351,7 +1806,8 @@ export default function MerchandiseRequestPage() {
                                             name="guest_position"
                                             className="form-control rounded-pill"
                                             value={
-                                                form.guest_position
+                                                form
+                                                    .guest_position
                                             }
                                             onChange={
                                                 handleChange
@@ -1381,7 +1837,8 @@ export default function MerchandiseRequestPage() {
 
                                             <div className="small text-muted mt-1">
                                                 {proofFile
-                                                    ? proofFile.name
+                                                    ? proofFile
+                                                          .name
                                                     : 'PDF, JPG, JPEG, PNG. Maksimal 5 MB.'}
                                             </div>
                                         </label>
@@ -1408,7 +1865,8 @@ export default function MerchandiseRequestPage() {
                                             className="form-control rounded-4"
                                             rows="4"
                                             value={
-                                                form.user_note
+                                                form
+                                                    .user_note
                                             }
                                             onChange={
                                                 handleChange
@@ -1422,7 +1880,11 @@ export default function MerchandiseRequestPage() {
                                             type="submit"
                                             className="btn btn-primary rounded-pill"
                                             disabled={
-                                                submitting
+                                                submitting ||
+                                                settingLoading ||
+                                                Boolean(
+                                                    settingError
+                                                )
                                             }
                                         >
                                             {submitting ? (
