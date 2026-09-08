@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\BorrowRequestController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\HumasServiceRequestController;
+use App\Http\Controllers\Api\HumasSettingController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\UserController;
@@ -70,6 +71,46 @@ Route::middleware('auth:sanctum')
                 ]
             );
         });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pengaturan Layanan Humas
+        |--------------------------------------------------------------------------
+        |
+        | GET:
+        | Semua user login dapat membaca setting.
+        |
+        | PUT service:
+        | Admin dan superadmin dapat buka/tutup layanan.
+        |
+        | PUT submission-rule:
+        | Controller membatasi hanya superadmin.
+        |
+        */
+
+        Route::get(
+            '/humas-settings',
+            [
+                HumasSettingController::class,
+                'show',
+            ]
+        );
+
+        Route::put(
+            '/humas-settings/service',
+            [
+                HumasSettingController::class,
+                'updateService',
+            ]
+        );
+
+        Route::put(
+            '/humas-settings/submission-rule',
+            [
+                HumasSettingController::class,
+                'updateSubmissionRule',
+            ]
+        );
 
         /*
         |--------------------------------------------------------------------------
@@ -377,15 +418,6 @@ Route::middleware('auth:sanctum')
         |--------------------------------------------------------------------------
         | Pengajuan SEKPiM
         |--------------------------------------------------------------------------
-        |
-        | Satu endpoint digunakan untuk:
-        |
-        | request_type = borrow
-        | → Peminjaman Barang
-        |
-        | request_type = asset_request
-        | → Request Barang
-        |
         */
 
         Route::middleware(
@@ -442,30 +474,11 @@ Route::middleware('auth:sanctum')
         |--------------------------------------------------------------------------
         | Approval SEKPiM - Process
         |--------------------------------------------------------------------------
-        |
-        | PEMINJAMAN BARANG
-        |
-        | pending
-        | → approved
-        | → borrowed
-        | → returned
-        |
-        |
-        | REQUEST BARANG
-        |
-        | pending
-        | → approved
-        | → completed
-        |
         */
 
         Route::middleware(
             'permission:approval.borrowing.process'
         )->group(function (): void {
-            /*
-             * Berlaku untuk Peminjaman Barang
-             * dan Request Barang.
-             */
             Route::put(
                 '/borrow-requests/{id}/approve',
                 [
@@ -476,10 +489,6 @@ Route::middleware('auth:sanctum')
                 'id'
             );
 
-            /*
-             * Berlaku untuk Peminjaman Barang
-             * dan Request Barang.
-             */
             Route::put(
                 '/borrow-requests/{id}/reject',
                 [
@@ -490,11 +499,6 @@ Route::middleware('auth:sanctum')
                 'id'
             );
 
-            /*
-             * Khusus Peminjaman Barang.
-             *
-             * approved → borrowed
-             */
             Route::put(
                 '/borrow-requests/{id}/borrowed',
                 [
@@ -505,11 +509,6 @@ Route::middleware('auth:sanctum')
                 'id'
             );
 
-            /*
-             * Khusus Peminjaman Barang.
-             *
-             * borrowed → returned
-             */
             Route::put(
                 '/borrow-requests/{id}/returned',
                 [
@@ -520,14 +519,6 @@ Route::middleware('auth:sanctum')
                 'id'
             );
 
-            /*
-             * Khusus Request Barang.
-             *
-             * approved → completed
-             *
-             * Bukti penyerahan wajib.
-             * Stok berkurang permanen.
-             */
             Route::put(
                 '/borrow-requests/{id}/complete',
                 [
@@ -703,7 +694,7 @@ Route::middleware('auth:sanctum')
                 );
 
             Route::patch(
-                '/users/{user}',
+                '/admin/users/{user}',
                 [
                     UserController::class,
                     'update',

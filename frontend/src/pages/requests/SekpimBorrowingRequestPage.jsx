@@ -21,6 +21,12 @@ const REQUEST_TYPE_BORROW =
 const REQUEST_TYPE_ASSET_REQUEST =
     'asset_request';
 
+const SERVICE_KEY_BORROW =
+    'sekpim_borrow';
+
+const SERVICE_KEY_ASSET_REQUEST =
+    'sekpim_asset_request';
+
 const ACTIVE_BORROW_STATUSES = [
     'pending',
     'approved',
@@ -66,33 +72,18 @@ const toLocalDateString = (
 ) => {
     return [
         date.getFullYear(),
+
         padNumber(
             date.getMonth() +
                 1
         ),
+
         padNumber(
             date.getDate()
         ),
     ].join(
         '-'
     );
-};
-
-const addDays = (
-    date,
-    days
-) => {
-    const nextDate =
-        new Date(
-            date
-        );
-
-    nextDate.setDate(
-        nextDate.getDate() +
-            days
-    );
-
-    return nextDate;
 };
 
 const formatDate = (
@@ -174,7 +165,8 @@ const normalizePhone = (
     value
 ) => {
     return String(
-        value || ''
+        value ||
+            ''
     ).replace(
         /[^0-9+\-\s().]/g,
         ''
@@ -187,15 +179,22 @@ const getBackendErrorMessage = (
         'Pengajuan gagal dikirim.'
 ) => {
     const responseData =
-        error?.response?.data;
+        error
+            ?.response
+            ?.data;
 
     if (
-        responseData?.errors
+        responseData
+            ?.errors
     ) {
         const firstError =
             Object.values(
                 responseData.errors
-            )?.[0]?.[0];
+            )
+                .flat()
+                .find(
+                    Boolean
+                );
 
         if (
             firstError
@@ -205,7 +204,8 @@ const getBackendErrorMessage = (
     }
 
     return (
-        responseData?.message ||
+        responseData
+            ?.message ||
         fallbackMessage
     );
 };
@@ -244,9 +244,20 @@ const getStatusLabel = (
 
         completed:
             'Selesai',
-    }[status] ||
+    }[
+        status
+    ] ||
         status ||
         '-';
+};
+
+const getRuleLabel = (
+    days
+) => {
+    return `H-${Number(
+        days ||
+            0
+    )}`;
 };
 
 export default function SekpimBorrowingRequestPage() {
@@ -306,6 +317,41 @@ export default function SekpimBorrowingRequestPage() {
         true
     );
 
+    const [
+        settingLoading,
+        setSettingLoading,
+    ] = useState(
+        true
+    );
+
+    const [
+        settingError,
+        setSettingError,
+    ] = useState(
+        ''
+    );
+
+    const [
+        submissionSettings,
+        setSubmissionSettings,
+    ] = useState({
+        [SERVICE_KEY_BORROW]: {
+            min_submission_days:
+                4,
+
+            minimum_date:
+                '',
+        },
+
+        [SERVICE_KEY_ASSET_REQUEST]: {
+            min_submission_days:
+                4,
+
+            minimum_date:
+                '',
+        },
+    });
+
     const today =
         useMemo(
             () =>
@@ -315,15 +361,149 @@ export default function SekpimBorrowingRequestPage() {
             []
         );
 
+    /*
+    |--------------------------------------------------------------------------
+    | CURRENT DYNAMIC SETTING
+    |--------------------------------------------------------------------------
+    */
+
+    const currentServiceKey =
+        form
+            .request_type ===
+        REQUEST_TYPE_ASSET_REQUEST
+            ? SERVICE_KEY_ASSET_REQUEST
+            : SERVICE_KEY_BORROW;
+
+    const currentSubmissionSetting =
+        submissionSettings[
+            currentServiceKey
+        ] || {
+            min_submission_days:
+                4,
+
+            minimum_date:
+                '',
+        };
+
+    const minimumSubmissionDays =
+        Number(
+            currentSubmissionSetting
+                .min_submission_days ??
+                4
+        );
+
     const minimumActivityDate =
-        useMemo(
-            () =>
-                toLocalDateString(
-                    addDays(
-                        new Date(),
-                        4
-                    )
-                ),
+        currentSubmissionSetting
+            .minimum_date ||
+        '';
+
+    /*
+    |--------------------------------------------------------------------------
+    | FETCH GLOBAL SETTINGS
+    |--------------------------------------------------------------------------
+    */
+
+    const fetchSubmissionSettings =
+        useCallback(
+            async () => {
+                try {
+                    setSettingLoading(
+                        true
+                    );
+
+                    setSettingError(
+                        ''
+                    );
+
+                    const response =
+                        await api.get(
+                            '/humas-settings'
+                        );
+
+                    const data =
+                        response
+                            ?.data
+                            ?.data ||
+                        {};
+
+                    const allSettings =
+                        data
+                            ?.submission_settings ||
+                        {};
+
+                    const borrowSetting =
+                        allSettings[
+                            SERVICE_KEY_BORROW
+                        ];
+
+                    const assetSetting =
+                        allSettings[
+                            SERVICE_KEY_ASSET_REQUEST
+                        ];
+
+                    if (
+                        !borrowSetting ||
+                        !assetSetting
+                    ) {
+                        throw new Error(
+                            'Pengaturan batas pengajuan SEKPiM belum lengkap.'
+                        );
+                    }
+
+                    setSubmissionSettings({
+                        [SERVICE_KEY_BORROW]: {
+                            min_submission_days:
+                                Number(
+                                    borrowSetting
+                                        ?.min_submission_days ??
+                                        4
+                                ),
+
+                            minimum_date:
+                                borrowSetting
+                                    ?.minimum_date ||
+                                '',
+                        },
+
+                        [SERVICE_KEY_ASSET_REQUEST]: {
+                            min_submission_days:
+                                Number(
+                                    assetSetting
+                                        ?.min_submission_days ??
+                                        4
+                                ),
+
+                            minimum_date:
+                                assetSetting
+                                    ?.minimum_date ||
+                                '',
+                        },
+                    });
+                } catch (
+                    error
+                ) {
+                    console.error(
+                        'Fetch SEKPiM submission settings error:',
+                        error
+                            ?.response
+                            ?.data ||
+                            error
+                    );
+
+                    setSettingError(
+                        getBackendErrorMessage(
+                            error,
+                            error
+                                ?.message ||
+                                'Pengaturan batas pengajuan SEKPiM gagal dimuat.'
+                        )
+                    );
+                } finally {
+                    setSettingLoading(
+                        false
+                    );
+                }
+            },
             []
         );
 
@@ -331,12 +511,6 @@ export default function SekpimBorrowingRequestPage() {
     |--------------------------------------------------------------------------
     | CHECK ACTIVE BORROW
     |--------------------------------------------------------------------------
-    |
-    | Backend tetap menjadi pengaman utama.
-    |
-    | Frontend hanya memberikan UX agar user langsung tahu
-    | bahwa Peminjaman Barang sementara tidak tersedia.
-    |
     */
 
     const fetchActiveBorrow =
@@ -363,9 +537,11 @@ export default function SekpimBorrowingRequestPage() {
                         )
                             ? data
                             : Array.isArray(
-                                  data?.data
+                                  data
+                                      ?.data
                               )
-                              ? data.data
+                              ? data
+                                    .data
                               : [];
 
                     const found =
@@ -394,10 +570,6 @@ export default function SekpimBorrowingRequestPage() {
                             null
                     );
 
-                    /*
-                     * Jika user punya peminjaman aktif,
-                     * otomatis arahkan pilihan awal ke Request Barang.
-                     */
                     if (
                         found
                     ) {
@@ -409,6 +581,12 @@ export default function SekpimBorrowingRequestPage() {
 
                                 request_type:
                                     REQUEST_TYPE_ASSET_REQUEST,
+
+                                activity_date:
+                                    '',
+
+                                borrow_date:
+                                    '',
 
                                 return_date:
                                     '',
@@ -426,10 +604,6 @@ export default function SekpimBorrowingRequestPage() {
                             error
                     );
 
-                    /*
-                     * Tidak memblok form jika endpoint riwayat gagal,
-                     * karena backend store tetap akan melakukan validasi.
-                     */
                     setActiveBorrow(
                         null
                     );
@@ -444,7 +618,7 @@ export default function SekpimBorrowingRequestPage() {
 
     /*
     |--------------------------------------------------------------------------
-    | FETCH PRODUCTS
+    | PRODUCTS
     |--------------------------------------------------------------------------
     */
 
@@ -509,16 +683,18 @@ export default function SekpimBorrowingRequestPage() {
         () => {
             fetchProducts();
             fetchActiveBorrow();
+            fetchSubmissionSettings();
         },
         [
             fetchProducts,
             fetchActiveBorrow,
+            fetchSubmissionSettings,
         ]
     );
 
     /*
     |--------------------------------------------------------------------------
-    | FILTER PRODUCT BY REQUEST TYPE
+    | FILTER PRODUCTS
     |--------------------------------------------------------------------------
     */
 
@@ -541,12 +717,6 @@ export default function SekpimBorrowingRequestPage() {
                             product
                                 ?.sekpim_item_type;
 
-                        /*
-                         * Legacy fallback:
-                         *
-                         * Produk lama type borrow/both
-                         * dianggap barang peminjaman.
-                         */
                         if (
                             !sekpimType &&
                             [
@@ -698,7 +868,8 @@ export default function SekpimBorrowingRequestPage() {
                     ) =>
                         total +
                         Number(
-                            item.quantity ||
+                            item
+                                .quantity ||
                                 0
                         ),
                     0
@@ -744,22 +915,20 @@ export default function SekpimBorrowingRequestPage() {
                         requestType,
 
                     /*
-                     * Request Barang tidak mempunyai
-                     * tanggal pengembalian.
+                     * Reset seluruh tanggal karena setiap jenis
+                     * dapat mempunyai aturan H-n berbeda.
                      */
+                    activity_date:
+                        '',
+
+                    borrow_date:
+                        '',
+
                     return_date:
-                        requestType ===
-                        REQUEST_TYPE_ASSET_REQUEST
-                            ? ''
-                            : previous
-                                  .return_date,
+                        '',
                 })
             );
 
-            /*
-             * Produk tiap jenis berbeda.
-             * Keranjang wajib dikosongkan ketika ganti jenis.
-             */
             setCart(
                 []
             );
@@ -781,7 +950,8 @@ export default function SekpimBorrowingRequestPage() {
         ) => {
             if (
                 Number(
-                    product.stock ||
+                    product
+                        .stock ||
                         0
                 ) <=
                 0
@@ -794,48 +964,64 @@ export default function SekpimBorrowingRequestPage() {
                 return;
             }
 
+            const existingItem =
+                cart.find(
+                    (
+                        item
+                    ) =>
+                        item
+                            .product_id ===
+                        product.id
+                );
+
+            if (
+                existingItem &&
+                existingItem
+                    .quantity >=
+                    Number(
+                        product
+                            .stock ||
+                            0
+                    )
+            ) {
+                await showWarningAlert(
+                    'Stok Tidak Cukup',
+                    `Stok ${product.name} hanya tersedia ${product.stock}.`
+                );
+
+                return;
+            }
+
             setCart(
                 (
                     previousCart
                 ) => {
-                    const existingItem =
+                    const existing =
                         previousCart.find(
                             (
                                 item
                             ) =>
-                                item.product_id ===
+                                item
+                                    .product_id ===
                                 product.id
                         );
 
                     if (
-                        existingItem
+                        existing
                     ) {
-                        if (
-                            existingItem.quantity >=
-                            Number(
-                                product.stock ||
-                                    0
-                            )
-                        ) {
-                            showWarningAlert(
-                                'Stok Tidak Cukup',
-                                `Stok ${product.name} hanya tersedia ${product.stock}.`
-                            );
-
-                            return previousCart;
-                        }
-
                         return previousCart.map(
                             (
                                 item
                             ) =>
-                                item.product_id ===
+                                item
+                                    .product_id ===
                                 product.id
                                     ? {
                                           ...item,
 
                                           quantity:
-                                              item.quantity +
+                                              item
+                                                  .quantity +
                                               1,
                                       }
                                     : item
@@ -870,13 +1056,15 @@ export default function SekpimBorrowingRequestPage() {
                             (
                                 item
                             ) =>
-                                item.product_id ===
+                                item
+                                    .product_id ===
                                 productId
                                     ? {
                                           ...item,
 
                                           quantity:
-                                              item.quantity -
+                                              item
+                                                  .quantity -
                                               1,
                                       }
                                     : item
@@ -885,7 +1073,8 @@ export default function SekpimBorrowingRequestPage() {
                             (
                                 item
                             ) =>
-                                item.quantity >
+                                item
+                                    .quantity >
                                 0
                         );
                 }
@@ -901,7 +1090,8 @@ export default function SekpimBorrowingRequestPage() {
                     (
                         item
                     ) =>
-                        item.product_id ===
+                        item
+                            .product_id ===
                         product.id
                 );
 
@@ -916,9 +1106,11 @@ export default function SekpimBorrowingRequestPage() {
             }
 
             if (
-                currentItem.quantity >=
+                currentItem
+                    .quantity >=
                 Number(
-                    product.stock ||
+                    product
+                        .stock ||
                         0
                 )
             ) {
@@ -939,7 +1131,8 @@ export default function SekpimBorrowingRequestPage() {
                             item
                         ) => {
                             if (
-                                item.product_id !==
+                                item
+                                    .product_id !==
                                 product.id
                             ) {
                                 return item;
@@ -949,7 +1142,8 @@ export default function SekpimBorrowingRequestPage() {
                                 ...item,
 
                                 quantity:
-                                    item.quantity +
+                                    item
+                                        .quantity +
                                     1,
                             };
                         }
@@ -969,7 +1163,8 @@ export default function SekpimBorrowingRequestPage() {
                         (
                             item
                         ) =>
-                            item.product_id !==
+                            item
+                                .product_id !==
                             productId
                     )
             );
@@ -977,7 +1172,7 @@ export default function SekpimBorrowingRequestPage() {
 
     /*
     |--------------------------------------------------------------------------
-    | FORM CHANGE
+    | FORM
     |--------------------------------------------------------------------------
     */
 
@@ -1017,15 +1212,11 @@ export default function SekpimBorrowingRequestPage() {
                 ) => {
                     const nextForm = {
                         ...previous,
+
                         [name]:
                             value,
                     };
 
-                    /*
-                     * Jika tanggal kegiatan berubah dan
-                     * tanggal pengambilan jadi lebih besar,
-                     * kosongkan tanggal pengambilan.
-                     */
                     if (
                         name ===
                             'activity_date' &&
@@ -1036,18 +1227,15 @@ export default function SekpimBorrowingRequestPage() {
                             .borrow_date >
                             value
                     ) {
-                        nextForm.borrow_date =
+                        nextForm
+                            .borrow_date =
                             '';
 
-                        nextForm.return_date =
+                        nextForm
+                            .return_date =
                             '';
                     }
 
-                    /*
-                     * Jika tanggal pengambilan berubah dan
-                     * tanggal return lebih awal,
-                     * kosongkan return.
-                     */
                     if (
                         name ===
                             'borrow_date' &&
@@ -1058,7 +1246,8 @@ export default function SekpimBorrowingRequestPage() {
                             .return_date <
                             value
                     ) {
-                        nextForm.return_date =
+                        nextForm
+                            .return_date =
                             '';
                     }
 
@@ -1075,6 +1264,28 @@ export default function SekpimBorrowingRequestPage() {
 
     const validateForm =
         async () => {
+            if (
+                settingLoading
+            ) {
+                await showWarningAlert(
+                    'Pengaturan Masih Dimuat',
+                    'Tunggu sampai aturan batas pengajuan selesai dimuat.'
+                );
+
+                return false;
+            }
+
+            if (
+                settingError
+            ) {
+                await showWarningAlert(
+                    'Pengaturan Belum Tersedia',
+                    'Aturan batas pengajuan SEKPiM gagal dimuat. Silakan muat ulang halaman.'
+                );
+
+                return false;
+            }
+
             if (
                 form
                     .request_type ===
@@ -1204,15 +1415,21 @@ export default function SekpimBorrowingRequestPage() {
             }
 
             if (
+                minimumActivityDate &&
                 form
                     .activity_date <
-                minimumActivityDate
+                    minimumActivityDate
             ) {
                 await showWarningAlert(
-                    'Belum Memenuhi H-4',
-                    `Tanggal kegiatan paling cepat ${formatDate(
-                        minimumActivityDate
-                    )}. Pengajuan harus dilakukan minimal H-4.`
+                    'Belum Memenuhi Batas Pengajuan',
+                    minimumSubmissionDays ===
+                    0
+                        ? 'Tanggal kegiatan tidak boleh sebelum hari ini.'
+                        : `${getRequestTypeLabel(
+                              form.request_type
+                          )} harus diajukan minimal H-${minimumSubmissionDays}. Tanggal kegiatan paling cepat ${formatDate(
+                              minimumActivityDate
+                          )}.`
                 );
 
                 return false;
@@ -1344,10 +1561,6 @@ export default function SekpimBorrowingRequestPage() {
                         form
                             .activity_date,
 
-                    /*
-                     * Backend menggunakan borrow_date
-                     * sebagai tanggal pengambilan.
-                     */
                     borrow_date:
                         form
                             .borrow_date,
@@ -1418,6 +1631,7 @@ export default function SekpimBorrowingRequestPage() {
                 await Promise.all([
                     fetchProducts(),
                     fetchActiveBorrow(),
+                    fetchSubmissionSettings(),
                 ]);
             } catch (
                 error
@@ -1444,11 +1658,10 @@ export default function SekpimBorrowingRequestPage() {
                     )
                 );
 
-                /*
-                 * Jika backend menolak karena masih ada
-                 * peminjaman aktif, refresh status.
-                 */
-                await fetchActiveBorrow();
+                await Promise.all([
+                    fetchActiveBorrow(),
+                    fetchSubmissionSettings(),
+                ]);
             } finally {
                 setSubmitting(
                     false
@@ -1490,11 +1703,13 @@ export default function SekpimBorrowingRequestPage() {
     */
 
     const isBorrow =
-        form.request_type ===
+        form
+            .request_type ===
         REQUEST_TYPE_BORROW;
 
     const isAssetRequest =
-        form.request_type ===
+        form
+            .request_type ===
         REQUEST_TYPE_ASSET_REQUEST;
 
     const pageTitle =
@@ -1509,6 +1724,34 @@ export default function SekpimBorrowingRequestPage() {
 
     return (
         <div className="container-fluid px-0">
+            {settingError && (
+                <div className="alert alert-danger border-0 shadow-sm rounded-4 mb-4">
+                    <div className="d-flex align-items-start gap-3">
+                        <i className="bi bi-exclamation-triangle-fill fs-4" />
+
+                        <div className="flex-grow-1">
+                            <div className="fw-bold">
+                                Aturan pengajuan gagal dimuat
+                            </div>
+
+                            <div className="small">
+                                {settingError}
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            className="btn btn-outline-danger btn-sm rounded-pill"
+                            onClick={
+                                fetchSubmissionSettings
+                            }
+                        >
+                            Muat Ulang
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {activeBorrow && (
                 <div className="alert alert-warning border-0 shadow-sm rounded-4 mb-4">
                     <div className="d-flex align-items-start gap-3">
@@ -1542,7 +1785,7 @@ export default function SekpimBorrowingRequestPage() {
                             </div>
 
                             <div className="small">
-                                Peminjaman Barang baru dapat dibuat setelah barang pada pengajuan sebelumnya dikembalikan dan diselesaikan admin. Kamu tetap dapat menggunakan fitur{' '}
+                                Peminjaman Barang baru dapat dibuat setelah barang sebelumnya dikembalikan dan diselesaikan admin. Kamu tetap dapat menggunakan fitur{' '}
 
                                 <strong>
                                     Request Barang
@@ -1582,29 +1825,38 @@ export default function SekpimBorrowingRequestPage() {
                                         1.8,
                                 }}
                             >
-                                Pilih Peminjaman Barang untuk perlengkapan yang harus dikembalikan, atau Request Barang untuk kebutuhan seperti kertas kop dan map yang tidak dikembalikan.
+                                Pilih Peminjaman Barang untuk perlengkapan yang harus dikembalikan, atau Request Barang untuk kebutuhan yang diberikan kepada pemohon.
                             </p>
                         </div>
 
                         <div className="col-lg-4">
                             <div className="p-4 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-25">
                                 <div className="small text-white-50 mb-1">
-                                    Ketentuan waktu
+                                    Ketentuan waktu {getRequestTypeLabel(
+                                        form.request_type
+                                    )}
                                 </div>
 
                                 <div className="fs-4 fw-black">
-                                    Minimal H-4
+                                    {settingLoading
+                                        ? 'Memuat...'
+                                        : `Minimal ${getRuleLabel(
+                                              minimumSubmissionDays
+                                          )}`}
                                 </div>
 
-                                <div className="small text-white-50 mt-2">
-                                    Tanggal kegiatan paling cepat{' '}
+                                {!settingLoading &&
+                                    !settingError && (
+                                        <div className="small text-white-50 mt-2">
+                                            Tanggal kegiatan paling cepat{' '}
 
-                                    <strong className="text-white">
-                                        {formatDate(
-                                            minimumActivityDate
-                                        )}
-                                    </strong>
-                                </div>
+                                            <strong className="text-white">
+                                                {formatDate(
+                                                    minimumActivityDate
+                                                )}
+                                            </strong>
+                                        </div>
+                                    )}
                             </div>
                         </div>
                     </div>
@@ -1623,7 +1875,7 @@ export default function SekpimBorrowingRequestPage() {
                         </h3>
 
                         <p className="text-muted mb-0">
-                            Jenis pengajuan menentukan barang yang tersedia serta proses setelah approval.
+                            Masing-masing jenis pengajuan dapat memiliki batas waktu pengajuan yang berbeda.
                         </p>
                     </div>
 
@@ -1683,13 +1935,20 @@ export default function SekpimBorrowingRequestPage() {
                                         </div>
 
                                         <p className="text-muted mb-3">
-                                            Untuk barang seperti taplak meja, piring, gelas, dan perlengkapan yang wajib dikembalikan.
+                                            Untuk barang yang wajib dikembalikan setelah digunakan.
                                         </p>
 
                                         <div className="small fw-bold text-success">
-                                            <i className="bi bi-arrow-return-left me-2" />
+                                            <i className="bi bi-clock-history me-2" />
 
-                                            Barang wajib dikembalikan
+                                            Minimal{' '}
+
+                                            {getRuleLabel(
+                                                submissionSettings[
+                                                    SERVICE_KEY_BORROW
+                                                ]
+                                                    ?.min_submission_days
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -1712,10 +1971,6 @@ export default function SekpimBorrowingRequestPage() {
                                 disabled={
                                     checkingBorrowStatus
                                 }
-                                style={{
-                                    cursor:
-                                        'pointer',
-                                }}
                             >
                                 <div className="d-flex align-items-start gap-3">
                                     <div
@@ -1741,13 +1996,20 @@ export default function SekpimBorrowingRequestPage() {
                                         </h5>
 
                                         <p className="text-muted mb-3">
-                                            Untuk barang seperti kertas kop, map Tel-U, dan kebutuhan lain yang diberikan kepada pemohon.
+                                            Untuk barang yang diberikan kepada pemohon dan tidak perlu dikembalikan.
                                         </p>
 
                                         <div className="small fw-bold text-primary">
-                                            <i className="bi bi-check-circle-fill me-2" />
+                                            <i className="bi bi-clock-history me-2" />
 
-                                            Tidak perlu dikembalikan
+                                            Minimal{' '}
+
+                                            {getRuleLabel(
+                                                submissionSettings[
+                                                    SERVICE_KEY_ASSET_REQUEST
+                                                ]
+                                                    ?.min_submission_days
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -1777,8 +2039,8 @@ export default function SekpimBorrowingRequestPage() {
                                             className="form-control"
                                             placeholder={
                                                 isBorrow
-                                                    ? 'Cari taplak, piring, gelas...'
-                                                    : 'Cari kertas kop, map Tel-U...'
+                                                    ? 'Cari barang peminjaman...'
+                                                    : 'Cari barang request...'
                                             }
                                             value={
                                                 search
@@ -1814,8 +2076,7 @@ export default function SekpimBorrowingRequestPage() {
                                                     }`}
                                                 >
                                                     {getRequestTypeLabel(
-                                                        form
-                                                            .request_type
+                                                        form.request_type
                                                     )}
                                                 </div>
 
@@ -1858,27 +2119,14 @@ export default function SekpimBorrowingRequestPage() {
                       0 ? (
                         <div className="card border-0 shadow-sm rounded-5">
                             <div className="card-body p-5 text-center">
-                                <div
-                                    className="mx-auto mb-3 d-flex align-items-center justify-content-center rounded-5 bg-light text-secondary"
-                                    style={{
-                                        width:
-                                            76,
+                                <i className="bi bi-inbox fs-1 text-muted" />
 
-                                        height:
-                                            76,
-                                    }}
-                                >
-                                    <i className="bi bi-inbox fs-1" />
-                                </div>
-
-                                <h5 className="fw-black mb-2">
+                                <h5 className="fw-black mt-3">
                                     Barang tidak ditemukan
                                 </h5>
 
                                 <p className="text-muted mb-0">
-                                    {isBorrow
-                                        ? 'Belum ada barang aktif yang tersedia untuk Peminjaman Barang.'
-                                        : 'Belum ada barang aktif yang tersedia untuk Request Barang.'}
+                                    Belum ada barang aktif untuk jenis pengajuan ini.
                                 </p>
                             </div>
                         </div>
@@ -1893,13 +2141,16 @@ export default function SekpimBorrowingRequestPage() {
                                             (
                                                 item
                                             ) =>
-                                                item.product_id ===
-                                                product.id
+                                                item
+                                                    .product_id ===
+                                                product
+                                                    .id
                                         );
 
                                     const stock =
                                         Number(
-                                            product.stock ||
+                                            product
+                                                .stock ||
                                                 0
                                         );
 
@@ -1907,7 +2158,8 @@ export default function SekpimBorrowingRequestPage() {
                                         <div
                                             className="col-12 col-md-6 col-xxl-4"
                                             key={
-                                                product.id
+                                                product
+                                                    .id
                                             }
                                         >
                                             <div className="card border-0 shadow-sm rounded-5 overflow-hidden h-100">
@@ -1925,10 +2177,12 @@ export default function SekpimBorrowingRequestPage() {
                                                     {product.image ? (
                                                         <img
                                                             src={
-                                                                product.image
+                                                                product
+                                                                    .image
                                                             }
                                                             alt={
-                                                                product.name
+                                                                product
+                                                                    .name
                                                             }
                                                             className="w-100 h-100 object-fit-cover"
                                                         />
@@ -1962,36 +2216,25 @@ export default function SekpimBorrowingRequestPage() {
 
                                                         <h5 className="fw-black mb-2">
                                                             {
-                                                                product.name
+                                                                product
+                                                                    .name
                                                             }
                                                         </h5>
 
-                                                        <p
-                                                            className="text-muted small mb-0"
-                                                            style={{
-                                                                lineHeight:
-                                                                    1.7,
-                                                            }}
-                                                        >
-                                                            {product.description ||
+                                                        <p className="text-muted small">
+                                                            {product
+                                                                .description ||
                                                                 'Tidak ada deskripsi.'}
                                                         </p>
                                                     </div>
 
                                                     <div className="mt-auto">
-                                                        <div className="p-3 rounded-4 border bg-light d-flex align-items-center justify-content-between mb-3">
+                                                        <div className="p-3 rounded-4 border bg-light d-flex justify-content-between mb-3">
                                                             <span className="small text-muted fw-bold">
                                                                 Stok tersedia
                                                             </span>
 
-                                                            <strong
-                                                                className={`fs-4 ${
-                                                                    stock >
-                                                                    0
-                                                                        ? ''
-                                                                        : 'text-danger'
-                                                                }`}
-                                                            >
+                                                            <strong className="fs-4">
                                                                 {
                                                                     stock
                                                                 }
@@ -2009,7 +2252,8 @@ export default function SekpimBorrowingRequestPage() {
                                                                     }`}
                                                                     onClick={() =>
                                                                         handleDecreaseQty(
-                                                                            product.id
+                                                                            product
+                                                                                .id
                                                                         )
                                                                     }
                                                                 >
@@ -2018,7 +2262,8 @@ export default function SekpimBorrowingRequestPage() {
 
                                                                 <div className="form-control text-center fw-black rounded-pill">
                                                                     {
-                                                                        cartItem.quantity
+                                                                        cartItem
+                                                                            .quantity
                                                                     }
                                                                 </div>
 
@@ -2082,28 +2327,14 @@ export default function SekpimBorrowingRequestPage() {
                     >
                         <section className="card border-0 shadow-sm rounded-5 mb-4">
                             <div className="card-body p-4">
-                                <div className="d-flex align-items-center justify-content-between mb-3">
-                                    <div>
-                                        <h4 className="fw-black mb-1">
-                                            Keranjang
-                                        </h4>
+                                <h4 className="fw-black mb-1">
+                                    Keranjang
+                                </h4>
 
-                                        <p className="text-muted mb-0">
-                                            {totalQty}{' '}
-                                            barang dipilih
-                                        </p>
-                                    </div>
-
-                                    <div
-                                        className={`icon-box ${
-                                            isBorrow
-                                                ? 'bg-success-subtle text-success'
-                                                : 'bg-primary-subtle text-primary'
-                                        }`}
-                                    >
-                                        <i className="bi bi-cart-fill fs-4" />
-                                    </div>
-                                </div>
+                                <p className="text-muted">
+                                    {totalQty}{' '}
+                                    barang dipilih
+                                </p>
 
                                 {selectedItems.length ===
                                 0 ? (
@@ -2122,29 +2353,28 @@ export default function SekpimBorrowingRequestPage() {
                                             ) => (
                                                 <div
                                                     key={
-                                                        item.product_id
+                                                        item
+                                                            .product_id
                                                     }
                                                     className="p-3 rounded-4 border"
                                                 >
-                                                    <div className="d-flex align-items-start justify-content-between gap-2">
-                                                        <div className="min-w-0">
+                                                    <div className="d-flex justify-content-between gap-2">
+                                                        <div>
                                                             <h6 className="fw-black mb-1">
                                                                 {
-                                                                    item.product.name
+                                                                    item
+                                                                        .product
+                                                                        .name
                                                                 }
                                                             </h6>
 
-                                                            <p className="text-muted small mb-0">
+                                                            <div className="small text-muted">
                                                                 Qty:{' '}
                                                                 {
-                                                                    item.quantity
-                                                                }{' '}
-                                                                • Stok:{' '}
-
-                                                                {
-                                                                    item.product.stock
+                                                                    item
+                                                                        .quantity
                                                                 }
-                                                            </p>
+                                                            </div>
                                                         </div>
 
                                                         <button
@@ -2152,7 +2382,8 @@ export default function SekpimBorrowingRequestPage() {
                                                             className="btn btn-outline-danger btn-sm rounded-pill"
                                                             onClick={() =>
                                                                 handleRemoveItem(
-                                                                    item.product_id
+                                                                    item
+                                                                        .product_id
                                                                 )
                                                             }
                                                         >
@@ -2180,9 +2411,7 @@ export default function SekpimBorrowingRequestPage() {
                                 </span>
 
                                 <h4 className="fw-black mb-1">
-                                    {
-                                        pageTitle
-                                    }
+                                    {pageTitle}
                                 </h4>
 
                                 <p className="text-muted mb-4">
@@ -2196,26 +2425,19 @@ export default function SekpimBorrowingRequestPage() {
                                 >
                                     <div className="mb-3">
                                         <label className="form-label fw-bold">
-                                            Nama PIC{' '}
-
-                                            <span className="text-danger">
-                                                *
-                                            </span>
+                                            Nama PIC *
                                         </label>
 
                                         <input
                                             type="text"
                                             name="pic_name"
                                             className="form-control rounded-pill"
-                                            placeholder="Nama PIC kegiatan"
                                             value={
-                                                form.pic_name
+                                                form
+                                                    .pic_name
                                             }
                                             onChange={
                                                 handleChange
-                                            }
-                                            maxLength={
-                                                255
                                             }
                                             required
                                         />
@@ -2223,42 +2445,27 @@ export default function SekpimBorrowingRequestPage() {
 
                                     <div className="mb-3">
                                         <label className="form-label fw-bold">
-                                            Nomor PIC{' '}
-
-                                            <span className="text-danger">
-                                                *
-                                            </span>
+                                            Nomor PIC *
                                         </label>
 
                                         <input
                                             type="text"
                                             name="pic_phone"
                                             className="form-control rounded-pill"
-                                            placeholder="Contoh: 081234567890"
                                             value={
-                                                form.pic_phone
+                                                form
+                                                    .pic_phone
                                             }
                                             onChange={
                                                 handleChange
                                             }
-                                            maxLength={
-                                                30
-                                            }
                                             required
                                         />
-
-                                        <div className="form-text">
-                                            Nomor WhatsApp atau telepon PIC yang dapat dihubungi.
-                                        </div>
                                     </div>
 
                                     <div className="mb-3">
                                         <label className="form-label fw-bold">
-                                            Tanggal Kegiatan{' '}
-
-                                            <span className="text-danger">
-                                                *
-                                            </span>
+                                            Tanggal Kegiatan *
                                         </label>
 
                                         <input
@@ -2266,36 +2473,39 @@ export default function SekpimBorrowingRequestPage() {
                                             name="activity_date"
                                             className="form-control rounded-pill"
                                             value={
-                                                form.activity_date
+                                                form
+                                                    .activity_date
                                             }
                                             min={
-                                                minimumActivityDate
+                                                minimumActivityDate ||
+                                                undefined
                                             }
                                             onChange={
                                                 handleChange
+                                            }
+                                            disabled={
+                                                settingLoading ||
+                                                Boolean(
+                                                    settingError
+                                                )
                                             }
                                             required
                                         />
 
                                         <div className="form-text">
-                                            Minimal H-4. Tanggal paling cepat{' '}
-
-                                            <strong>
-                                                {formatDate(
-                                                    minimumActivityDate
-                                                )}
-                                            </strong>
-                                            .
+                                            {settingLoading
+                                                ? 'Memuat aturan batas pengajuan...'
+                                                : `Minimal ${getRuleLabel(
+                                                      minimumSubmissionDays
+                                                  )}. Tanggal paling cepat ${formatDate(
+                                                      minimumActivityDate
+                                                  )}.`}
                                         </div>
                                     </div>
 
                                     <div className="mb-3">
                                         <label className="form-label fw-bold">
-                                            Tanggal Pengambilan{' '}
-
-                                            <span className="text-danger">
-                                                *
-                                            </span>
+                                            Tanggal Pengambilan *
                                         </label>
 
                                         <input
@@ -2303,13 +2513,15 @@ export default function SekpimBorrowingRequestPage() {
                                             name="borrow_date"
                                             className="form-control rounded-pill"
                                             value={
-                                                form.borrow_date
+                                                form
+                                                    .borrow_date
                                             }
                                             min={
                                                 today
                                             }
                                             max={
-                                                form.activity_date ||
+                                                form
+                                                    .activity_date ||
                                                 undefined
                                             }
                                             onChange={
@@ -2317,20 +2529,12 @@ export default function SekpimBorrowingRequestPage() {
                                             }
                                             required
                                         />
-
-                                        <div className="form-text">
-                                            Pengambilan dapat dilakukan mulai hari ini dan tidak boleh setelah tanggal kegiatan.
-                                        </div>
                                     </div>
 
                                     {isBorrow && (
                                         <div className="mb-3">
                                             <label className="form-label fw-bold">
-                                                Tanggal Pengembalian{' '}
-
-                                                <span className="text-danger">
-                                                    *
-                                                </span>
+                                                Tanggal Pengembalian *
                                             </label>
 
                                             <input
@@ -2338,10 +2542,12 @@ export default function SekpimBorrowingRequestPage() {
                                                 name="return_date"
                                                 className="form-control rounded-pill"
                                                 value={
-                                                    form.return_date
+                                                    form
+                                                        .return_date
                                                 }
                                                 min={
-                                                    form.borrow_date ||
+                                                    form
+                                                        .borrow_date ||
                                                     today
                                                 }
                                                 onChange={
@@ -2349,15 +2555,13 @@ export default function SekpimBorrowingRequestPage() {
                                                 }
                                                 required
                                             />
-
-                                            <div className="form-text">
-                                                Barang wajib dikembalikan paling cepat pada tanggal pengambilan.
-                                            </div>
                                         </div>
                                     )}
 
-                                    {form.activity_date &&
-                                        form.borrow_date && (
+                                    {form
+                                        .activity_date &&
+                                        form
+                                            .borrow_date && (
                                             <div
                                                 className={`p-3 rounded-4 mb-3 ${
                                                     isBorrow
@@ -2369,68 +2573,55 @@ export default function SekpimBorrowingRequestPage() {
                                                     Ringkasan Jadwal
                                                 </div>
 
-                                                <div className="d-flex flex-column gap-1 small">
-                                                    <div>
-                                                        <strong>
-                                                            Kegiatan:
-                                                        </strong>{' '}
+                                                <div className="small">
+                                                    <strong>
+                                                        Kegiatan:
+                                                    </strong>{' '}
 
-                                                        {formatDate(
-                                                            form.activity_date
-                                                        )}
-                                                    </div>
-
-                                                    <div>
-                                                        <strong>
-                                                            Pengambilan:
-                                                        </strong>{' '}
-
-                                                        {formatDate(
-                                                            form.borrow_date
-                                                        )}
-                                                    </div>
-
-                                                    {isBorrow &&
-                                                        form.return_date && (
-                                                            <div>
-                                                                <strong>
-                                                                    Pengembalian:
-                                                                </strong>{' '}
-
-                                                                {formatDate(
-                                                                    form.return_date
-                                                                )}
-                                                            </div>
-                                                        )}
+                                                    {formatDate(
+                                                        form.activity_date
+                                                    )}
                                                 </div>
+
+                                                <div className="small">
+                                                    <strong>
+                                                        Pengambilan:
+                                                    </strong>{' '}
+
+                                                    {formatDate(
+                                                        form.borrow_date
+                                                    )}
+                                                </div>
+
+                                                {isBorrow &&
+                                                    form
+                                                        .return_date && (
+                                                        <div className="small">
+                                                            <strong>
+                                                                Pengembalian:
+                                                            </strong>{' '}
+
+                                                            {formatDate(
+                                                                form.return_date
+                                                            )}
+                                                        </div>
+                                                    )}
                                             </div>
                                         )}
 
                                     <div className="mb-4">
                                         <label className="form-label fw-bold">
-                                            Keperluan{' '}
-
-                                            <span className="text-danger">
-                                                *
-                                            </span>
+                                            Keperluan *
                                         </label>
 
                                         <textarea
                                             name="purpose"
                                             className="form-control rounded-4"
-                                            rows={
-                                                5
-                                            }
-                                            maxLength={
-                                                3000
-                                            }
-                                            placeholder={
-                                                isBorrow
-                                                    ? 'Contoh: Peminjaman taplak meja untuk kegiatan rapat pimpinan...'
-                                                    : 'Contoh: Request map Tel-U untuk kebutuhan penerimaan tamu...'
-                                            }
+                                            rows="5"
+                                            maxLength="3000"
                                             value={
-                                                form.purpose
+                                                form
+                                                    .purpose
                                             }
                                             onChange={
                                                 handleChange
@@ -2440,7 +2631,9 @@ export default function SekpimBorrowingRequestPage() {
 
                                         <div className="form-text text-end">
                                             {
-                                                form.purpose.length
+                                                form
+                                                    .purpose
+                                                    .length
                                             }
                                             /3000
                                         </div>
@@ -2450,13 +2643,13 @@ export default function SekpimBorrowingRequestPage() {
                                         <div className="alert alert-warning border-0 rounded-4 small">
                                             <i className="bi bi-info-circle-fill me-2" />
 
-                                            Kamu tidak dapat membuat Peminjaman Barang baru sebelum peminjaman aktif sebelumnya dikembalikan dan diselesaikan admin.
+                                            Peminjaman baru hanya dapat dibuat setelah peminjaman aktif sebelumnya selesai.
                                         </div>
                                     ) : (
                                         <div className="alert alert-primary border-0 rounded-4 small">
                                             <i className="bi bi-info-circle-fill me-2" />
 
-                                            Request Barang tidak memiliki proses pengembalian. Stok akan dikurangi permanen ketika barang diserahkan oleh admin.
+                                            Request Barang tidak mempunyai proses pengembalian.
                                         </div>
                                     )}
 
@@ -2471,6 +2664,10 @@ export default function SekpimBorrowingRequestPage() {
                                             disabled={
                                                 submitting ||
                                                 checkingBorrowStatus ||
+                                                settingLoading ||
+                                                Boolean(
+                                                    settingError
+                                                ) ||
                                                 (
                                                     isBorrow &&
                                                     Boolean(
@@ -2506,8 +2703,6 @@ export default function SekpimBorrowingRequestPage() {
                                                 submitting
                                             }
                                         >
-                                            <i className="bi bi-arrow-counterclockwise me-2" />
-
                                             Reset Form
                                         </button>
                                     </div>

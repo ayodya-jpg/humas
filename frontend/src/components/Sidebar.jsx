@@ -33,19 +33,32 @@ const ROLE_LABELS = {
     superadmin: 'Super Admin',
 };
 
+const ADMIN_ROLES = [
+    'admin',
+    'admin_humas',
+    'admin_sekpim',
+    'superadmin',
+];
+
 const extractResponseData = (
     response
 ) => {
     const payload =
         response?.data?.data;
 
-    if (Array.isArray(payload)) {
+    if (
+        Array.isArray(
+            payload
+        )
+    ) {
         return payload;
     }
 
     if (
         payload &&
-        Array.isArray(payload.data)
+        Array.isArray(
+            payload.data
+        )
     ) {
         return payload.data;
     }
@@ -53,9 +66,13 @@ const extractResponseData = (
     return [];
 };
 
-const getRoleLabel = (role) => {
+const getRoleLabel = (
+    role
+) => {
     return (
-        ROLE_LABELS[role] ||
+        ROLE_LABELS[
+            role
+        ] ||
         role ||
         'Pengguna'
     );
@@ -65,22 +82,45 @@ const createMenuGroups = (
     basePath,
     isSuperadmin
 ) => [
+    /*
+    |--------------------------------------------------------------------------
+    | UTAMA
+    |--------------------------------------------------------------------------
+    */
+
     {
-        title: 'Utama',
+        title:
+            'Utama',
 
         items: [
             {
-                label: 'Dashboard',
-                icon: 'bi-speedometer2',
-                path: `${basePath}/dashboard`,
-                permission: 'dashboard.view',
-                badgeKey: null,
+                label:
+                    'Dashboard',
+
+                icon:
+                    'bi-speedometer2',
+
+                path:
+                    `${basePath}/dashboard`,
+
+                permission:
+                    'dashboard.view',
+
+                badgeKey:
+                    null,
             },
         ],
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | PENGAJUAN SAYA
+    |--------------------------------------------------------------------------
+    */
+
     {
-        title: 'Pengajuan Saya',
+        title:
+            'Pengajuan Saya',
 
         items: [
             {
@@ -96,7 +136,8 @@ const createMenuGroups = (
                 permission:
                     'request.merchandise.create',
 
-                badgeKey: null,
+                badgeKey:
+                    null,
             },
 
             {
@@ -112,7 +153,8 @@ const createMenuGroups = (
                 permission:
                     'request.humas.create',
 
-                badgeKey: null,
+                badgeKey:
+                    null,
             },
 
             {
@@ -128,7 +170,8 @@ const createMenuGroups = (
                 permission:
                     'request.borrowing.create',
 
-                badgeKey: null,
+                badgeKey:
+                    null,
             },
 
             {
@@ -144,15 +187,24 @@ const createMenuGroups = (
                 permission:
                     'request.history.view',
 
-                badgeKey: null,
+                badgeKey:
+                    null,
             },
         ],
     },
 
-    {
-        title: 'Layanan Humas',
+    /*
+    |--------------------------------------------------------------------------
+    | LAYANAN HUMAS
+    |--------------------------------------------------------------------------
+    */
 
-        adminOnly: true,
+    {
+        title:
+            'Layanan Humas',
+
+        adminOnly:
+            true,
 
         items: [
             {
@@ -191,10 +243,18 @@ const createMenuGroups = (
         ],
     },
 
-    {
-        title: 'Layanan SEKPiM',
+    /*
+    |--------------------------------------------------------------------------
+    | LAYANAN SEKPIM
+    |--------------------------------------------------------------------------
+    */
 
-        adminOnly: true,
+    {
+        title:
+            'Layanan SEKPiM',
+
+        adminOnly:
+            true,
 
         items: [
             {
@@ -216,10 +276,18 @@ const createMenuGroups = (
         ],
     },
 
-    {
-        title: 'Master Data',
+    /*
+    |--------------------------------------------------------------------------
+    | MASTER DATA
+    |--------------------------------------------------------------------------
+    */
 
-        adminOnly: true,
+    {
+        title:
+            'Master Data',
+
+        adminOnly:
+            true,
 
         items: [
             {
@@ -235,7 +303,8 @@ const createMenuGroups = (
                 permission:
                     'categories.view',
 
-                badgeKey: null,
+                badgeKey:
+                    null,
             },
 
             {
@@ -257,10 +326,18 @@ const createMenuGroups = (
         ],
     },
 
-    {
-        title: 'Manajemen Sistem',
+    /*
+    |--------------------------------------------------------------------------
+    | MANAJEMEN SISTEM
+    |--------------------------------------------------------------------------
+    */
 
-        adminOnly: true,
+    {
+        title:
+            'Manajemen Sistem',
+
+        adminOnly:
+            true,
 
         items: [
             {
@@ -278,7 +355,8 @@ const createMenuGroups = (
                     'users.manage',
                 ],
 
-                badgeKey: null,
+                badgeKey:
+                    null,
             },
 
             {
@@ -291,20 +369,67 @@ const createMenuGroups = (
                 path:
                     '/admin/users/create',
 
-                superadminOnly: true,
+                superadminOnly:
+                    true,
 
-                permission: null,
+                permission:
+                    null,
 
-                badgeKey: null,
+                badgeKey:
+                    null,
+            },
+
+            /*
+             * Pengaturan Layanan sekarang berada
+             * pada Manajemen Sistem karena:
+             *
+             * - mengatur H-n Merchandise
+             * - mengatur H-n Humas
+             * - mengatur H-n Peminjaman SEKPiM
+             * - mengatur H-n Request Barang
+             * - membuka / menutup layanan Humas
+             *
+             * Semua admin boleh membuka halaman.
+             * Hak edit masing-masing setting tetap
+             * diamankan oleh backend.
+             */
+            {
+                label:
+                    'Pengaturan Layanan',
+
+                icon:
+                    'bi-sliders2',
+
+                path:
+                    '/admin/humas-settings',
+
+                adminRoleOnly:
+                    true,
+
+                permission:
+                    null,
+
+                badgeKey:
+                    null,
             },
         ],
     },
 
-    {
-        title: 'Akses Superadmin',
+    /*
+    |--------------------------------------------------------------------------
+    | AKSES SUPERADMIN
+    |--------------------------------------------------------------------------
+    */
 
-        adminOnly: true,
-        superadminOnly: true,
+    {
+        title:
+            'Akses Superadmin',
+
+        adminOnly:
+            true,
+
+        superadminOnly:
+            true,
 
         items: [
             {
@@ -317,30 +442,54 @@ const createMenuGroups = (
                 path:
                     '/admin/users',
 
-                permission: null,
+                permission:
+                    null,
 
-                superadminOnly: true,
+                superadminOnly:
+                    true,
 
-                badgeKey: null,
+                badgeKey:
+                    null,
             },
         ],
     },
 ].filter(
-    (group) =>
-        !group.superadminOnly ||
+    (
+        group
+    ) =>
+        !group
+            .superadminOnly ||
         isSuperadmin
 );
+
+/*
+|--------------------------------------------------------------------------
+| ITEM ACCESS
+|--------------------------------------------------------------------------
+*/
 
 const isItemAllowed = (
     item,
     currentUser
 ) => {
     if (
-        item.superadminOnly
+        item
+            .superadminOnly
     ) {
         return (
-            currentUser?.role ===
+            currentUser
+                ?.role ===
             'superadmin'
+        );
+    }
+
+    if (
+        item
+            .adminRoleOnly
+    ) {
+        return ADMIN_ROLES.includes(
+            currentUser
+                ?.role
         );
     }
 
@@ -367,15 +516,15 @@ export default function Sidebar({
     );
 
     /*
-     * getStoredUser dipanggil ketika komponen render.
-     * Setelah login ulang atau layout dibuat ulang,
-     * data permission terbaru langsung digunakan.
+     * User selalu dibaca dari localStorage
+     * ketika Sidebar dirender.
      */
     const currentUser =
         getStoredUser();
 
     const role =
-        currentUser?.role ||
+        currentUser
+            ?.role ||
         'user';
 
     const isSuperadmin =
@@ -397,8 +546,18 @@ export default function Sidebar({
         );
 
     const isOpen =
-        Boolean(sidebarOpen) ||
-        Boolean(isSidebarOpen);
+        Boolean(
+            sidebarOpen
+        ) ||
+        Boolean(
+            isSidebarOpen
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | MENU
+    |--------------------------------------------------------------------------
+    */
 
     const menuGroups =
         useMemo(
@@ -412,6 +571,12 @@ export default function Sidebar({
                 isSuperadmin,
             ]
         );
+
+    /*
+    |--------------------------------------------------------------------------
+    | BADGE PERMISSIONS
+    |--------------------------------------------------------------------------
+    */
 
     const canViewMerchandiseApproval =
         hasPermission(
@@ -437,6 +602,12 @@ export default function Sidebar({
             'products.view'
         );
 
+    /*
+    |--------------------------------------------------------------------------
+    | BADGE DATA
+    |--------------------------------------------------------------------------
+    */
+
     const fetchBadgeData =
         useCallback(
             async () => {
@@ -445,7 +616,9 @@ export default function Sidebar({
                         'admin_token'
                     );
 
-                if (!token) {
+                if (
+                    !token
+                ) {
                     setBadges(
                         EMPTY_BADGES
                     );
@@ -453,9 +626,15 @@ export default function Sidebar({
                     return;
                 }
 
-                const requests = [];
-                const requestKeys = [];
+                const requests =
+                    [];
 
+                const requestKeys =
+                    [];
+
+                /*
+                 * Merchandise approval.
+                 */
                 if (
                     canViewMerchandiseApproval
                 ) {
@@ -470,6 +649,9 @@ export default function Sidebar({
                     );
                 }
 
+                /*
+                 * Humas approval.
+                 */
                 if (
                     canViewHumasApproval
                 ) {
@@ -484,6 +666,9 @@ export default function Sidebar({
                     );
                 }
 
+                /*
+                 * SEKPiM approval.
+                 */
                 if (
                     canViewBorrowingApproval
                 ) {
@@ -498,6 +683,9 @@ export default function Sidebar({
                     );
                 }
 
+                /*
+                 * Produk stok rendah.
+                 */
                 if (
                     canViewProducts
                 ) {
@@ -525,11 +713,13 @@ export default function Sidebar({
 
                 try {
                     const responses =
-                        await Promise.allSettled(
-                            requests
-                        );
+                        await Promise
+                            .allSettled(
+                                requests
+                            );
 
-                    const resultMap = {};
+                    const resultMap =
+                        {};
 
                     responses.forEach(
                         (
@@ -542,86 +732,116 @@ export default function Sidebar({
                                 ];
 
                             if (
-                                result.status ===
+                                result
+                                    .status ===
                                 'fulfilled'
                             ) {
-                                resultMap[key] =
+                                resultMap[
+                                    key
+                                ] =
                                     extractResponseData(
-                                        result.value
+                                        result
+                                            .value
                                     );
 
                                 return;
                             }
 
-                            resultMap[key] =
+                            resultMap[
+                                key
+                            ] =
                                 [];
 
                             /*
-                             * Jangan tampilkan alert untuk badge.
-                             * Kegagalan salah satu endpoint tidak boleh
-                             * membuat seluruh sidebar berhenti.
+                             * Error badge tidak boleh
+                             * menghentikan Sidebar.
                              */
                             console.error(
                                 `Fetch sidebar badge ${key} error:`,
-                                result.reason
+
+                                result
+                                    .reason
                                     ?.response
                                     ?.data ||
-                                    result.reason
+                                    result
+                                        .reason
                             );
                         }
                     );
 
                     const orders =
-                        resultMap.orders ||
+                        resultMap
+                            .orders ||
                         [];
 
                     const humasRequests =
-                        resultMap.humas ||
+                        resultMap
+                            .humas ||
                         [];
 
                     const borrowRequests =
-                        resultMap.borrowing ||
+                        resultMap
+                            .borrowing ||
                         [];
 
                     const products =
-                        resultMap.products ||
+                        resultMap
+                            .products ||
                         [];
 
                     setBadges({
                         merchandisePending:
                             orders.filter(
-                                (item) =>
-                                    item.status ===
+                                (
+                                    item
+                                ) =>
+                                    item
+                                        .status ===
                                     'pending'
                             ).length,
 
                         humasPending:
                             humasRequests.filter(
-                                (item) =>
-                                    item.status ===
+                                (
+                                    item
+                                ) =>
+                                    item
+                                        .status ===
                                     'pending'
                             ).length,
 
                         borrowingPending:
                             borrowRequests.filter(
-                                (item) =>
-                                    item.status ===
+                                (
+                                    item
+                                ) =>
+                                    item
+                                        .status ===
                                     'pending'
                             ).length,
 
                         lowStock:
                             products.filter(
-                                (item) =>
+                                (
+                                    item
+                                ) =>
                                     Number(
-                                        item.stock ||
+                                        item
+                                            .stock ||
                                             0
-                                    ) <= 5
+                                    ) <=
+                                    5
                             ).length,
                     });
-                } catch (error) {
+                } catch (
+                    error
+                ) {
                     console.error(
                         'Fetch sidebar badges error:',
-                        error?.response?.data ||
+
+                        error
+                            ?.response
+                            ?.data ||
                             error
                     );
 
@@ -638,53 +858,89 @@ export default function Sidebar({
             ]
         );
 
-    useEffect(() => {
-        fetchBadgeData();
-    }, [
-        fetchBadgeData,
-        location.pathname,
-    ]);
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD BADGES
+    |--------------------------------------------------------------------------
+    */
 
-    useEffect(() => {
-        const intervalId =
-            window.setInterval(
-                fetchBadgeData,
-                30000
-            );
+    useEffect(
+        () => {
+            fetchBadgeData();
+        },
+        [
+            fetchBadgeData,
+            location.pathname,
+        ]
+    );
 
-        return () => {
-            window.clearInterval(
-                intervalId
-            );
-        };
-    }, [fetchBadgeData]);
+    /*
+     * Refresh badge setiap 30 detik.
+     */
+    useEffect(
+        () => {
+            const intervalId =
+                window.setInterval(
+                    fetchBadgeData,
+                    30000
+                );
+
+            return () => {
+                window.clearInterval(
+                    intervalId
+                );
+            };
+        },
+        [
+            fetchBadgeData,
+        ]
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | FILTER MENU
+    |--------------------------------------------------------------------------
+    */
 
     const allowedGroups =
         useMemo(
             () =>
                 menuGroups
                     .filter(
-                        (group) =>
-                            !group.adminOnly ||
+                        (
+                            group
+                        ) =>
+                            !group
+                                .adminOnly ||
                             !isUserRole
                     )
                     .map(
-                        (group) => ({
+                        (
+                            group
+                        ) => ({
                             ...group,
 
                             items:
-                                group.items.filter(
-                                    (item) =>
-                                        isItemAllowed(
-                                            item,
-                                            currentUser
-                                        )
-                                ),
+                                group
+                                    .items
+                                    .filter(
+                                        (
+                                            item
+                                        ) =>
+                                            isItemAllowed(
+                                                item,
+                                                currentUser
+                                            )
+                                    ),
                         })
                     )
                     .filter(
-                        (group) =>
-                            group.items.length >
+                        (
+                            group
+                        ) =>
+                            group
+                                .items
+                                .length >
                             0
                     ),
             [
@@ -694,93 +950,140 @@ export default function Sidebar({
             ]
         );
 
-    const closeSidebar = () => {
-        setSidebarOpen(false);
-        setIsSidebarOpen(false);
-    };
+    /*
+    |--------------------------------------------------------------------------
+    | CLOSE SIDEBAR
+    |--------------------------------------------------------------------------
+    */
 
-    const isActiveMenu = (
-        item
-    ) => {
-        if (
-            item.path ===
-            `${basePath}/dashboard`
-        ) {
-            return (
-                location.pathname ===
-                item.path
+    const closeSidebar =
+        () => {
+            setSidebarOpen(
+                false
             );
-        }
 
-        /*
-         * Hindari /admin/users dianggap aktif untuk semua halaman
-         * ketika menu Tambah User juga tersedia.
-         */
-        if (
-            item.path ===
-            '/admin/users'
-        ) {
-            return (
-                location.pathname ===
-                '/admin/users' ||
-                (
-                    location.pathname.startsWith(
-                        '/admin/users/'
-                    ) &&
-                    location.pathname !==
-                        '/admin/users/create'
-                )
+            setIsSidebarOpen(
+                false
             );
-        }
+        };
 
-        return (
-            location.pathname ===
-                item.path ||
-            location.pathname.startsWith(
-                `${item.path}/`
-            )
-        );
-    };
+    /*
+    |--------------------------------------------------------------------------
+    | ACTIVE MENU
+    |--------------------------------------------------------------------------
+    */
 
-    const getBadgeValue = (
-        badgeKey
-    ) => {
-        if (!badgeKey) {
-            return 0;
-        }
+    const isActiveMenu =
+        (
+            item
+        ) => {
+            if (
+                item
+                    .path ===
+                `${basePath}/dashboard`
+            ) {
+                return (
+                    location
+                        .pathname ===
+                    item.path
+                );
+            }
 
-        return Number(
-            badges[badgeKey] ||
-                0
-        );
-    };
+            /*
+             * Data User tidak boleh ikut aktif
+             * ketika halaman Tambah User dibuka.
+             */
+            if (
+                item
+                    .path ===
+                '/admin/users'
+            ) {
+                return (
+                    location
+                        .pathname ===
+                        '/admin/users' ||
+                    (
+                        location
+                            .pathname
+                            .startsWith(
+                                '/admin/users/'
+                            ) &&
+                        location
+                            .pathname !==
+                            '/admin/users/create'
+                    )
+                );
+            }
 
-    const getBadgeClass = (
-        badgeKey
-    ) => {
-        if (
-            badgeKey ===
-            'lowStock'
-        ) {
-            return 'sidebar-badge-danger';
-        }
+            return (
+                location
+                    .pathname ===
+                    item.path ||
+                location
+                    .pathname
+                    .startsWith(
+                        `${item.path}/`
+                    )
+            );
+        };
 
-        if (
-            badgeKey ===
-            'humasPending'
-        ) {
-            return 'sidebar-badge-warning';
-        }
+    /*
+    |--------------------------------------------------------------------------
+    | BADGE HELPERS
+    |--------------------------------------------------------------------------
+    */
 
-        if (
-            badgeKey ===
-            'borrowingPending'
-        ) {
-            return 'sidebar-badge-success';
-        }
+    const getBadgeValue =
+        (
+            badgeKey
+        ) => {
+            if (
+                !badgeKey
+            ) {
+                return 0;
+            }
 
-        return 'sidebar-badge-primary';
-    };
+            return Number(
+                badges[
+                    badgeKey
+                ] ||
+                    0
+            );
+        };
+
+    const getBadgeClass =
+        (
+            badgeKey
+        ) => {
+            if (
+                badgeKey ===
+                'lowStock'
+            ) {
+                return 'sidebar-badge-danger';
+            }
+
+            if (
+                badgeKey ===
+                'humasPending'
+            ) {
+                return 'sidebar-badge-warning';
+            }
+
+            if (
+                badgeKey ===
+                'borrowingPending'
+            ) {
+                return 'sidebar-badge-success';
+            }
+
+            return 'sidebar-badge-primary';
+        };
+
+    /*
+    |--------------------------------------------------------------------------
+    | VIEW
+    |--------------------------------------------------------------------------
+    */
 
     return (
         <>
@@ -791,6 +1094,8 @@ export default function Sidebar({
                         : ''
                 }`}
             >
+                {/* BRAND */}
+
                 <div className="sidebar-brand">
                     <Link
                         to={
@@ -809,7 +1114,10 @@ export default function Sidebar({
                                 onError={(
                                     event
                                 ) => {
-                                    event.currentTarget.style.display =
+                                    event
+                                        .currentTarget
+                                        .style
+                                        .display =
                                         'none';
                                 }}
                             />
@@ -842,19 +1150,25 @@ export default function Sidebar({
                     </button>
                 </div>
 
+                {/* USER */}
+
                 <div className="sidebar-user">
                     <div className="profile-avatar bg-white text-danger">
                         {(
-                            currentUser?.name ||
+                            currentUser
+                                ?.name ||
                             'U'
                         )
-                            .charAt(0)
+                            .charAt(
+                                0
+                            )
                             .toUpperCase()}
                     </div>
 
                     <div className="min-w-0">
                         <div className="sidebar-user-name text-truncate">
-                            {currentUser?.name ||
+                            {currentUser
+                                ?.name ||
                                 'Pengguna'}
                         </div>
 
@@ -866,94 +1180,107 @@ export default function Sidebar({
                     </div>
                 </div>
 
+                {/* NAVIGATION */}
+
                 <nav className="sidebar-nav">
                     {allowedGroups.map(
-                        (group) => (
+                        (
+                            group
+                        ) => (
                             <div
                                 className="sidebar-group"
                                 key={
-                                    group.title
+                                    group
+                                        .title
                                 }
                             >
                                 <div className="sidebar-group-title">
                                     {
-                                        group.title
+                                        group
+                                            .title
                                     }
                                 </div>
 
                                 <div className="sidebar-menu">
-                                    {group.items.map(
-                                        (item) => {
-                                            const active =
-                                                isActiveMenu(
-                                                    item
-                                                );
+                                    {group
+                                        .items
+                                        .map(
+                                            (
+                                                item
+                                            ) => {
+                                                const active =
+                                                    isActiveMenu(
+                                                        item
+                                                    );
 
-                                            const badgeValue =
-                                                getBadgeValue(
-                                                    item.badgeKey
-                                                );
+                                                const badgeValue =
+                                                    getBadgeValue(
+                                                        item
+                                                            .badgeKey
+                                                    );
 
-                                            return (
-                                                <Link
-                                                    key={
-                                                        `${group.title}-${item.path}-${item.label}`
-                                                    }
-                                                    to={
-                                                        item.path
-                                                    }
-                                                    className={`sidebar-link ${
-                                                        active
-                                                            ? 'active'
-                                                            : ''
-                                                    }`}
-                                                    onClick={
-                                                        closeSidebar
-                                                    }
-                                                >
-                                                    <span className="sidebar-link-icon">
-                                                        <i
-                                                            className={`bi ${item.icon}`}
-                                                        />
-                                                    </span>
-
-                                                    <span className="sidebar-link-text">
-                                                        {
-                                                            item.label
+                                                return (
+                                                    <Link
+                                                        key={`${group.title}-${item.path}-${item.label}`}
+                                                        to={
+                                                            item
+                                                                .path
                                                         }
-                                                    </span>
-
-                                                    {badgeValue >
-                                                        0 && (
-                                                        <span
-                                                            className={`sidebar-badge ${getBadgeClass(
-                                                                item.badgeKey
-                                                            )}`}
-                                                        >
-                                                            {badgeValue >
-                                                            99
-                                                                ? '99+'
-                                                                : badgeValue}
+                                                        className={`sidebar-link ${
+                                                            active
+                                                                ? 'active'
+                                                                : ''
+                                                        }`}
+                                                        onClick={
+                                                            closeSidebar
+                                                        }
+                                                    >
+                                                        <span className="sidebar-link-icon">
+                                                            <i
+                                                                className={`bi ${item.icon}`}
+                                                            />
                                                         </span>
-                                                    )}
 
-                                                    {active &&
-                                                        badgeValue ===
+                                                        <span className="sidebar-link-text">
+                                                            {
+                                                                item
+                                                                    .label
+                                                            }
+                                                        </span>
+
+                                                        {badgeValue >
                                                             0 && (
-                                                        <span className="sidebar-link-indicator">
-                                                            <i className="bi bi-chevron-right" />
-                                                        </span>
-                                                    )}
-                                                </Link>
-                                            );
-                                        }
-                                    )}
+                                                            <span
+                                                                className={`sidebar-badge ${getBadgeClass(
+                                                                    item
+                                                                        .badgeKey
+                                                                )}`}
+                                                            >
+                                                                {badgeValue >
+                                                                99
+                                                                    ? '99+'
+                                                                    : badgeValue}
+                                                            </span>
+                                                        )}
+
+                                                        {active &&
+                                                            badgeValue ===
+                                                                0 && (
+                                                            <span className="sidebar-link-indicator">
+                                                                <i className="bi bi-chevron-right" />
+                                                            </span>
+                                                        )}
+                                                    </Link>
+                                                );
+                                            }
+                                        )}
                                 </div>
                             </div>
                         )
                     )}
 
-                    {allowedGroups.length ===
+                    {allowedGroups
+                        .length ===
                         0 && (
                         <div className="p-3">
                             <div className="alert alert-warning border-0 rounded-4 mb-0">
@@ -969,6 +1296,8 @@ export default function Sidebar({
                     )}
                 </nav>
 
+                {/* FOOTER */}
+
                 <div className="sidebar-footer">
                     <div className="sidebar-footer-card">
                         <div className="fw-bold mb-1">
@@ -981,6 +1310,8 @@ export default function Sidebar({
                     </div>
                 </div>
             </aside>
+
+            {/* MOBILE BACKDROP */}
 
             {isOpen && (
                 <button

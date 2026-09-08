@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderRevisionHistory;
 use App\Models\Product;
+use App\Models\ServiceSubmissionSetting;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -54,8 +55,10 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
+
             'message' =>
                 'Data pengajuan merchandise berhasil diambil.',
+
             'data' =>
                 $orders,
         ]);
@@ -100,8 +103,10 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
+
             'message' =>
                 'Riwayat pengajuan merchandise berhasil diambil.',
+
             'data' =>
                 $orders,
         ]);
@@ -135,8 +140,10 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
+
             'message' =>
                 'Detail pengajuan merchandise berhasil diambil.',
+
             'data' =>
                 $order,
         ]);
@@ -320,8 +327,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
+
                 'message' =>
                     'Pengajuan merchandise berhasil dikirim.',
+
                 'data' =>
                     $order,
             ], 201);
@@ -346,8 +355,12 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
+
                 'message' =>
-                    'Pengajuan merchandise gagal dikirim.',
+                    app()->isLocal()
+                        ? $error->getMessage()
+                        : 'Pengajuan merchandise gagal dikirim.',
+
                 'data' =>
                     null,
             ], 500);
@@ -406,7 +419,8 @@ class OrderController extends Controller
                                 );
 
                         if (
-                            $lockedOrder->status !==
+                            $lockedOrder
+                                ->status !==
                             'pending'
                         ) {
                             $this->abortJson(
@@ -428,7 +442,8 @@ class OrderController extends Controller
                         OrderRevisionHistory::query()
                             ->create([
                                 'order_id' =>
-                                    $lockedOrder->id,
+                                    $lockedOrder
+                                        ->id,
 
                                 'requested_by' =>
                                     $user?->id,
@@ -478,8 +493,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
+
                 'message' =>
                     'Pengajuan merchandise dikembalikan kepada pemohon untuk direvisi.',
+
                 'data' =>
                     $order,
             ]);
@@ -496,8 +513,12 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
+
                 'message' =>
-                    'Permintaan revisi gagal diproses.',
+                    app()->isLocal()
+                        ? $error->getMessage()
+                        : 'Permintaan revisi gagal diproses.',
+
                 'data' =>
                     null,
             ], 500);
@@ -534,8 +555,11 @@ class OrderController extends Controller
                 );
 
         if (
-            (int) $order->user_id !==
-            (int) $user->id
+            (int)
+                $order
+                    ->user_id !==
+            (int)
+                $user->id
         ) {
             return $this->forbiddenResponse(
                 'Kamu hanya dapat memperbaiki pengajuan milik sendiri.'
@@ -548,8 +572,10 @@ class OrderController extends Controller
         ) {
             return response()->json([
                 'success' => false,
+
                 'message' =>
                     'Pengajuan hanya dapat diperbarui ketika berstatus revisi.',
+
                 'data' =>
                     null,
             ], 422);
@@ -566,7 +592,8 @@ class OrderController extends Controller
             null;
 
         $oldProofFilePath =
-            $order->proof_file_path;
+            $order
+                ->proof_file_path;
 
         try {
             $newProofFile =
@@ -601,7 +628,8 @@ class OrderController extends Controller
                                 );
 
                         if (
-                            $lockedOrder->status !==
+                            $lockedOrder
+                                ->status !==
                             'revision'
                         ) {
                             $this->abortJson(
@@ -785,8 +813,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
+
                 'message' =>
                     'Perbaikan pengajuan berhasil dikirim ulang.',
+
                 'data' =>
                     $updatedOrder,
             ]);
@@ -811,8 +841,12 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
+
                 'message' =>
-                    'Perbaikan pengajuan gagal dikirim ulang.',
+                    app()->isLocal()
+                        ? $error->getMessage()
+                        : 'Perbaikan pengajuan gagal dikirim ulang.',
+
                 'data' =>
                     null,
             ], 500);
@@ -847,7 +881,8 @@ class OrderController extends Controller
                                 );
 
                         if (
-                            $lockedOrder->status !==
+                            $lockedOrder
+                                ->status !==
                             'pending'
                         ) {
                             $this->abortJson(
@@ -873,14 +908,16 @@ class OrderController extends Controller
                         }
 
                         foreach (
-                            $lockedOrder->items
-                            as $item
+                            $lockedOrder
+                                ->items as
+                            $item
                         ) {
                             $product =
                                 Product::query()
                                     ->lockForUpdate()
                                     ->find(
-                                        $item->product_id
+                                        $item
+                                            ->product_id
                                     );
 
                             if (
@@ -893,7 +930,8 @@ class OrderController extends Controller
                             }
 
                             if (
-                                $product->status !==
+                                $product
+                                    ->status !==
                                 'active'
                             ) {
                                 $this->abortJson(
@@ -904,7 +942,8 @@ class OrderController extends Controller
 
                             if (
                                 !in_array(
-                                    $product->type,
+                                    $product
+                                        ->type,
                                     [
                                         'checkout',
                                         'both',
@@ -919,8 +958,12 @@ class OrderController extends Controller
                             }
 
                             if (
-                                (int) $product->stock <
-                                (int) $item->quantity
+                                (int)
+                                    $product
+                                        ->stock <
+                                (int)
+                                    $item
+                                        ->quantity
                             ) {
                                 $this->abortJson(
                                     "Stok {$product->name} tidak mencukupi.",
@@ -930,7 +973,9 @@ class OrderController extends Controller
 
                             $product->decrement(
                                 'stock',
-                                (int) $item->quantity
+                                (int)
+                                    $item
+                                        ->quantity
                             );
                         }
 
@@ -963,8 +1008,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
+
                 'message' =>
                     'Pengajuan merchandise berhasil disetujui.',
+
                 'data' =>
                     $order,
             ]);
@@ -981,8 +1028,12 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
+
                 'message' =>
-                    'Approval merchandise gagal diproses.',
+                    app()->isLocal()
+                        ? $error->getMessage()
+                        : 'Approval merchandise gagal diproses.',
+
                 'data' =>
                     null,
             ], 500);
@@ -1037,7 +1088,8 @@ class OrderController extends Controller
                                 );
 
                         if (
-                            $lockedOrder->status !==
+                            $lockedOrder
+                                ->status !==
                             'pending'
                         ) {
                             $this->abortJson(
@@ -1079,8 +1131,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
+
                 'message' =>
                     'Pengajuan merchandise berhasil ditolak.',
+
                 'data' =>
                     $order,
             ]);
@@ -1097,8 +1151,12 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
+
                 'message' =>
-                    'Penolakan pengajuan gagal diproses.',
+                    app()->isLocal()
+                        ? $error->getMessage()
+                        : 'Penolakan pengajuan gagal diproses.',
+
                 'data' =>
                     null,
             ], 500);
@@ -1143,7 +1201,8 @@ class OrderController extends Controller
                                 );
 
                         if (
-                            $lockedOrder->status !==
+                            $lockedOrder
+                                ->status !==
                             'approved'
                         ) {
                             $this->abortJson(
@@ -1190,8 +1249,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
+
                 'message' =>
                     'Pengajuan merchandise berhasil ditandai selesai.',
+
                 'data' =>
                     $order,
             ]);
@@ -1208,8 +1269,12 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => false,
+
                 'message' =>
-                    'Penyelesaian pengajuan gagal diproses.',
+                    app()->isLocal()
+                        ? $error->getMessage()
+                        : 'Penyelesaian pengajuan gagal diproses.',
+
                 'data' =>
                     null,
             ], 500);
@@ -1221,6 +1286,29 @@ class OrderController extends Controller
         bool $proofFileRequired,
         ?Order $existingOrder = null
     ): array {
+        /*
+         * Ambil aturan Merchandise terbaru.
+         *
+         * Contoh:
+         * 4 = H-4
+         * 1 = H-1
+         * 0 = H-0
+         */
+        $minimumSubmissionDays =
+            ServiceSubmissionSetting::minimumDays(
+                ServiceSubmissionSetting::SERVICE_MERCHANDISE
+            );
+
+        $today =
+            Carbon::today();
+
+        $minimumActivityDate =
+            $today
+                ->copy()
+                ->addDays(
+                    $minimumSubmissionDays
+                );
+
         $validated =
             $request->validate([
                 'event_name' => [
@@ -1356,14 +1444,6 @@ class OrderController extends Controller
                     'Pilih minimal satu merchandise.',
             ]);
 
-        $today =
-            Carbon::today();
-
-        $minimumActivityDate =
-            $today
-                ->copy()
-                ->addDays(4);
-
         $activityDate =
             Carbon::parse(
                 $validated[
@@ -1379,11 +1459,11 @@ class OrderController extends Controller
             )->startOfDay();
 
         /*
-         * Pengajuan baru wajib minimal H-4.
+         * Saat resubmit, aturan H-n hanya diterapkan
+         * jika tanggal kegiatan diubah.
          *
-         * Saat resubmit revisi, aturan H-4 hanya
-         * diterapkan lagi apabila tanggal kegiatan
-         * diubah oleh user.
+         * Dengan demikian request lama yang sedang direvisi
+         * tidak rusak hanya karena waktu sudah berjalan.
          */
         $existingActivityDate =
             $existingOrder
@@ -1406,8 +1486,14 @@ class OrderController extends Controller
                 $minimumActivityDate
             )
         ) {
+            $ruleLabel =
+                $minimumSubmissionDays ===
+                0
+                    ? 'H-0'
+                    : "H-{$minimumSubmissionDays}";
+
             $this->abortJson(
-                'Pengajuan merchandise wajib dilakukan minimal H-4 sebelum tanggal kegiatan. Pilih tanggal kegiatan minimal ' .
+                "Pengajuan merchandise wajib dilakukan minimal {$ruleLabel} sebelum tanggal kegiatan. Pilih tanggal kegiatan minimal " .
                     $minimumActivityDate
                         ->locale(
                             'id'
@@ -1432,11 +1518,11 @@ class OrderController extends Controller
         }
 
         /*
-         * Pickup lama tetap boleh dipertahankan ketika
-         * user hanya melakukan resubmit revisi.
+         * Pickup lama boleh dipertahankan ketika
+         * user melakukan resubmit revisi.
          *
-         * Tetapi jika pickup diubah, tanggal baru tidak
-         * boleh berada di masa lalu.
+         * Tetapi jika pickup diubah, tanggal baru
+         * tidak boleh berada di masa lalu.
          */
         $existingPickupDate =
             $existingOrder
@@ -1477,8 +1563,7 @@ class OrderController extends Controller
             ->delete();
 
         foreach (
-            $items as
-            $item
+            $items as $item
         ) {
             OrderItem::query()
                 ->create([
@@ -1530,8 +1615,11 @@ class OrderController extends Controller
         }
 
         return (
-            (int) $order->user_id ===
-            (int) $user->id
+            (int)
+                $order
+                    ->user_id ===
+            (int)
+                $user->id
         );
     }
 
@@ -1542,7 +1630,8 @@ class OrderController extends Controller
             $request->user();
 
         return (
-            $user !== null &&
+            $user !==
+                null &&
             $this->userHasPermission(
                 $user,
                 'approval.merchandise.process'
@@ -1575,9 +1664,11 @@ class OrderController extends Controller
 
         $permissions =
             is_array(
-                $user->permissions
+                $user
+                    ->permissions
             )
-                ? $user->permissions
+                ? $user
+                    ->permissions
                 : [];
 
         return in_array(
@@ -1591,8 +1682,7 @@ class OrderController extends Controller
         array $items
     ): void {
         foreach (
-            $items as
-            $item
+            $items as $item
         ) {
             $product =
                 Product::query()
@@ -1612,7 +1702,8 @@ class OrderController extends Controller
             }
 
             if (
-                $product->status !==
+                $product
+                    ->status !==
                 'active'
             ) {
                 $this->abortJson(
@@ -1623,7 +1714,8 @@ class OrderController extends Controller
 
             if (
                 !in_array(
-                    $product->type,
+                    $product
+                        ->type,
                     [
                         'checkout',
                         'both',
@@ -1638,10 +1730,13 @@ class OrderController extends Controller
             }
 
             if (
-                (int) $product->stock <
-                (int) $item[
-                    'quantity'
-                ]
+                (int)
+                    $product
+                        ->stock <
+                (int)
+                    $item[
+                        'quantity'
+                    ]
             ) {
                 $this->abortJson(
                     "Stok {$product->name} tidak mencukupi. Stok tersedia {$product->stock}.",
@@ -1707,8 +1802,10 @@ class OrderController extends Controller
     ): JsonResponse {
         return response()->json([
             'success' => false,
+
             'message' =>
                 $message,
+
             'data' =>
                 null,
         ], 403);

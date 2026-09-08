@@ -1,564 +1,929 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from 'react';
+
+import {
+    Link,
+} from 'react-router-dom';
 
 import api from '../../api/axios';
 
 import {
-    closeAlert,
-    showCompletionAlert,
-    showConfirmAlert,
     showErrorAlert,
-    showLoadingAlert,
-    showSuccessAlert,
-    showTextareaAlert,
 } from '../../utils/sweetAlert';
 
-const STATUS_OPTIONS = [
+const TYPE_BORROW =
+    'borrow';
+
+const TYPE_ASSET_REQUEST =
+    'asset_request';
+
+/*
+|--------------------------------------------------------------------------
+| FILTER TYPE
+|--------------------------------------------------------------------------
+*/
+
+const requestTypeOptions = [
     {
-        value: 'all',
-        label: 'Semua Status',
+        key:
+            'all',
+
+        label:
+            'Semua Jenis',
+
+        icon:
+            'bi-grid-fill',
     },
+
     {
-        value: 'pending',
-        label: 'Menunggu',
+        key:
+            TYPE_BORROW,
+
+        label:
+            'Peminjaman Barang',
+
+        icon:
+            'bi-box-arrow-up-right',
     },
+
     {
-        value: 'approved',
-        label: 'Disetujui',
-    },
-    {
-        value: 'rejected',
-        label: 'Ditolak',
-    },
-    {
-        value: 'completed',
-        label: 'Selesai',
+        key:
+            TYPE_ASSET_REQUEST,
+
+        label:
+            'Request Barang',
+
+        icon:
+            'bi-box2-heart-fill',
     },
 ];
 
-const COVERAGE_OPTIONS = [
+/*
+|--------------------------------------------------------------------------
+| FILTER STATUS
+|--------------------------------------------------------------------------
+*/
+
+const statusOptions = [
     {
-        value: 'all',
-        label: 'Semua Jenis Liputan',
+        key:
+            'all',
+
+        label:
+            'Semua',
+
+        icon:
+            'bi-collection-fill',
     },
+
     {
-        value: 'SOCIAL MEDIA',
-        label: 'Social Media',
+        key:
+            'pending',
+
+        label:
+            'Menunggu',
+
+        icon:
+            'bi-hourglass-split',
     },
+
     {
-        value: 'DOKUMENTASI',
-        label: 'Dokumentasi',
+        key:
+            'approved',
+
+        label:
+            'Disetujui',
+
+        icon:
+            'bi-check-circle-fill',
     },
+
     {
-        value: 'PUBLIKASI WEBSITE',
-        label: 'Publikasi Website',
+        key:
+            'borrowed',
+
+        label:
+            'Dipinjam',
+
+        icon:
+            'bi-box-arrow-up-right',
     },
+
     {
-        value: 'YOUTUBE',
-        label: 'YouTube',
+        key:
+            'returned',
+
+        label:
+            'Dikembalikan',
+
+        icon:
+            'bi-box-arrow-in-down-left',
     },
+
     {
-        value: 'VIDEO REELS',
-        label: 'Video Reels',
+        key:
+            'completed',
+
+        label:
+            'Selesai',
+
+        icon:
+            'bi-check2-all',
+    },
+
+    {
+        key:
+            'rejected',
+
+        label:
+            'Ditolak',
+
+        icon:
+            'bi-x-circle-fill',
     },
 ];
+
+/*
+|--------------------------------------------------------------------------
+| STATUS CONFIG
+|--------------------------------------------------------------------------
+*/
 
 const STATUS_CONFIG = {
     pending: {
-        label: 'Menunggu',
-        className: 'bg-warning-subtle text-warning-emphasis',
-        icon: 'bi-hourglass-split',
+        label:
+            'Menunggu',
+
+        className:
+            'bg-warning-subtle text-warning-emphasis',
+
+        icon:
+            'bi-hourglass-split',
     },
+
     approved: {
-        label: 'Disetujui',
-        className: 'bg-primary-subtle text-primary',
-        icon: 'bi-check-circle-fill',
+        label:
+            'Disetujui',
+
+        className:
+            'bg-primary-subtle text-primary',
+
+        icon:
+            'bi-check-circle-fill',
     },
-    rejected: {
-        label: 'Ditolak',
-        className: 'bg-danger-subtle text-danger',
-        icon: 'bi-x-circle-fill',
+
+    borrowed: {
+        label:
+            'Sedang Dipinjam',
+
+        className:
+            'bg-info-subtle text-info-emphasis',
+
+        icon:
+            'bi-box-arrow-up-right',
     },
+
+    returned: {
+        label:
+            'Dikembalikan',
+
+        className:
+            'bg-success-subtle text-success',
+
+        icon:
+            'bi-box-arrow-in-down-left',
+    },
+
     completed: {
-        label: 'Selesai',
-        className: 'bg-success-subtle text-success',
-        icon: 'bi-check2-all',
+        label:
+            'Selesai',
+
+        className:
+            'bg-success-subtle text-success',
+
+        icon:
+            'bi-check2-all',
+    },
+
+    rejected: {
+        label:
+            'Ditolak',
+
+        className:
+            'bg-danger-subtle text-danger',
+
+        icon:
+            'bi-x-circle-fill',
     },
 };
 
-const COVERAGE_CONFIG = {
-    'SOCIAL MEDIA': {
-        label: 'Social Media',
-        icon: 'bi-instagram',
-        className: 'bg-danger-subtle text-danger',
-    },
-    DOKUMENTASI: {
-        label: 'Dokumentasi',
-        icon: 'bi-camera-fill',
-        className: 'bg-success-subtle text-success',
-    },
-    'PUBLIKASI WEBSITE': {
-        label: 'Publikasi Website',
-        icon: 'bi-globe2',
-        className: 'bg-primary-subtle text-primary',
-    },
-    YOUTUBE: {
-        label: 'YouTube',
-        icon: 'bi-youtube',
-        className: 'bg-danger-subtle text-danger',
-    },
-    'VIDEO REELS': {
-        label: 'Video Reels',
-        icon: 'bi-play-btn-fill',
-        className: 'bg-warning-subtle text-warning-emphasis',
-    },
+/*
+|--------------------------------------------------------------------------
+| HELPERS
+|--------------------------------------------------------------------------
+*/
+
+const getRequestType = (
+    request
+) => {
+    /*
+     * Data lama tanpa request_type
+     * dianggap sebagai Peminjaman Barang.
+     */
+    return (
+        request
+            ?.request_type ||
+        TYPE_BORROW
+    );
 };
 
-const formatDate = (dateValue) => {
-    if (!dateValue) {
+const getRequestTypeLabel = (
+    requestType
+) => {
+    if (
+        requestType ===
+        TYPE_ASSET_REQUEST
+    ) {
+        return 'Request Barang';
+    }
+
+    return 'Peminjaman Barang';
+};
+
+const getRequestTypeIcon = (
+    requestType
+) => {
+    if (
+        requestType ===
+        TYPE_ASSET_REQUEST
+    ) {
+        return 'bi-box2-heart-fill';
+    }
+
+    return 'bi-box-arrow-up-right';
+};
+
+const getRequestTypeClass = (
+    requestType
+) => {
+    if (
+        requestType ===
+        TYPE_ASSET_REQUEST
+    ) {
+        return 'bg-primary-subtle text-primary';
+    }
+
+    return 'bg-success-subtle text-success';
+};
+
+const formatDate = (
+    date
+) => {
+    if (
+        !date
+    ) {
         return '-';
     }
 
-    const parsedDate = new Date(`${dateValue}T00:00:00`);
+    if (
+        typeof date ===
+            'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(
+            date
+        )
+    ) {
+        const [
+            year,
+            month,
+            day,
+        ] =
+            date
+                .split('-')
+                .map(
+                    Number
+                );
 
-    if (Number.isNaN(parsedDate.getTime())) {
-        return dateValue;
+        return new Date(
+            year,
+            month - 1,
+            day
+        ).toLocaleDateString(
+            'id-ID',
+            {
+                day:
+                    '2-digit',
+
+                month:
+                    'short',
+
+                year:
+                    'numeric',
+            }
+        );
     }
 
-    return new Intl.DateTimeFormat('id-ID', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-    }).format(parsedDate);
+    const parsedDate =
+        new Date(
+            date
+        );
+
+    if (
+        Number.isNaN(
+            parsedDate.getTime()
+        )
+    ) {
+        return '-';
+    }
+
+    return parsedDate
+        .toLocaleDateString(
+            'id-ID',
+            {
+                day:
+                    '2-digit',
+
+                month:
+                    'short',
+
+                year:
+                    'numeric',
+            }
+        );
 };
 
-const getResolvedUnit = (request) => {
-    if (request?.resolved_unit_name) {
-        return request.resolved_unit_name;
+const formatDateTime = (
+    date
+) => {
+    if (
+        !date
+    ) {
+        return '-';
     }
 
-    if (request?.unit_name === 'Lainnya') {
-        return request?.other_unit_name || 'Lainnya';
+    const parsedDate =
+        new Date(
+            date
+        );
+
+    if (
+        Number.isNaN(
+            parsedDate.getTime()
+        )
+    ) {
+        return '-';
     }
 
-    return request?.unit_name || '-';
+    return parsedDate
+        .toLocaleString(
+            'id-ID',
+            {
+                day:
+                    '2-digit',
+
+                month:
+                    'short',
+
+                year:
+                    'numeric',
+
+                hour:
+                    '2-digit',
+
+                minute:
+                    '2-digit',
+
+                hour12:
+                    false,
+            }
+        );
 };
 
-const extractErrorMessage = (error) => {
-    const responseData = error?.response?.data;
+const extractErrorMessage = (
+    error
+) => {
+    const responseData =
+        error
+            ?.response
+            ?.data;
 
-    if (responseData?.errors) {
-        const firstError = Object.values(responseData.errors)
-            .flat()
-            .find(Boolean);
+    if (
+        responseData
+            ?.errors
+    ) {
+        const firstError =
+            Object.values(
+                responseData
+                    .errors
+            )
+                .flat()
+                .find(
+                    Boolean
+                );
 
-        if (firstError) {
+        if (
+            firstError
+        ) {
             return firstError;
         }
     }
 
     return (
-        responseData?.message ||
-        'Terjadi kesalahan ketika memproses request liputan.'
+        responseData
+            ?.message ||
+        'Data approval SEKPiM gagal dimuat.'
     );
 };
 
-const StatusBadge = ({ status }) => {
-    const config = STATUS_CONFIG[status] || {
-        label: status || '-',
-        className: 'bg-secondary-subtle text-secondary',
-        icon: 'bi-circle-fill',
-    };
+const StatusBadge = ({
+    status,
+}) => {
+    const config =
+        STATUS_CONFIG[
+            status
+        ] || {
+            label:
+                status ||
+                '-',
+
+            className:
+                'bg-secondary-subtle text-secondary',
+
+            icon:
+                'bi-circle-fill',
+        };
 
     return (
         <span
             className={`badge rounded-pill px-3 py-2 ${config.className}`}
         >
-            <i className={`bi ${config.icon} me-2`} />
-            {config.label}
+            <i
+                className={`bi ${config.icon} me-2`}
+            />
+
+            {
+                config.label
+            }
         </span>
     );
 };
 
-const CoverageBadge = ({ type }) => {
-    const config = COVERAGE_CONFIG[type] || {
-        label: type || '-',
-        icon: 'bi-camera-reels-fill',
-        className: 'bg-secondary-subtle text-secondary',
-    };
+/*
+|--------------------------------------------------------------------------
+| PAGE
+|--------------------------------------------------------------------------
+*/
 
-    return (
-        <span
-            className={`badge rounded-pill px-3 py-2 ${config.className}`}
-        >
-            <i className={`bi ${config.icon} me-2`} />
-            {config.label}
-        </span>
+export default function BorrowingApprovalPage() {
+    const [
+        borrowRequests,
+        setBorrowRequests,
+    ] =
+        useState(
+            []
+        );
+
+    const [
+        selectedStatus,
+        setSelectedStatus,
+    ] =
+        useState(
+            'all'
+        );
+
+    const [
+        selectedType,
+        setSelectedType,
+    ] =
+        useState(
+            'all'
+        );
+
+    const [
+        search,
+        setSearch,
+    ] =
+        useState(
+            ''
+        );
+
+    const [
+        loading,
+        setLoading,
+    ] =
+        useState(
+            true
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD DATA
+    |--------------------------------------------------------------------------
+    */
+
+    const fetchBorrowRequests =
+        useCallback(
+            async (
+                showLoader =
+                    true
+            ) => {
+                try {
+                    if (
+                        showLoader
+                    ) {
+                        setLoading(
+                            true
+                        );
+                    }
+
+                    const response =
+                        await api.get(
+                            '/borrow-requests'
+                        );
+
+                    const responseData =
+                        response
+                            ?.data
+                            ?.data;
+
+                    setBorrowRequests(
+                        Array.isArray(
+                            responseData
+                        )
+                            ? responseData
+                            : []
+                    );
+                } catch (
+                    error
+                ) {
+                    console.error(
+                        'Fetch SEKPiM approval error:',
+                        error
+                            ?.response
+                            ?.data ||
+                            error
+                    );
+
+                    await showErrorAlert(
+                        'Gagal Memuat Data',
+                        extractErrorMessage(
+                            error
+                        )
+                    );
+                } finally {
+                    if (
+                        showLoader
+                    ) {
+                        setLoading(
+                            false
+                        );
+                    }
+                }
+            },
+            []
+        );
+
+    useEffect(
+        () => {
+            fetchBorrowRequests();
+
+            const intervalId =
+                window.setInterval(
+                    () => {
+                        fetchBorrowRequests(
+                            false
+                        );
+                    },
+                    30000
+                );
+
+            return () => {
+                window.clearInterval(
+                    intervalId
+                );
+            };
+        },
+        [
+            fetchBorrowRequests,
+        ]
     );
-};
 
-export default function HumasServiceApprovalPage() {
-    const [requests, setRequests] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [processingId, setProcessingId] = useState(null);
-    const [errorMessage, setErrorMessage] = useState('');
+    /*
+    |--------------------------------------------------------------------------
+    | FILTER
+    |--------------------------------------------------------------------------
+    */
 
-    const [searchKeyword, setSearchKeyword] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
-    const [coverageFilter, setCoverageFilter] = useState('all');
+    const filteredBorrowRequests =
+        useMemo(
+            () => {
+                const searchValue =
+                    search
+                        .trim()
+                        .toLowerCase();
 
-    const loadRequests = async (showLoader = true) => {
-        try {
-            if (showLoader) {
-                setLoading(true);
-            }
+                return borrowRequests.filter(
+                    (
+                        request
+                    ) => {
+                        const requestType =
+                            getRequestType(
+                                request
+                            );
 
-            setErrorMessage('');
+                        const matchStatus =
+                            selectedStatus ===
+                                'all' ||
+                            request
+                                .status ===
+                                selectedStatus;
 
-            const response = await api.get('/humas-service-requests');
+                        const matchType =
+                            selectedType ===
+                                'all' ||
+                            requestType ===
+                                selectedType;
 
-            const responseData = response?.data?.data;
+                        const searchableText = [
+                            request
+                                .borrow_code,
 
-            setRequests(
-                Array.isArray(responseData)
-                    ? responseData
-                    : []
-            );
-        } catch (error) {
-            console.error(
-                'Load Humas requests error:',
-                error?.response?.data || error
-            );
+                            request
+                                .purpose,
 
-            setErrorMessage(
-                extractErrorMessage(error)
-            );
-        } finally {
-            if (showLoader) {
-                setLoading(false);
-            }
-        }
-    };
+                            request
+                                .pic_name,
 
-    useEffect(() => {
-        loadRequests();
+                            request
+                                .pic_phone,
 
-        const intervalId = window.setInterval(() => {
-            loadRequests(false);
-        }, 30000);
+                            request
+                                .user
+                                ?.name,
 
-        return () => {
-            window.clearInterval(intervalId);
-        };
-    }, []);
+                            request
+                                .user
+                                ?.email,
 
-    const statistics = useMemo(() => {
-        return {
-            total: requests.length,
-            pending: requests.filter(
-                (item) => item.status === 'pending'
-            ).length,
-            approved: requests.filter(
-                (item) => item.status === 'approved'
-            ).length,
-            completed: requests.filter(
-                (item) => item.status === 'completed'
-            ).length,
-            rejected: requests.filter(
-                (item) => item.status === 'rejected'
-            ).length,
-        };
-    }, [requests]);
+                            request
+                                .admin_note,
 
-    const filteredRequests = useMemo(() => {
-        const normalizedKeyword = searchKeyword
-            .trim()
-            .toLowerCase();
+                            getRequestTypeLabel(
+                                requestType
+                            ),
 
-        return requests.filter((item) => {
-            const matchesStatus =
-                statusFilter === 'all' ||
-                item.status === statusFilter;
+                            ...(
+                                Array.isArray(
+                                    request
+                                        .items
+                                )
+                                    ? request
+                                          .items
+                                          .map(
+                                              (
+                                                  item
+                                              ) =>
+                                                  item
+                                                      ?.product
+                                                      ?.name
+                                          )
+                                    : []
+                            ),
+                        ]
+                            .filter(
+                                Boolean
+                            )
+                            .join(
+                                ' '
+                            )
+                            .toLowerCase();
 
-            const matchesCoverage =
-                coverageFilter === 'all' ||
-                item.coverage_type === coverageFilter;
+                        const matchSearch =
+                            !searchValue ||
+                            searchableText.includes(
+                                searchValue
+                            );
 
-            const searchableText = [
-                item.service_code,
-                item.applicant_name,
-                item.unit_name,
-                item.other_unit_name,
-                item.pic_whatsapp,
-                item.activity_detail,
-                item.coverage_type,
-                item.event_location,
-                item.user?.name,
-                item.user?.email,
+                        return (
+                            matchStatus &&
+                            matchType &&
+                            matchSearch
+                        );
+                    }
+                );
+            },
+            [
+                borrowRequests,
+                selectedStatus,
+                selectedType,
+                search,
             ]
-                .filter(Boolean)
-                .join(' ')
-                .toLowerCase();
+        );
 
-            const matchesSearch =
-                !normalizedKeyword ||
-                searchableText.includes(normalizedKeyword);
+    /*
+    |--------------------------------------------------------------------------
+    | SUMMARY
+    |--------------------------------------------------------------------------
+    */
 
-            return (
-                matchesStatus &&
-                matchesCoverage &&
-                matchesSearch
-            );
-        });
-    }, [
-        requests,
-        searchKeyword,
-        statusFilter,
-        coverageFilter,
-    ]);
+    const summary =
+        useMemo(
+            () => {
+                const statusSummary =
+                    statusOptions.reduce(
+                        (
+                            result,
+                            status
+                        ) => {
+                            if (
+                                status
+                                    .key ===
+                                'all'
+                            ) {
+                                result[
+                                    status
+                                        .key
+                                ] =
+                                    borrowRequests
+                                        .length;
 
-    const handleApprove = async (item) => {
-        const confirmation = await showConfirmAlert({
-            title: 'Setujui request liputan?',
-            text: `Request ${item.service_code} akan diteruskan untuk diproses oleh Humas.`,
-            confirmButtonText: 'Ya, setujui',
-            cancelButtonText: 'Batal',
-            icon: 'question',
-            confirmButtonColor: '#2563eb',
-        });
+                                return result;
+                            }
 
-        if (!confirmation.isConfirmed) {
-            return;
-        }
+                            result[
+                                status.key
+                            ] =
+                                borrowRequests.filter(
+                                    (
+                                        request
+                                    ) =>
+                                        request
+                                            .status ===
+                                        status
+                                            .key
+                                ).length;
 
-        try {
-            setProcessingId(item.id);
+                            return result;
+                        },
+                        {}
+                    );
 
-            showLoadingAlert(
-                'Menyetujui Request',
-                'Mohon tunggu, status request sedang diperbarui.'
-            );
+                const borrowCount =
+                    borrowRequests.filter(
+                        (
+                            request
+                        ) =>
+                            getRequestType(
+                                request
+                            ) ===
+                            TYPE_BORROW
+                    ).length;
 
-            const response = await api.put(
-                `/humas-service-requests/${item.id}/approve`
-            );
+                const assetRequestCount =
+                    borrowRequests.filter(
+                        (
+                            request
+                        ) =>
+                            getRequestType(
+                                request
+                            ) ===
+                            TYPE_ASSET_REQUEST
+                    ).length;
 
-            closeAlert();
+                return {
+                    ...statusSummary,
 
-            await showSuccessAlert(
-                'Request Disetujui',
-                response?.data?.message ||
-                'Request liputan berhasil disetujui.'
-            );
+                    borrow:
+                        borrowCount,
 
-            await loadRequests(false);
-        } catch (error) {
-            closeAlert();
+                    asset_request:
+                        assetRequestCount,
+                };
+            },
+            [
+                borrowRequests,
+            ]
+        );
 
-            await showErrorAlert(
-                'Approval Gagal',
-                extractErrorMessage(error)
-            );
-        } finally {
-            setProcessingId(null);
-        }
-    };
+    /*
+    |--------------------------------------------------------------------------
+    | RESET FILTER
+    |--------------------------------------------------------------------------
+    */
 
-    const handleReject = async (item) => {
-        const result = await showTextareaAlert({
-            title: 'Tolak request liputan?',
-            text:
-                'Masukkan alasan penolakan agar pemohon mengetahui penyebab request tidak dapat diproses.',
-            inputLabel: 'Alasan penolakan',
-            inputPlaceholder: 'Tuliskan alasan penolakan...',
-            confirmButtonText: 'Ya, tolak request',
-            cancelButtonText: 'Batal',
-            confirmButtonColor: '#dc2626',
-            minimumLength: 5,
-            maximumLength: 2000,
-        });
-
-        if (!result.isConfirmed) {
-            return;
-        }
-
-        try {
-            setProcessingId(item.id);
-
-            showLoadingAlert(
-                'Menolak Request',
-                'Mohon tunggu, alasan penolakan sedang disimpan.'
-            );
-
-            const response = await api.put(
-                `/humas-service-requests/${item.id}/reject`,
-                {
-                    admin_note: result.value.trim(),
-                }
+    const resetFilters =
+        () => {
+            setSelectedStatus(
+                'all'
             );
 
-            closeAlert();
-
-            await showSuccessAlert(
-                'Request Ditolak',
-                response?.data?.message ||
-                'Request liputan berhasil ditolak.'
+            setSelectedType(
+                'all'
             );
 
-            await loadRequests(false);
-        } catch (error) {
-            closeAlert();
-
-            await showErrorAlert(
-                'Penolakan Gagal',
-                extractErrorMessage(error)
+            setSearch(
+                ''
             );
-        } finally {
-            setProcessingId(null);
-        }
-    };
+        };
 
-    // const processReject = async (item, adminNote) => {
-    //     try {
-    //         setProcessingId(item.id);
-
-    //         showLoadingAlert(
-    //             'Menolak Request',
-    //             'Mohon tunggu, alasan penolakan sedang disimpan.'
-    //         );
-
-    //         const response = await api.put(
-    //             `/humas-service-requests/${item.id}/reject`,
-    //             {
-    //                 admin_note: adminNote,
-    //             }
-    //         );
-
-    //         closeAlert();
-
-    //         await showSuccessAlert(
-    //             'Request Ditolak',
-    //             response?.data?.message ||
-    //             'Request liputan berhasil ditolak.'
-    //         );
-
-    //         await loadRequests(false);
-    //     } catch (error) {
-    //         closeAlert();
-
-    //         await showErrorAlert(
-    //             'Penolakan Gagal',
-    //             extractErrorMessage(error)
-    //         );
-    //     } finally {
-    //         setProcessingId(null);
-    //     }
-    // };
-
-    const handleComplete = async (item) => {
-        const result = await showCompletionAlert({
-            title: 'Selesaikan request liputan?',
-            text: `Masukkan link hasil pekerjaan untuk request ${item.service_code}.`,
-            confirmButtonText: 'Simpan dan Selesaikan',
-            cancelButtonText: 'Batal',
-        });
-
-        if (!result.isConfirmed || !result.value) {
-            return;
-        }
-
-        try {
-            setProcessingId(item.id);
-
-            showLoadingAlert(
-                'Menyelesaikan Request',
-                'Link hasil pekerjaan sedang disimpan.'
-            );
-
-            const response = await api.put(
-                `/humas-service-requests/${item.id}/complete`,
-                {
-                    result_link: result.value.result_link,
-                    result_note: result.value.result_note,
-                }
-            );
-
-            closeAlert();
-
-            await showSuccessAlert(
-                'Request Berhasil Diselesaikan',
-                response?.data?.message ||
-                'Link hasil pekerjaan berhasil disimpan dan dapat dilihat oleh pemohon.'
-            );
-
-            await loadRequests(false);
-        } catch (error) {
-            closeAlert();
-
-            await showErrorAlert(
-                'Penyelesaian Request Gagal',
-                extractErrorMessage(error)
-            );
-        } finally {
-            setProcessingId(null);
-        }
-    };
-
-    const resetFilters = () => {
-        setSearchKeyword('');
-        setStatusFilter('all');
-        setCoverageFilter('all');
-    };
+    /*
+    |--------------------------------------------------------------------------
+    | VIEW
+    |--------------------------------------------------------------------------
+    */
 
     return (
         <div className="container-fluid px-0">
-            <section className="card border-0 shadow-sm rounded-5 overflow-hidden mb-4">
-                <div
-                    className="card-body p-4 p-lg-5 text-white"
-                    style={{
-                        background:
-                            'radial-gradient(circle at top right, rgba(255,255,255,.20), transparent 30%), linear-gradient(135deg, #111827 0%, #7f1d1d 55%, #dc2626 120%)',
-                    }}
-                >
+            {/* HERO */}
+
+            <section
+                className="card border-0 shadow-sm rounded-5 overflow-hidden mb-4"
+                style={{
+                    background:
+                        'linear-gradient(135deg, rgba(15,118,110,0.96), rgba(15,23,42,0.98))',
+                }}
+            >
+                <div className="card-body p-4 p-lg-5 text-white">
                     <div className="row align-items-center g-4">
                         <div className="col-lg-8">
-                            <span className="badge bg-white text-danger rounded-pill px-3 py-2 mb-3">
-                                APPROVAL HUMAS
+                            <span className="badge rounded-pill text-bg-light text-success px-3 py-2 mb-3">
+                                Approval SEKPiM
                             </span>
 
-                            <h1 className="display-6 fw-bold mb-3">
-                                Approval Request Liputan
+                            <h1 className="display-6 fw-black mb-3">
+                                Daftar Pengajuan SEKPiM
                             </h1>
 
                             <p
-                                className="text-white-50 mb-0"
+                                className="mb-0 text-white-50"
                                 style={{
-                                    maxWidth: 820,
-                                    lineHeight: 1.8,
+                                    maxWidth:
+                                        760,
+
+                                    lineHeight:
+                                        1.8,
                                 }}
                             >
-                                Periksa request liputan, dokumen pendukung,
-                                jadwal kegiatan, serta informasi PIC sebelum
-                                menyetujui atau menolak pengajuan.
+                                Kelola Peminjaman Barang dan Request Barang SEKPiM dalam satu halaman. Setiap jenis pengajuan memiliki alur proses dan pengelolaan stok yang berbeda.
                             </p>
                         </div>
 
                         <div className="col-lg-4">
-                            <div className="bg-white bg-opacity-10 border border-white border-opacity-25 rounded-5 p-4">
-                                <div className="d-flex align-items-center justify-content-between mb-2">
-                                    <span className="text-white-50">
-                                        Menunggu Approval
-                                    </span>
+                            <div className="row g-3">
+                                <div className="col-6">
+                                    <div className="bg-white bg-opacity-10 rounded-5 p-3 h-100">
+                                        <div className="fs-3 fw-black">
+                                            {summary.all ||
+                                                0}
+                                        </div>
 
-                                    <i className="bi bi-hourglass-split fs-4" />
+                                        <div className="small text-white-50">
+                                            Total
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="display-5 fw-bold">
-                                    {statistics.pending}
+                                <div className="col-6">
+                                    <div className="bg-white bg-opacity-10 rounded-5 p-3 h-100">
+                                        <div className="fs-3 fw-black">
+                                            {summary.pending ||
+                                                0}
+                                        </div>
+
+                                        <div className="small text-white-50">
+                                            Menunggu
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="small text-white-50 mt-2">
-                                    Request perlu segera diperiksa.
+                                <div className="col-6">
+                                    <div className="bg-white bg-opacity-10 rounded-5 p-3 h-100">
+                                        <div className="fs-3 fw-black">
+                                            {summary.borrow ||
+                                                0}
+                                        </div>
+
+                                        <div className="small text-white-50">
+                                            Peminjaman
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="col-6">
+                                    <div className="bg-white bg-opacity-10 rounded-5 p-3 h-100">
+                                        <div className="fs-3 fw-black">
+                                            {summary
+                                                .asset_request ||
+                                                0}
+                                        </div>
+
+                                        <div className="small text-white-50">
+                                            Request Barang
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -566,416 +931,427 @@ export default function HumasServiceApprovalPage() {
                 </div>
             </section>
 
-            <section className="row g-3 mb-4">
-                <div className="col-6 col-md-4 col-xl">
-                    <div className="card border-0 shadow-sm rounded-4 h-100">
-                        <div className="card-body p-3">
-                            <div className="small text-muted mb-1">
-                                Total Request
-                            </div>
-
-                            <div className="fs-3 fw-bold">
-                                {statistics.total}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-6 col-md-4 col-xl">
-                    <div className="card border-0 shadow-sm rounded-4 h-100">
-                        <div className="card-body p-3">
-                            <div className="small text-muted mb-1">
-                                Menunggu
-                            </div>
-
-                            <div className="fs-3 fw-bold text-warning">
-                                {statistics.pending}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-6 col-md-4 col-xl">
-                    <div className="card border-0 shadow-sm rounded-4 h-100">
-                        <div className="card-body p-3">
-                            <div className="small text-muted mb-1">
-                                Disetujui
-                            </div>
-
-                            <div className="fs-3 fw-bold text-primary">
-                                {statistics.approved}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-6 col-md-4 col-xl">
-                    <div className="card border-0 shadow-sm rounded-4 h-100">
-                        <div className="card-body p-3">
-                            <div className="small text-muted mb-1">
-                                Selesai
-                            </div>
-
-                            <div className="fs-3 fw-bold text-success">
-                                {statistics.completed}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-6 col-md-4 col-xl">
-                    <div className="card border-0 shadow-sm rounded-4 h-100">
-                        <div className="card-body p-3">
-                            <div className="small text-muted mb-1">
-                                Ditolak
-                            </div>
-
-                            <div className="fs-3 fw-bold text-danger">
-                                {statistics.rejected}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+            {/* FILTER */}
 
             <section className="card border-0 shadow-sm rounded-5 mb-4">
                 <div className="card-body p-4">
-                    <div className="row g-3">
-                        <div className="col-lg-5">
-                            <label className="form-label fw-semibold">
-                                Cari Request
+                    <div className="row g-4">
+                        <div className="col-xl-4">
+                            <label className="form-label fw-bold">
+                                Cari Pengajuan
                             </label>
 
                             <div className="input-group">
-                                <span className="input-group-text bg-light border-end-0">
+                                <span className="input-group-text bg-light">
                                     <i className="bi bi-search" />
                                 </span>
 
                                 <input
                                     type="search"
-                                    className="form-control border-start-0"
-                                    placeholder="Cari kode, pemohon, unit, lokasi..."
-                                    value={searchKeyword}
-                                    onChange={(event) =>
-                                        setSearchKeyword(event.target.value)
+                                    className="form-control"
+                                    placeholder="Kode, pemohon, PIC, barang..."
+                                    value={
+                                        search
+                                    }
+                                    onChange={(
+                                        event
+                                    ) =>
+                                        setSearch(
+                                            event
+                                                .target
+                                                .value
+                                        )
                                     }
                                 />
                             </div>
                         </div>
 
-                        <div className="col-md-5 col-lg-3">
-                            <label className="form-label fw-semibold">
+                        <div className="col-xl-8">
+                            <label className="form-label fw-bold">
+                                Jenis Pengajuan
+                            </label>
+
+                            <div className="d-flex flex-wrap gap-2">
+                                {requestTypeOptions.map(
+                                    (
+                                        type
+                                    ) => (
+                                        <button
+                                            key={
+                                                type.key
+                                            }
+                                            type="button"
+                                            className={`btn rounded-pill ${
+                                                selectedType ===
+                                                type.key
+                                                    ? 'btn-dark'
+                                                    : 'btn-outline-dark'
+                                            }`}
+                                            onClick={() =>
+                                                setSelectedType(
+                                                    type.key
+                                                )
+                                            }
+                                        >
+                                            <i
+                                                className={`bi ${type.icon} me-2`}
+                                            />
+
+                                            {
+                                                type.label
+                                            }
+
+                                            {type.key !==
+                                                'all' && (
+                                                <span className="ms-2 badge rounded-pill bg-light text-dark">
+                                                    {
+                                                        summary[
+                                                            type
+                                                                .key
+                                                        ] ||
+                                                        0
+                                                    }
+                                                </span>
+                                            )}
+                                        </button>
+                                    )
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="col-12">
+                            <label className="form-label fw-bold">
                                 Status
                             </label>
 
-                            <select
-                                className="form-select"
-                                value={statusFilter}
-                                onChange={(event) =>
-                                    setStatusFilter(event.target.value)
-                                }
-                            >
-                                {STATUS_OPTIONS.map((status) => (
-                                    <option
-                                        value={status.value}
-                                        key={status.value}
-                                    >
-                                        {status.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                            <div className="d-flex flex-wrap gap-2">
+                                {statusOptions.map(
+                                    (
+                                        status
+                                    ) => (
+                                        <button
+                                            key={
+                                                status.key
+                                            }
+                                            type="button"
+                                            className={`btn rounded-pill ${
+                                                selectedStatus ===
+                                                status.key
+                                                    ? 'btn-success'
+                                                    : 'btn-outline-success'
+                                            }`}
+                                            onClick={() =>
+                                                setSelectedStatus(
+                                                    status.key
+                                                )
+                                            }
+                                        >
+                                            <i
+                                                className={`bi ${status.icon} me-2`}
+                                            />
 
-                        <div className="col-md-5 col-lg-3">
-                            <label className="form-label fw-semibold">
-                                Jenis Liputan
-                            </label>
+                                            {
+                                                status.label
+                                            }
 
-                            <select
-                                className="form-select"
-                                value={coverageFilter}
-                                onChange={(event) =>
-                                    setCoverageFilter(event.target.value)
-                                }
-                            >
-                                {COVERAGE_OPTIONS.map((coverage) => (
-                                    <option
-                                        value={coverage.value}
-                                        key={coverage.value}
-                                    >
-                                        {coverage.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                                            <span className="ms-2 badge rounded-pill text-bg-light text-success">
+                                                {
+                                                    summary[
+                                                        status
+                                                            .key
+                                                    ] ||
+                                                    0
+                                                }
+                                            </span>
+                                        </button>
+                                    )
+                                )}
 
-                        <div className="col-md-2 col-lg-1 d-flex align-items-end">
-                            <button
-                                type="button"
-                                className="btn btn-light border w-100"
-                                onClick={resetFilters}
-                                title="Reset filter"
-                            >
-                                <i className="bi bi-arrow-counterclockwise" />
-                            </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-light border rounded-pill"
+                                    onClick={
+                                        resetFilters
+                                    }
+                                >
+                                    <i className="bi bi-arrow-counterclockwise me-2" />
+
+                                    Reset
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            {loading ? (
-                <section className="card border-0 shadow-sm rounded-5">
-                    <div className="card-body p-5 text-center">
-                        <div
-                            className="spinner-border text-danger mb-3"
-                            role="status"
-                        />
+            {/* CONTENT */}
 
-                        <h5 className="fw-bold mb-1">
-                            Memuat request liputan
+            {loading ? (
+                <div className="card border-0 shadow-sm rounded-5">
+                    <div className="card-body p-5 text-center">
+                        <div className="spinner-border text-success mb-3" />
+
+                        <h5 className="fw-black mb-1">
+                            Memuat Pengajuan SEKPiM
                         </h5>
 
                         <p className="text-muted mb-0">
                             Mohon tunggu sebentar.
                         </p>
                     </div>
-                </section>
-            ) : errorMessage ? (
-                <section className="card border-0 shadow-sm rounded-5">
+                </div>
+            ) : filteredBorrowRequests.length ===
+              0 ? (
+                <div className="card border-0 shadow-sm rounded-5">
                     <div className="card-body p-5 text-center">
                         <div
-                            className="mx-auto mb-3 rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center"
+                            className="mx-auto mb-3 d-flex align-items-center justify-content-center rounded-5 bg-light text-secondary"
                             style={{
-                                width: 72,
-                                height: 72,
+                                width:
+                                    76,
+
+                                height:
+                                    76,
                             }}
                         >
-                            <i className="bi bi-exclamation-triangle-fill fs-3" />
+                            <i className="bi bi-inbox fs-1" />
                         </div>
 
-                        <h5 className="fw-bold mb-2">
-                            Data gagal dimuat
-                        </h5>
-
-                        <p className="text-muted mb-4">
-                            {errorMessage}
-                        </p>
-
-                        <button
-                            type="button"
-                            className="btn btn-danger rounded-pill px-4"
-                            onClick={() => loadRequests()}
-                        >
-                            <i className="bi bi-arrow-clockwise me-2" />
-                            Coba Lagi
-                        </button>
-                    </div>
-                </section>
-            ) : filteredRequests.length === 0 ? (
-                <section className="card border-0 shadow-sm rounded-5">
-                    <div className="card-body p-5 text-center">
-                        <div
-                            className="mx-auto mb-3 rounded-circle bg-light text-secondary d-flex align-items-center justify-content-center"
-                            style={{
-                                width: 76,
-                                height: 76,
-                            }}
-                        >
-                            <i className="bi bi-inbox-fill fs-3" />
-                        </div>
-
-                        <h5 className="fw-bold mb-2">
-                            Request tidak ditemukan
+                        <h5 className="fw-black mb-2">
+                            Data Tidak Ditemukan
                         </h5>
 
                         <p className="text-muted mb-3">
-                            Belum ada request yang sesuai dengan filter.
+                            Tidak ada pengajuan SEKPiM berdasarkan filter yang dipilih.
                         </p>
 
                         <button
                             type="button"
                             className="btn btn-outline-secondary rounded-pill"
-                            onClick={resetFilters}
+                            onClick={
+                                resetFilters
+                            }
                         >
                             Reset Filter
                         </button>
                     </div>
-                </section>
+                </div>
             ) : (
-                <section className="card border-0 shadow-sm rounded-5 overflow-hidden">
-                    <div className="card-header bg-white border-0 p-4">
-                        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                            <div>
-                                <h5 className="fw-bold mb-1">
-                                    Daftar Request Liputan
-                                </h5>
+                <div className="row g-4">
+                    {filteredBorrowRequests.map(
+                        (
+                            request
+                        ) => {
+                            const requestType =
+                                getRequestType(
+                                    request
+                                );
 
-                                <p className="text-muted small mb-0">
-                                    Menampilkan {filteredRequests.length} dari{' '}
-                                    {requests.length} request.
-                                </p>
-                            </div>
+                            const isBorrow =
+                                requestType ===
+                                TYPE_BORROW;
 
-                            <button
-                                type="button"
-                                className="btn btn-light border rounded-pill"
-                                onClick={() => loadRequests()}
-                            >
-                                <i className="bi bi-arrow-clockwise me-2" />
-                                Refresh
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="table-responsive">
-                        <table className="table align-middle mb-0">
-                            <thead className="table-light">
-                                <tr>
-                                    <th className="ps-4 py-3">
-                                        Request
-                                    </th>
-                                    <th className="py-3">
-                                        Pemohon
-                                    </th>
-                                    <th className="py-3">
-                                        Jenis Liputan
-                                    </th>
-                                    <th className="py-3">
-                                        Pelaksanaan
-                                    </th>
-                                    <th className="py-3">
-                                        Status
-                                    </th>
-                                    <th className="text-end pe-4 py-3">
-                                        Aksi
-                                    </th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                {filteredRequests.map((item) => (
-                                    <tr key={item.id}>
-                                        <td className="ps-4 py-3">
-                                            <div className="fw-bold">
-                                                {item.service_code || '-'}
-                                            </div>
-
-                                            <div
-                                                className="small text-muted text-truncate"
-                                                style={{
-                                                    maxWidth: 260,
-                                                }}
-                                            >
-                                                {item.activity_detail || '-'}
-                                            </div>
-                                        </td>
-
-                                        <td className="py-3">
-                                            <div className="fw-semibold">
-                                                {item.applicant_name || '-'}
-                                            </div>
-
-                                            <div className="small text-muted">
-                                                {getResolvedUnit(item)}
-                                            </div>
-
-                                            <div className="small text-success">
-                                                <i className="bi bi-whatsapp me-1" />
-                                                {item.pic_whatsapp || '-'}
-                                            </div>
-                                        </td>
-
-                                        <td className="py-3">
-                                            <CoverageBadge
-                                                type={item.coverage_type}
-                                            />
-                                        </td>
-
-                                        <td className="py-3">
-                                            <div className="fw-semibold">
-                                                {formatDate(item.event_date)}
-                                            </div>
-
-                                            <div className="small text-muted">
-                                                <i className="bi bi-geo-alt-fill me-1" />
-                                                {item.event_location || '-'}
-                                            </div>
-                                        </td>
-
-                                        <td className="py-3">
-                                            <StatusBadge
-                                                status={item.status}
-                                            />
-                                        </td>
-
-                                        <td className="text-end pe-4 py-3">
-                                            <div className="d-inline-flex flex-wrap justify-content-end gap-2">
-                                                <Link
-                                                    to={`/admin/humas-services/${item.id}`}
-                                                    className="btn btn-sm btn-light border rounded-pill"
-                                                >
-                                                    <i className="bi bi-eye-fill me-1" />
-                                                    Detail
-                                                </Link>
-
-                                                {item.status === 'pending' && (
-                                                    <>
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-sm btn-primary rounded-pill"
-                                                            onClick={() =>
-                                                                handleApprove(item)
-                                                            }
-                                                            disabled={
-                                                                processingId ===
-                                                                item.id
-                                                            }
+                            return (
+                                <div
+                                    className="col-12"
+                                    key={
+                                        request.id
+                                    }
+                                >
+                                    <div className="card border-0 shadow-sm rounded-5 overflow-hidden">
+                                        <div className="card-body p-4">
+                                            <div className="row g-4 align-items-center">
+                                                <div className="col-xl-5">
+                                                    <div className="d-flex gap-3">
+                                                        <div
+                                                            className={`icon-box ${getRequestTypeClass(
+                                                                requestType
+                                                            )}`}
                                                         >
-                                                            <i className="bi bi-check-lg me-1" />
-                                                            Setujui
-                                                        </button>
+                                                            <i
+                                                                className={`bi ${getRequestTypeIcon(
+                                                                    requestType
+                                                                )} fs-4`}
+                                                            />
+                                                        </div>
 
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-sm btn-outline-danger rounded-pill"
-                                                            onClick={() =>
-                                                                handleReject(item)
-                                                            }
-                                                            disabled={
-                                                                processingId ===
-                                                                item.id
-                                                            }
-                                                        >
-                                                            <i className="bi bi-x-lg me-1" />
-                                                            Tolak
-                                                        </button>
-                                                    </>
-                                                )}
+                                                        <div className="min-w-0">
+                                                            <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                                                <span
+                                                                    className={`badge rounded-pill px-3 py-2 ${getRequestTypeClass(
+                                                                        requestType
+                                                                    )}`}
+                                                                >
+                                                                    <i
+                                                                        className={`bi ${getRequestTypeIcon(
+                                                                            requestType
+                                                                        )} me-2`}
+                                                                    />
 
-                                                {item.status === 'approved' && (
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-sm btn-success rounded-pill"
-                                                        onClick={() =>
-                                                            handleComplete(item)
-                                                        }
-                                                        disabled={
-                                                            processingId ===
-                                                            item.id
-                                                        }
+                                                                    {getRequestTypeLabel(
+                                                                        requestType
+                                                                    )}
+                                                                </span>
+
+                                                                <StatusBadge
+                                                                    status={
+                                                                        request
+                                                                            .status
+                                                                    }
+                                                                />
+                                                            </div>
+
+                                                            <div className="small text-muted mb-1">
+                                                                {
+                                                                    request
+                                                                        .borrow_code ||
+                                                                    `REQ-${request.id}`
+                                                                }
+                                                            </div>
+
+                                                            <h5 className="fw-black mb-2">
+                                                                {request
+                                                                    .purpose ||
+                                                                    getRequestTypeLabel(
+                                                                        requestType
+                                                                    )}
+                                                            </h5>
+
+                                                            <div className="text-muted">
+                                                                Pemohon:{' '}
+
+                                                                <strong className="text-dark">
+                                                                    {request
+                                                                        .user
+                                                                        ?.name ||
+                                                                        '-'}
+                                                                </strong>
+                                                            </div>
+
+                                                            {request
+                                                                .pic_name && (
+                                                                <div className="small text-muted mt-1">
+                                                                    PIC:{' '}
+
+                                                                    <strong>
+                                                                        {
+                                                                            request
+                                                                                .pic_name
+                                                                        }
+                                                                    </strong>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-md-4 col-xl-2">
+                                                    <div className="small text-muted mb-1">
+                                                        Tanggal Kegiatan
+                                                    </div>
+
+                                                    <div className="fw-bold">
+                                                        {formatDate(
+                                                            request
+                                                                .activity_date
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-md-4 col-xl-2">
+                                                    <div className="small text-muted mb-1">
+                                                        Tanggal Pengambilan
+                                                    </div>
+
+                                                    <div className="fw-bold">
+                                                        {formatDate(
+                                                            request
+                                                                .borrow_date
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-md-4 col-xl-1">
+                                                    <div className="small text-muted mb-1">
+                                                        {isBorrow
+                                                            ? 'Pengembalian'
+                                                            : 'Item'}
+                                                    </div>
+
+                                                    <div className="fw-bold">
+                                                        {isBorrow
+                                                            ? formatDate(
+                                                                  request
+                                                                      .return_date
+                                                              )
+                                                            : `${
+                                                                  Array.isArray(
+                                                                      request
+                                                                          .items
+                                                                  )
+                                                                      ? request
+                                                                            .items
+                                                                            .length
+                                                                      : 0
+                                                              } item`}
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-xl-2 text-xl-end">
+                                                    <div className="small text-muted mb-2">
+                                                        {formatDateTime(
+                                                            request
+                                                                .submitted_at ||
+                                                                request
+                                                                    .created_at
+                                                        )}
+                                                    </div>
+
+                                                    <Link
+                                                        to={`/admin/borrow-requests/${request.id}`}
+                                                        className={`btn rounded-pill ${
+                                                            isBorrow
+                                                                ? 'btn-success'
+                                                                : 'btn-primary'
+                                                        }`}
                                                     >
-                                                        <i className="bi bi-check2-all me-1" />
-                                                        Selesai
-                                                    </button>
-                                                )}
+                                                        <i className="bi bi-eye-fill me-2" />
+
+                                                        Detail
+                                                    </Link>
+                                                </div>
                                             </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
+
+                                            {request
+                                                .admin_note && (
+                                                <div
+                                                    className={`mt-4 p-3 rounded-4 border ${
+                                                        request
+                                                            .status ===
+                                                        'rejected'
+                                                            ? 'bg-danger-subtle'
+                                                            : 'bg-light'
+                                                    }`}
+                                                >
+                                                    <div className="small fw-bold text-muted mb-1">
+                                                        Catatan Admin
+                                                    </div>
+
+                                                    <p className="mb-0">
+                                                        {
+                                                            request
+                                                                .admin_note
+                                                        }
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        }
+                    )}
+                </div>
             )}
         </div>
     );

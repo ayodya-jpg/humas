@@ -11,14 +11,45 @@ import {
 
 import api from '../../api/axios';
 
+/*
+|--------------------------------------------------------------------------
+| CONSTANT
+|--------------------------------------------------------------------------
+*/
+
+const TYPE_BORROW =
+    'borrow';
+
+const TYPE_ASSET_REQUEST =
+    'asset_request';
+
+/*
+|--------------------------------------------------------------------------
+| FILTER / SERVICE CONFIG
+|--------------------------------------------------------------------------
+|
+| filterType dipakai hanya untuk tampilan/filter.
+|
+| requestType tetap:
+| - merchandise
+| - humas
+| - borrowing
+|
+| supaya route detail lama tidak rusak.
+|
+*/
+
 const REQUEST_TYPES = {
     merchandise: {
         label:
             'Merchandise',
+
         singularLabel:
             'Merchandise',
+
         icon:
             'bi-gift-fill',
+
         color:
             'primary',
     },
@@ -26,83 +57,135 @@ const REQUEST_TYPES = {
     humas: {
         label:
             'Layanan Humas',
+
         singularLabel:
             'Layanan Humas',
+
         icon:
             'bi-camera-reels-fill',
+
         color:
             'danger',
     },
 
-    borrowing: {
+    sekpim_borrow: {
         label:
-            'Peminjaman SEKPiM',
+            'Peminjaman Barang',
+
         singularLabel:
-            'Peminjaman',
+            'Peminjaman Barang',
+
         icon:
-            'bi-box-seam-fill',
+            'bi-box-arrow-up-right',
+
         color:
             'success',
     },
+
+    sekpim_asset_request: {
+        label:
+            'Request Barang',
+
+        singularLabel:
+            'Request Barang',
+
+        icon:
+            'bi-box2-heart-fill',
+
+        color:
+            'info',
+    },
 };
+
+/*
+|--------------------------------------------------------------------------
+| STATUS OPTIONS
+|--------------------------------------------------------------------------
+*/
 
 const STATUS_OPTIONS = [
     {
         value:
             'all',
+
         label:
             'Semua Status',
     },
+
     {
         value:
             'pending',
+
         label:
             'Menunggu',
     },
+
+    /*
+     * Revision hanya digunakan Merchandise.
+     */
     {
         value:
             'revision',
+
         label:
             'Perlu Revisi',
     },
+
     {
         value:
             'approved',
+
         label:
             'Disetujui',
     },
-    {
-        value:
-            'rejected',
-        label:
-            'Ditolak',
-    },
-    {
-        value:
-            'completed',
-        label:
-            'Selesai',
-    },
+
     {
         value:
             'borrowed',
+
         label:
             'Sedang Dipinjam',
     },
+
     {
         value:
             'returned',
+
         label:
             'Dikembalikan',
     },
+
+    {
+        value:
+            'completed',
+
+        label:
+            'Selesai',
+    },
+
+    {
+        value:
+            'rejected',
+
+        label:
+            'Ditolak',
+    },
 ];
+
+/*
+|--------------------------------------------------------------------------
+| STATUS CONFIG
+|--------------------------------------------------------------------------
+*/
 
 const STATUS_CONFIG = {
     pending: {
         label:
             'Menunggu',
+
         badgeClass:
             'text-bg-warning',
+
         icon:
             'bi-hourglass-split',
     },
@@ -110,8 +193,10 @@ const STATUS_CONFIG = {
     revision: {
         label:
             'Perlu Revisi',
+
         badgeClass:
             'text-bg-info',
+
         icon:
             'bi-pencil-square',
     },
@@ -119,8 +204,10 @@ const STATUS_CONFIG = {
     approved: {
         label:
             'Disetujui',
+
         badgeClass:
             'text-bg-success',
+
         icon:
             'bi-check-circle-fill',
     },
@@ -128,8 +215,10 @@ const STATUS_CONFIG = {
     rejected: {
         label:
             'Ditolak',
+
         badgeClass:
             'text-bg-danger',
+
         icon:
             'bi-x-circle-fill',
     },
@@ -137,8 +226,10 @@ const STATUS_CONFIG = {
     completed: {
         label:
             'Selesai',
+
         badgeClass:
             'text-bg-primary',
+
         icon:
             'bi-check2-all',
     },
@@ -146,8 +237,10 @@ const STATUS_CONFIG = {
     borrowed: {
         label:
             'Sedang Dipinjam',
+
         badgeClass:
             'text-bg-info',
+
         icon:
             'bi-box-arrow-up-right',
     },
@@ -155,17 +248,26 @@ const STATUS_CONFIG = {
     returned: {
         label:
             'Dikembalikan',
+
         badgeClass:
             'text-bg-secondary',
+
         icon:
             'bi-box-arrow-in-down-left',
     },
 };
 
+/*
+|--------------------------------------------------------------------------
+| HUMAS COVERAGE
+|--------------------------------------------------------------------------
+*/
+
 const COVERAGE_TYPE_CONFIG = {
     'REQUEST DESIGN INSTAGRAM': {
         label:
             'Request Design Instagram',
+
         icon:
             'bi-instagram',
     },
@@ -173,6 +275,7 @@ const COVERAGE_TYPE_CONFIG = {
     DOKUMENTASI: {
         label:
             'Dokumentasi',
+
         icon:
             'bi-camera-fill',
     },
@@ -180,6 +283,7 @@ const COVERAGE_TYPE_CONFIG = {
     'PUBLIKASI WEBSITE': {
         label:
             'Publikasi Website',
+
         icon:
             'bi-globe2',
     },
@@ -187,6 +291,7 @@ const COVERAGE_TYPE_CONFIG = {
     'PUBLIKASI MEDIA MASSA': {
         label:
             'Publikasi Media Massa',
+
         icon:
             'bi-newspaper',
     },
@@ -194,6 +299,7 @@ const COVERAGE_TYPE_CONFIG = {
     YOUTUBE: {
         label:
             'YouTube',
+
         icon:
             'bi-youtube',
     },
@@ -201,6 +307,7 @@ const COVERAGE_TYPE_CONFIG = {
     'VIDEO REELS': {
         label:
             'Video Reels',
+
         icon:
             'bi-play-btn-fill',
     },
@@ -211,81 +318,137 @@ const COVERAGE_TYPE_CONFIG = {
     'SOCIAL MEDIA': {
         label:
             'Social Media (Data Lama)',
+
         icon:
             'bi-instagram',
     },
 };
 
-const getCurrentUser = () => {
-    try {
-        return JSON.parse(
-            localStorage.getItem(
-                'admin_user'
-            ) || '{}'
-        );
-    } catch {
-        return {};
-    }
-};
+/*
+|--------------------------------------------------------------------------
+| USER
+|--------------------------------------------------------------------------
+*/
 
-const extractArray = (
-    response
-) => {
-    const payload =
-        response?.data?.data;
+const getCurrentUser =
+    () => {
+        try {
+            return JSON.parse(
+                localStorage.getItem(
+                    'admin_user'
+                ) ||
+                    '{}'
+            );
+        } catch {
+            return {};
+        }
+    };
 
-    if (
-        Array.isArray(
-            payload
-        )
-    ) {
-        return payload;
-    }
+/*
+|--------------------------------------------------------------------------
+| RESPONSE
+|--------------------------------------------------------------------------
+*/
 
-    if (
-        Array.isArray(
-            payload?.data
-        )
-    ) {
-        return payload.data;
-    }
+const extractArray =
+    (
+        response
+    ) => {
+        const payload =
+            response
+                ?.data
+                ?.data;
 
-    return [];
-};
+        if (
+            Array.isArray(
+                payload
+            )
+        ) {
+            return payload;
+        }
 
-const formatDate = (
-    date
-) => {
-    if (
-        !date
-    ) {
-        return '-';
-    }
+        if (
+            Array.isArray(
+                payload
+                    ?.data
+            )
+        ) {
+            return payload
+                .data;
+        }
 
-    if (
-        typeof date ===
-            'string' &&
-        /^\d{4}-\d{2}-\d{2}$/.test(
-            date
-        )
-    ) {
-        const [
-            year,
-            month,
-            day,
-        ] =
-            date
-                .split('-')
-                .map(
-                    Number
+        return [];
+    };
+
+/*
+|--------------------------------------------------------------------------
+| DATE
+|--------------------------------------------------------------------------
+*/
+
+const formatDate =
+    (
+        date
+    ) => {
+        if (
+            !date
+        ) {
+            return '-';
+        }
+
+        if (
+            typeof date ===
+                'string' &&
+            /^\d{4}-\d{2}-\d{2}$/.test(
+                date
+            )
+        ) {
+            const [
+                year,
+                month,
+                day,
+            ] =
+                date
+                    .split('-')
+                    .map(
+                        Number
+                    );
+
+            const parsedDate =
+                new Date(
+                    year,
+                    month - 1,
+                    day
                 );
+
+            return parsedDate
+                .toLocaleDateString(
+                    'id-ID',
+                    {
+                        day:
+                            '2-digit',
+
+                        month:
+                            'long',
+
+                        year:
+                            'numeric',
+                    }
+                );
+        }
 
         const parsedDate =
             new Date(
-                year,
-                month - 1,
-                day
+                date
             );
+
+        if (
+            Number.isNaN(
+                parsedDate.getTime()
+            )
+        ) {
+            return '-';
+        }
 
         return parsedDate
             .toLocaleDateString(
@@ -293,280 +456,307 @@ const formatDate = (
                 {
                     day:
                         '2-digit',
+
                     month:
                         'long',
+
                     year:
                         'numeric',
                 }
             );
-    }
+    };
 
-    const parsedDate =
-        new Date(
-            date
-        );
+const formatDateTime =
+    (
+        date
+    ) => {
+        if (
+            !date
+        ) {
+            return '-';
+        }
 
-    if (
-        Number.isNaN(
-            parsedDate.getTime()
-        )
-    ) {
-        return '-';
-    }
+        const parsedDate =
+            new Date(
+                date
+            );
 
-    return parsedDate
-        .toLocaleDateString(
-            'id-ID',
-            {
-                day:
-                    '2-digit',
-                month:
-                    'long',
-                year:
-                    'numeric',
-            }
-        );
-};
-
-const formatDateTime = (
-    date
-) => {
-    if (
-        !date
-    ) {
-        return '-';
-    }
-
-    const parsedDate =
-        new Date(
-            date
-        );
-
-    if (
-        Number.isNaN(
-            parsedDate.getTime()
-        )
-    ) {
-        return '-';
-    }
-
-    return parsedDate
-        .toLocaleString(
-            'id-ID',
-            {
-                day:
-                    '2-digit',
-                month:
-                    'short',
-                year:
-                    'numeric',
-                hour:
-                    '2-digit',
-                minute:
-                    '2-digit',
-                hour12:
-                    false,
-            }
-        );
-};
-
-const normalizeExternalUrl = (
-    value
-) => {
-    if (
-        !value
-    ) {
-        return null;
-    }
-
-    const normalizedValue =
-        String(
-            value
-        ).trim();
-
-    if (
-        !normalizedValue
-    ) {
-        return null;
-    }
-
-    if (
-        /^https?:\/\//i.test(
-            normalizedValue
-        )
-    ) {
-        return normalizedValue;
-    }
-
-    return `https://${normalizedValue}`;
-};
-
-const getResolvedUnitName = (
-    item
-) => {
-    if (
-        item?.resolved_unit_name
-    ) {
-        return item
-            .resolved_unit_name;
-    }
-
-    if (
-        item?.unit_name ===
-        'Lainnya'
-    ) {
-        return (
-            item.other_unit_name ||
-            'Lainnya'
-        );
-    }
-
-    return (
-        item?.unit_name ||
-        item?.requester_unit ||
-        item?.user?.unit_name ||
-        '-'
-    );
-};
-
-const getCoverageConfig = (
-    coverageType
-) => {
-    const normalizedCoverage =
-        String(
-            coverageType ||
-                ''
-        )
-            .split(
-                /[;,]/
+        if (
+            Number.isNaN(
+                parsedDate.getTime()
             )
-            .map(
+        ) {
+            return '-';
+        }
+
+        return parsedDate
+            .toLocaleString(
+                'id-ID',
+                {
+                    day:
+                        '2-digit',
+
+                    month:
+                        'short',
+
+                    year:
+                        'numeric',
+
+                    hour:
+                        '2-digit',
+
+                    minute:
+                        '2-digit',
+
+                    hour12:
+                        false,
+                }
+            );
+    };
+
+/*
+|--------------------------------------------------------------------------
+| URL
+|--------------------------------------------------------------------------
+*/
+
+const normalizeExternalUrl =
+    (
+        value
+    ) => {
+        if (
+            !value
+        ) {
+            return null;
+        }
+
+        const normalizedValue =
+            String(
+                value
+            ).trim();
+
+        if (
+            !normalizedValue
+        ) {
+            return null;
+        }
+
+        if (
+            /^https?:\/\//i.test(
+                normalizedValue
+            )
+        ) {
+            return normalizedValue;
+        }
+
+        return `https://${normalizedValue}`;
+    };
+
+/*
+|--------------------------------------------------------------------------
+| HUMAS HELPERS
+|--------------------------------------------------------------------------
+*/
+
+const getResolvedUnitName =
+    (
+        item
+    ) => {
+        if (
+            item
+                ?.resolved_unit_name
+        ) {
+            return item
+                .resolved_unit_name;
+        }
+
+        if (
+            item
+                ?.unit_name ===
+            'Lainnya'
+        ) {
+            return (
+                item
+                    .other_unit_name ||
+                'Lainnya'
+            );
+        }
+
+        return (
+            item
+                ?.unit_name ||
+            item
+                ?.requester_unit ||
+            item
+                ?.user
+                ?.unit_name ||
+            '-'
+        );
+    };
+
+const getCoverageConfig =
+    (
+        coverageType
+    ) => {
+        const normalizedCoverage =
+            String(
+                coverageType ||
+                    ''
+            )
+                .split(
+                    /[;,]/
+                )
+                .map(
+                    (
+                        item
+                    ) =>
+                        item
+                            .trim()
+                            .toUpperCase()
+                )
+                .filter(
+                    Boolean
+                );
+
+        if (
+            normalizedCoverage
+                .length ===
+            0
+        ) {
+            return {
+                label:
+                    'Layanan Humas',
+
+                icon:
+                    'bi-camera-reels-fill',
+            };
+        }
+
+        const labels =
+            normalizedCoverage.map(
                 (
                     item
                 ) =>
+                    COVERAGE_TYPE_CONFIG[
+                        item
+                    ]
+                        ?.label ||
                     item
-                        .trim()
-                        .toUpperCase()
-            )
-            .filter(
-                Boolean
             );
 
-    if (
-        normalizedCoverage.length ===
-        0
-    ) {
+        const firstConfig =
+            COVERAGE_TYPE_CONFIG[
+                normalizedCoverage[
+                    0
+                ]
+            ];
+
         return {
             label:
-                'Layanan Humas',
+                labels.join(
+                    '; '
+                ),
+
             icon:
+                firstConfig
+                    ?.icon ||
                 'bi-camera-reels-fill',
         };
-    }
-
-    const labels =
-        normalizedCoverage.map(
-            (
-                item
-            ) =>
-                COVERAGE_TYPE_CONFIG[
-                    item
-                ]?.label ||
-                item
-        );
-
-    const firstConfig =
-        COVERAGE_TYPE_CONFIG[
-            normalizedCoverage[
-                0
-            ]
-        ];
-
-    return {
-        label:
-            labels.join(
-                '; '
-            ),
-
-        icon:
-            firstConfig?.icon ||
-            'bi-camera-reels-fill',
     };
-};
 
-const normalizeMerchandise = (
-    item
-) => ({
-    ...item,
+/*
+|--------------------------------------------------------------------------
+| SEKPiM HELPERS
+|--------------------------------------------------------------------------
+*/
 
-    requestType:
-        'merchandise',
-
-    requestCode:
-        item.order_code ||
-        item.code ||
-        `MER-${String(
-            item.id
-        ).padStart(
-            4,
-            '0'
-        )}`,
-
-    requestTitle:
-        item.event_name ||
-        item.activity_name ||
-        item.title ||
-        'Pengajuan Merchandise',
-
-    requestDescription:
-        item.institution_name ||
-        item.requester_unit ||
-        item.guest_name ||
-        item.user_note ||
-        'Pengajuan paket merchandise',
-
-    requestMeta:
-        item.activity_date
-            ? `Kegiatan: ${formatDate(
-                  item.activity_date
-              )}`
-            : null,
-
-    requestDate:
-        item.activity_date ||
-        item.submitted_at ||
-        item.created_at,
-
-    updatedDate:
-        item.updated_at ||
-        item.resubmitted_at ||
-        item.submitted_at ||
-        item.created_at,
-});
-
-const normalizeHumas = (
-    item
-) => {
-    const coverageConfig =
-        getCoverageConfig(
-            item.coverage_type
-        );
-
-    const resolvedUnitName =
-        getResolvedUnitName(
+const getSekpimRequestType =
+    (
+        item
+    ) => {
+        /*
+         * Compatibility data lama.
+         *
+         * Data tanpa request_type dianggap
+         * Peminjaman Barang.
+         */
+        return (
             item
+                ?.request_type ||
+            TYPE_BORROW
         );
+    };
 
-    return {
+const getSekpimFilterType =
+    (
+        item
+    ) => {
+        const requestType =
+            getSekpimRequestType(
+                item
+            );
+
+        if (
+            requestType ===
+            TYPE_ASSET_REQUEST
+        ) {
+            return 'sekpim_asset_request';
+        }
+
+        return 'sekpim_borrow';
+    };
+
+const getSekpimTypeLabel =
+    (
+        item
+    ) => {
+        return getSekpimRequestType(
+            item
+        ) ===
+        TYPE_ASSET_REQUEST
+            ? 'Request Barang'
+            : 'Peminjaman Barang';
+    };
+
+/*
+|--------------------------------------------------------------------------
+| NORMALIZE MERCHANDISE
+|--------------------------------------------------------------------------
+*/
+
+const normalizeMerchandise =
+    (
+        item
+    ) => ({
         ...item,
 
+        /*
+         * Untuk route detail.
+         */
         requestType:
-            'humas',
+            'merchandise',
+
+        /*
+         * Untuk filter halaman.
+         */
+        filterType:
+            'merchandise',
+
+        serviceLabel:
+            'Merchandise',
+
+        serviceIcon:
+            'bi-gift-fill',
+
+        serviceColor:
+            'primary',
 
         requestCode:
-            item.service_code ||
-            item.code ||
-            `LIP-${String(
+            item
+                .order_code ||
+            item
+                .code ||
+            `MER-${String(
                 item.id
             ).padStart(
                 4,
@@ -574,96 +764,383 @@ const normalizeHumas = (
             )}`,
 
         requestTitle:
-            coverageConfig.label,
+            item
+                .event_name ||
+            item
+                .activity_name ||
+            item
+                .title ||
+            'Pengajuan Merchandise',
 
         requestDescription:
-            item.activity_detail ||
-            item.event_location ||
-            'Request layanan Humas',
+            item
+                .institution_name ||
+            item
+                .requester_unit ||
+            item
+                .guest_name ||
+            item
+                .user_note ||
+            'Pengajuan paket merchandise',
 
-        requestMeta: [
-            resolvedUnitName,
-            item.event_location,
-        ]
-            .filter(
-                Boolean
-            )
-            .join(
-                ' • '
-            ),
+        requestMeta:
+            item
+                .activity_date
+                ? `Kegiatan: ${formatDate(
+                      item
+                          .activity_date
+                  )}`
+                : null,
 
         requestDate:
-            item.event_date ||
-            item.submitted_at ||
-            item.created_at,
+            item
+                .activity_date ||
+            item
+                .submitted_at ||
+            item
+                .created_at,
 
         updatedDate:
-            item.updated_at ||
-            item.submitted_at ||
-            item.created_at,
+            item
+                .updated_at ||
+            item
+                .resubmitted_at ||
+            item
+                .submitted_at ||
+            item
+                .created_at,
+    });
 
-        coverageLabel:
-            coverageConfig.label,
+/*
+|--------------------------------------------------------------------------
+| NORMALIZE HUMAS
+|--------------------------------------------------------------------------
+*/
 
-        coverageIcon:
-            coverageConfig.icon,
+const normalizeHumas =
+    (
+        item
+    ) => {
+        const coverageConfig =
+            getCoverageConfig(
+                item
+                    .coverage_type
+            );
 
-        resultUrl:
-            normalizeExternalUrl(
-                item.result_link
-            ),
+        const resolvedUnitName =
+            getResolvedUnitName(
+                item
+            );
+
+        return {
+            ...item,
+
+            requestType:
+                'humas',
+
+            filterType:
+                'humas',
+
+            serviceLabel:
+                coverageConfig
+                    .label,
+
+            serviceIcon:
+                coverageConfig
+                    .icon,
+
+            serviceColor:
+                'danger',
+
+            requestCode:
+                item
+                    .service_code ||
+                item
+                    .code ||
+                `LIP-${String(
+                    item.id
+                ).padStart(
+                    4,
+                    '0'
+                )}`,
+
+            requestTitle:
+                coverageConfig
+                    .label,
+
+            requestDescription:
+                item
+                    .activity_detail ||
+                item
+                    .event_location ||
+                'Request layanan Humas',
+
+            requestMeta: [
+                resolvedUnitName,
+
+                item
+                    .event_location,
+            ]
+                .filter(
+                    Boolean
+                )
+                .join(
+                    ' • '
+                ),
+
+            requestDate:
+                item
+                    .event_date ||
+                item
+                    .submitted_at ||
+                item
+                    .created_at,
+
+            updatedDate:
+                item
+                    .updated_at ||
+                item
+                    .submitted_at ||
+                item
+                    .created_at,
+
+            coverageLabel:
+                coverageConfig
+                    .label,
+
+            coverageIcon:
+                coverageConfig
+                    .icon,
+
+            resultUrl:
+                normalizeExternalUrl(
+                    item
+                        .result_link
+                ),
+        };
     };
-};
 
-const normalizeBorrowing = (
-    item
-) => ({
-    ...item,
+/*
+|--------------------------------------------------------------------------
+| NORMALIZE SEKPiM
+|--------------------------------------------------------------------------
+*/
 
-    requestType:
-        'borrowing',
+const normalizeBorrowing =
+    (
+        item
+    ) => {
+        const sekpimType =
+            getSekpimRequestType(
+                item
+            );
 
-    requestCode:
-        item.borrow_code ||
-        item.code ||
-        `BRW-${String(
-            item.id
-        ).padStart(
-            4,
-            '0'
-        )}`,
+        const isAssetRequest =
+            sekpimType ===
+            TYPE_ASSET_REQUEST;
 
-    requestTitle:
-        item.event_name ||
-        item.activity_name ||
-        item.purpose ||
-        'Peminjaman Perlengkapan',
+        const filterType =
+            getSekpimFilterType(
+                item
+            );
 
-    requestDescription:
-        item.requester_unit ||
-        item.location ||
-        item.person_in_charge ||
-        item.purpose ||
-        'Pengajuan peminjaman SEKPiM',
+        const serviceConfig =
+            REQUEST_TYPES[
+                filterType
+            ];
 
-    requestMeta:
-        item.return_date
-            ? `Kembali: ${formatDate(
-                  item.return_date
-              )}`
-            : null,
+        const itemNames =
+            Array.isArray(
+                item
+                    .items
+            )
+                ? item
+                      .items
+                      .map(
+                          (
+                              requestItem
+                          ) =>
+                              requestItem
+                                  ?.product
+                                  ?.name
+                      )
+                      .filter(
+                          Boolean
+                      )
+                : [];
 
-    requestDate:
-        item.borrow_at ||
-        item.borrow_date ||
-        item.submitted_at ||
-        item.created_at,
+        const itemSummary =
+            itemNames
+                .length >
+            0
+                ? itemNames.join(
+                      ', '
+                  )
+                : null;
 
-    updatedDate:
-        item.updated_at ||
-        item.submitted_at ||
-        item.created_at,
-});
+        return {
+            ...item,
+
+            /*
+             * Route detail tetap borrowing.
+             *
+             * Jangan diganti menjadi sekpim_borrow
+             * karena route existing menggunakan:
+             *
+             * /my-requests/borrowing/{id}/detail
+             */
+            requestType:
+                'borrowing',
+
+            filterType,
+
+            sekpimRequestType:
+                sekpimType,
+
+            isAssetRequest,
+
+            serviceLabel:
+                serviceConfig
+                    .label,
+
+            serviceIcon:
+                serviceConfig
+                    .icon,
+
+            serviceColor:
+                serviceConfig
+                    .color,
+
+            requestCode:
+                item
+                    .borrow_code ||
+                item
+                    .code ||
+                (
+                    isAssetRequest
+                        ? `REQ-${String(
+                              item.id
+                          ).padStart(
+                              4,
+                              '0'
+                          )}`
+                        : `BRW-${String(
+                              item.id
+                          ).padStart(
+                              4,
+                              '0'
+                          )}`
+                ),
+
+            requestTitle:
+                item
+                    .purpose ||
+                (
+                    isAssetRequest
+                        ? 'Request Barang'
+                        : 'Peminjaman Barang'
+                ),
+
+            requestDescription:
+                itemSummary ||
+                item
+                    .purpose ||
+                (
+                    isAssetRequest
+                        ? 'Request barang SEKPiM'
+                        : 'Peminjaman barang SEKPiM'
+                ),
+
+            requestMeta:
+                isAssetRequest
+                    ? [
+                          item
+                              .activity_date
+                              ? `Kegiatan: ${formatDate(
+                                    item
+                                        .activity_date
+                                )}`
+                              : null,
+
+                          item
+                              .borrow_date
+                              ? `Pengambilan: ${formatDate(
+                                    item
+                                        .borrow_date
+                                )}`
+                              : null,
+                      ]
+                          .filter(
+                              Boolean
+                          )
+                          .join(
+                              ' • '
+                          )
+                    : [
+                          item
+                              .activity_date
+                              ? `Kegiatan: ${formatDate(
+                                    item
+                                        .activity_date
+                                )}`
+                              : null,
+
+                          item
+                              .borrow_date
+                              ? `Ambil: ${formatDate(
+                                    item
+                                        .borrow_date
+                                )}`
+                              : null,
+
+                          item
+                              .return_date
+                              ? `Kembali: ${formatDate(
+                                    item
+                                        .return_date
+                                )}`
+                              : null,
+                      ]
+                          .filter(
+                              Boolean
+                          )
+                          .join(
+                              ' • '
+                          ),
+
+            requestDate:
+                item
+                    .activity_date ||
+                item
+                    .borrow_date ||
+                item
+                    .submitted_at ||
+                item
+                    .created_at,
+
+            updatedDate:
+                item
+                    .updated_at ||
+                item
+                    .completed_at ||
+                item
+                    .returned_at ||
+                item
+                    .borrowed_at ||
+                item
+                    .approved_at ||
+                item
+                    .submitted_at ||
+                item
+                    .created_at,
+        };
+    };
+
+/*
+|--------------------------------------------------------------------------
+| PAGE
+|--------------------------------------------------------------------------
+*/
 
 export default function MyRequestsPage() {
     const currentUser =
@@ -674,7 +1151,8 @@ export default function MyRequestsPage() {
         );
 
     const basePath =
-        currentUser.role ===
+        currentUser
+            .role ===
         'user'
             ? '/user'
             : '/admin';
@@ -682,47 +1160,64 @@ export default function MyRequestsPage() {
     const [
         requests,
         setRequests,
-    ] = useState([]);
+    ] =
+        useState(
+            []
+        );
 
     const [
         loading,
         setLoading,
-    ] = useState(
-        true
-    );
+    ] =
+        useState(
+            true
+        );
 
     const [
         refreshing,
         setRefreshing,
-    ] = useState(
-        false
-    );
+    ] =
+        useState(
+            false
+        );
 
     const [
         activeType,
         setActiveType,
-    ] = useState(
-        'all'
-    );
+    ] =
+        useState(
+            'all'
+        );
 
     const [
         statusFilter,
         setStatusFilter,
-    ] = useState(
-        'all'
-    );
+    ] =
+        useState(
+            'all'
+        );
 
     const [
         searchKeyword,
         setSearchKeyword,
-    ] = useState(
-        ''
-    );
+    ] =
+        useState(
+            ''
+        );
 
     const [
         endpointErrors,
         setEndpointErrors,
-    ] = useState([]);
+    ] =
+        useState(
+            []
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD REQUESTS
+    |--------------------------------------------------------------------------
+    */
 
     const fetchRequests =
         useCallback(
@@ -748,55 +1243,70 @@ export default function MyRequestsPage() {
                     );
 
                     const results =
-                        await Promise.allSettled([
-                            api.get(
-                                '/my-orders'
-                            ),
+                        await Promise
+                            .allSettled([
+                                api.get(
+                                    '/my-orders'
+                                ),
 
-                            api.get(
-                                '/my-humas-service-requests'
-                            ),
+                                api.get(
+                                    '/my-humas-service-requests'
+                                ),
 
-                            api.get(
-                                '/my-borrow-requests'
-                            ),
-                        ]);
+                                api.get(
+                                    '/my-borrow-requests'
+                                ),
+                            ]);
 
                     const nextErrors =
                         [];
 
                     const merchandiseData =
-                        results[0]
+                        results[
+                            0
+                        ]
                             .status ===
                         'fulfilled'
                             ? extractArray(
-                                  results[0]
+                                  results[
+                                      0
+                                  ]
                                       .value
                               )
                             : [];
 
                     const humasData =
-                        results[1]
+                        results[
+                            1
+                        ]
                             .status ===
                         'fulfilled'
                             ? extractArray(
-                                  results[1]
+                                  results[
+                                      1
+                                  ]
                                       .value
                               )
                             : [];
 
                     const borrowingData =
-                        results[2]
+                        results[
+                            2
+                        ]
                             .status ===
                         'fulfilled'
                             ? extractArray(
-                                  results[2]
+                                  results[
+                                      2
+                                  ]
                                       .value
                               )
                             : [];
 
                     if (
-                        results[0]
+                        results[
+                            0
+                        ]
                             .status ===
                         'rejected'
                     ) {
@@ -806,7 +1316,9 @@ export default function MyRequestsPage() {
                     }
 
                     if (
-                        results[1]
+                        results[
+                            1
+                        ]
                             .status ===
                         'rejected'
                     ) {
@@ -816,12 +1328,14 @@ export default function MyRequestsPage() {
                     }
 
                     if (
-                        results[2]
+                        results[
+                            2
+                        ]
                             .status ===
                         'rejected'
                     ) {
                         nextErrors.push(
-                            'Peminjaman SEKPiM'
+                            'Layanan SEKPiM'
                         );
                     }
 
@@ -846,13 +1360,15 @@ export default function MyRequestsPage() {
                         ) => {
                             const firstDate =
                                 new Date(
-                                    firstItem.updatedDate ||
+                                    firstItem
+                                        .updatedDate ||
                                         0
                                 ).getTime();
 
                             const secondDate =
                                 new Date(
-                                    secondItem.updatedDate ||
+                                    secondItem
+                                        .updatedDate ||
                                         0
                                 ).getTime();
 
@@ -906,18 +1422,26 @@ export default function MyRequestsPage() {
         ]
     );
 
+    /*
+    |--------------------------------------------------------------------------
+    | REQUEST COUNTS
+    |--------------------------------------------------------------------------
+    */
+
     const requestCounts =
         useMemo(
             () => ({
                 all:
-                    requests.length,
+                    requests
+                        .length,
 
                 merchandise:
                     requests.filter(
                         (
                             item
                         ) =>
-                            item.requestType ===
+                            item
+                                .filterType ===
                             'merchandise'
                     ).length,
 
@@ -926,23 +1450,41 @@ export default function MyRequestsPage() {
                         (
                             item
                         ) =>
-                            item.requestType ===
+                            item
+                                .filterType ===
                             'humas'
                     ).length,
 
-                borrowing:
+                sekpim_borrow:
                     requests.filter(
                         (
                             item
                         ) =>
-                            item.requestType ===
-                            'borrowing'
+                            item
+                                .filterType ===
+                            'sekpim_borrow'
+                    ).length,
+
+                sekpim_asset_request:
+                    requests.filter(
+                        (
+                            item
+                        ) =>
+                            item
+                                .filterType ===
+                            'sekpim_asset_request'
                     ).length,
             }),
             [
                 requests,
             ]
         );
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATUS COUNTS
+    |--------------------------------------------------------------------------
+    */
 
     const statusCounts =
         useMemo(
@@ -952,7 +1494,8 @@ export default function MyRequestsPage() {
                         (
                             item
                         ) =>
-                            item.status ===
+                            item
+                                .status ===
                             'pending'
                     ).length,
 
@@ -961,9 +1504,11 @@ export default function MyRequestsPage() {
                         (
                             item
                         ) =>
-                            item.requestType ===
+                            item
+                                .requestType ===
                                 'merchandise' &&
-                            item.status ===
+                            item
+                                .status ===
                                 'revision'
                     ).length,
 
@@ -972,8 +1517,19 @@ export default function MyRequestsPage() {
                         (
                             item
                         ) =>
-                            item.status ===
+                            item
+                                .status ===
                             'approved'
+                    ).length,
+
+                borrowed:
+                    requests.filter(
+                        (
+                            item
+                        ) =>
+                            item
+                                .status ===
+                            'borrowed'
                     ).length,
 
                 rejected:
@@ -981,18 +1537,25 @@ export default function MyRequestsPage() {
                         (
                             item
                         ) =>
-                            item.status ===
+                            item
+                                .status ===
                             'rejected'
                     ).length,
 
+                /*
+                 * Returned pada Peminjaman dianggap
+                 * sudah selesai pada card ringkasan.
+                 */
                 completed:
                     requests.filter(
                         (
                             item
                         ) =>
-                            item.status ===
+                            item
+                                .status ===
                                 'completed' ||
-                            item.status ===
+                            item
+                                .status ===
                                 'returned'
                     ).length,
             }),
@@ -1000,6 +1563,12 @@ export default function MyRequestsPage() {
                 requests,
             ]
         );
+
+    /*
+    |--------------------------------------------------------------------------
+    | FILTER
+    |--------------------------------------------------------------------------
+    */
 
     const filteredRequests =
         useMemo(
@@ -1016,31 +1585,93 @@ export default function MyRequestsPage() {
                         const matchesType =
                             activeType ===
                                 'all' ||
-                            item.requestType ===
+                            item
+                                .filterType ===
                                 activeType;
 
                         const matchesStatus =
                             statusFilter ===
                                 'all' ||
-                            item.status ===
+                            item
+                                .status ===
                                 statusFilter;
 
+                        const itemNames =
+                            Array.isArray(
+                                item
+                                    .items
+                            )
+                                ? item
+                                      .items
+                                      .map(
+                                          (
+                                              requestItem
+                                          ) =>
+                                              requestItem
+                                                  ?.product
+                                                  ?.name
+                                      )
+                                : [];
+
                         const searchableText = [
-                            item.requestCode,
-                            item.requestTitle,
-                            item.requestDescription,
-                            item.requestMeta,
-                            item.status,
-                            item.admin_note,
-                            item.applicant_name,
-                            item.unit_name,
-                            item.other_unit_name,
-                            item.pic_whatsapp,
-                            item.coverage_type,
-                            item.coverageLabel,
-                            item.event_location,
-                            item.activity_detail,
-                            item.result_note,
+                            item
+                                .requestCode,
+
+                            item
+                                .requestTitle,
+
+                            item
+                                .requestDescription,
+
+                            item
+                                .requestMeta,
+
+                            item
+                                .serviceLabel,
+
+                            item
+                                .status,
+
+                            item
+                                .admin_note,
+
+                            item
+                                .applicant_name,
+
+                            item
+                                .unit_name,
+
+                            item
+                                .other_unit_name,
+
+                            item
+                                .pic_name,
+
+                            item
+                                .pic_phone,
+
+                            item
+                                .pic_whatsapp,
+
+                            item
+                                .coverage_type,
+
+                            item
+                                .coverageLabel,
+
+                            item
+                                .event_location,
+
+                            item
+                                .activity_detail,
+
+                            item
+                                .purpose,
+
+                            item
+                                .result_note,
+
+                            ...itemNames,
                         ]
                             .filter(
                                 Boolean
@@ -1072,6 +1703,12 @@ export default function MyRequestsPage() {
             ]
         );
 
+    /*
+    |--------------------------------------------------------------------------
+    | RESET
+    |--------------------------------------------------------------------------
+    */
+
     const resetFilters =
         () => {
             setActiveType(
@@ -1086,6 +1723,12 @@ export default function MyRequestsPage() {
                 ''
             );
         };
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATUS CONFIG
+    |--------------------------------------------------------------------------
+    */
 
     const getStatusConfig =
         (
@@ -1105,11 +1748,23 @@ export default function MyRequestsPage() {
                     'bi-info-circle-fill',
             };
 
+    /*
+    |--------------------------------------------------------------------------
+    | DETAIL PATH
+    |--------------------------------------------------------------------------
+    */
+
     const getDetailPath =
         (
             item
         ) =>
             `${basePath}/my-requests/${item.requestType}/${item.id}/detail`;
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOADING
+    |--------------------------------------------------------------------------
+    */
 
     if (
         loading
@@ -1133,8 +1788,16 @@ export default function MyRequestsPage() {
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | VIEW
+    |--------------------------------------------------------------------------
+    */
+
     return (
         <div className="container-fluid px-0">
+            {/* HERO */}
+
             <section className="card border-0 shadow-sm rounded-5 mb-4">
                 <div className="card-body p-4 p-lg-5">
                     <div className="d-flex flex-wrap align-items-center justify-content-between gap-4">
@@ -1144,11 +1807,11 @@ export default function MyRequestsPage() {
                             </span>
 
                             <h2 className="fw-black mb-2">
-                                Pantau seluruh pengajuan
+                                Pantau Seluruh Pengajuan
                             </h2>
 
                             <p className="text-muted mb-0">
-                                Lihat status merchandise, layanan Humas, dan peminjaman SEKPiM dalam satu halaman.
+                                Lihat status Merchandise, layanan Humas, Peminjaman Barang, dan Request Barang SEKPiM dalam satu halaman.
                             </p>
                         </div>
 
@@ -1159,13 +1822,16 @@ export default function MyRequestsPage() {
 
                             <div className="display-5 fw-black text-danger">
                                 {
-                                    requests.length
+                                    requests
+                                        .length
                                 }
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
+
+            {/* ENDPOINT WARNING */}
 
             {endpointErrors.length >
                 0 && (
@@ -1193,55 +1859,96 @@ export default function MyRequestsPage() {
                 </div>
             )}
 
+            {/* STATISTICS */}
+
             <section className="row g-3 mb-4">
                 {[
                     {
                         label:
                             'Menunggu',
+
                         value:
-                            statusCounts.pending,
+                            statusCounts
+                                .pending,
+
                         icon:
                             'bi-hourglass-split',
+
                         className:
                             'bg-warning-subtle text-warning',
                     },
+
                     {
                         label:
                             'Perlu Revisi',
+
                         value:
-                            statusCounts.revision,
+                            statusCounts
+                                .revision,
+
                         icon:
                             'bi-pencil-square',
+
                         className:
                             'bg-info-subtle text-info',
                     },
+
                     {
                         label:
                             'Disetujui',
+
                         value:
-                            statusCounts.approved,
+                            statusCounts
+                                .approved,
+
                         icon:
                             'bi-check-circle-fill',
+
                         className:
                             'bg-success-subtle text-success',
                     },
+
+                    {
+                        label:
+                            'Sedang Dipinjam',
+
+                        value:
+                            statusCounts
+                                .borrowed,
+
+                        icon:
+                            'bi-box-arrow-up-right',
+
+                        className:
+                            'bg-info-subtle text-info',
+                    },
+
                     {
                         label:
                             'Ditolak',
+
                         value:
-                            statusCounts.rejected,
+                            statusCounts
+                                .rejected,
+
                         icon:
                             'bi-x-circle-fill',
+
                         className:
                             'bg-danger-subtle text-danger',
                     },
+
                     {
                         label:
                             'Selesai',
+
                         value:
-                            statusCounts.completed,
+                            statusCounts
+                                .completed,
+
                         icon:
                             'bi-check2-all',
+
                         className:
                             'bg-primary-subtle text-primary',
                     },
@@ -1250,9 +1957,10 @@ export default function MyRequestsPage() {
                         statistic
                     ) => (
                         <div
-                            className="col-6 col-lg-4 col-xl"
+                            className="col-6 col-md-4 col-xl-2"
                             key={
-                                statistic.label
+                                statistic
+                                    .label
                             }
                         >
                             <div className="card border-0 shadow-sm rounded-4 h-100">
@@ -1261,13 +1969,15 @@ export default function MyRequestsPage() {
                                         <div>
                                             <div className="small text-muted fw-bold mb-1">
                                                 {
-                                                    statistic.label
+                                                    statistic
+                                                        .label
                                                 }
                                             </div>
 
                                             <div className="fs-2 fw-black">
                                                 {
-                                                    statistic.value
+                                                    statistic
+                                                        .value
                                                 }
                                             </div>
                                         </div>
@@ -1287,12 +1997,14 @@ export default function MyRequestsPage() {
                 )}
             </section>
 
+            {/* SEARCH */}
+
             <section className="card border-0 shadow-sm rounded-5 mb-4">
                 <div className="card-body p-4">
                     <div className="row g-3 align-items-end">
                         <div className="col-lg-5">
                             <label className="form-label fw-bold">
-                                Cari pengajuan
+                                Cari Pengajuan
                             </label>
 
                             <div className="input-group">
@@ -1303,7 +2015,7 @@ export default function MyRequestsPage() {
                                 <input
                                     type="search"
                                     className="form-control"
-                                    placeholder="Cari kode, unit, layanan, lokasi..."
+                                    placeholder="Cari kode, layanan, PIC, barang, lokasi..."
                                     value={
                                         searchKeyword
                                     }
@@ -1346,14 +2058,17 @@ export default function MyRequestsPage() {
                                     ) => (
                                         <option
                                             key={
-                                                option.value
+                                                option
+                                                    .value
                                             }
                                             value={
-                                                option.value
+                                                option
+                                                    .value
                                             }
                                         >
                                             {
-                                                option.label
+                                                option
+                                                    .label
                                             }
                                         </option>
                                     )
@@ -1390,11 +2105,13 @@ export default function MyRequestsPage() {
                                     {refreshing ? (
                                         <>
                                             <span className="spinner-border spinner-border-sm me-2" />
+
                                             Memuat...
                                         </>
                                     ) : (
                                         <>
                                             <i className="bi bi-arrow-clockwise me-2" />
+
                                             Refresh
                                         </>
                                     )}
@@ -1405,7 +2122,11 @@ export default function MyRequestsPage() {
                 </div>
             </section>
 
+            {/* TABLE */}
+
             <section className="card border-0 shadow-sm rounded-5 overflow-hidden">
+                {/* TYPE FILTER */}
+
                 <div className="card-header bg-white border-0 p-3 p-lg-4">
                     <div className="d-flex flex-wrap gap-2">
                         <button
@@ -1423,11 +2144,13 @@ export default function MyRequestsPage() {
                             }
                         >
                             <i className="bi bi-grid-fill me-2" />
+
                             Semua
 
                             <span className="badge bg-white text-dark ms-2">
                                 {
-                                    requestCounts.all
+                                    requestCounts
+                                        .all
                                 }
                             </span>
                         </button>
@@ -1461,7 +2184,8 @@ export default function MyRequestsPage() {
                                     />
 
                                     {
-                                        typeConfig.label
+                                        typeConfig
+                                            .label
                                     }
 
                                     <span
@@ -1472,11 +2196,10 @@ export default function MyRequestsPage() {
                                                 : 'text-bg-secondary'
                                         }`}
                                     >
-                                        {
-                                            requestCounts[
-                                                typeKey
-                                            ]
-                                        }
+                                        {requestCounts[
+                                            typeKey
+                                        ] ||
+                                            0}
                                     </span>
                                 </button>
                             )
@@ -1484,8 +2207,11 @@ export default function MyRequestsPage() {
                     </div>
                 </div>
 
+                {/* TABLE BODY */}
+
                 <div className="card-body p-0">
-                    {filteredRequests.length ===
+                    {filteredRequests
+                        .length ===
                     0 ? (
                         <div className="text-center py-5 px-4">
                             <div
@@ -1493,6 +2219,7 @@ export default function MyRequestsPage() {
                                 style={{
                                     width:
                                         82,
+
                                     height:
                                         82,
                                 }}
@@ -1552,27 +2279,57 @@ export default function MyRequestsPage() {
                                         ) => {
                                             const typeConfig =
                                                 REQUEST_TYPES[
-                                                    item.requestType
-                                                ];
+                                                    item
+                                                        .filterType
+                                                ] || {
+                                                    label:
+                                                        item
+                                                            .serviceLabel ||
+                                                        '-',
+
+                                                    icon:
+                                                        item
+                                                            .serviceIcon ||
+                                                        'bi-grid-fill',
+
+                                                    color:
+                                                        item
+                                                            .serviceColor ||
+                                                        'secondary',
+                                                };
 
                                             const statusConfig =
                                                 getStatusConfig(
-                                                    item.status
+                                                    item
+                                                        .status
                                                 );
 
                                             const hasHumasResult =
-                                                item.requestType ===
+                                                item
+                                                    .requestType ===
                                                     'humas' &&
-                                                item.status ===
+                                                item
+                                                    .status ===
                                                     'completed' &&
                                                 Boolean(
-                                                    item.resultUrl
+                                                    item
+                                                        .resultUrl
                                                 );
+
+                                            const isMerchandiseRevision =
+                                                item
+                                                    .requestType ===
+                                                    'merchandise' &&
+                                                item
+                                                    .status ===
+                                                    'revision';
 
                                             return (
                                                 <tr
                                                     key={`${item.requestType}-${item.id}`}
                                                 >
+                                                    {/* REQUEST */}
+
                                                     <td className="ps-4 py-3">
                                                         <div className="d-flex align-items-center gap-3">
                                                             <div
@@ -1580,10 +2337,10 @@ export default function MyRequestsPage() {
                                                             >
                                                                 <i
                                                                     className={`bi ${
-                                                                        item.requestType ===
-                                                                        'humas'
-                                                                            ? item.coverageIcon
-                                                                            : typeConfig.icon
+                                                                        item
+                                                                            .serviceIcon ||
+                                                                        typeConfig
+                                                                            .icon
                                                                     }`}
                                                                 />
                                                             </div>
@@ -1591,7 +2348,8 @@ export default function MyRequestsPage() {
                                                             <div className="min-w-0">
                                                                 <div className="fw-black text-dark mb-1">
                                                                     {
-                                                                        item.requestTitle
+                                                                        item
+                                                                            .requestTitle
                                                                     }
                                                                 </div>
 
@@ -1601,46 +2359,94 @@ export default function MyRequestsPage() {
                                                                         maxWidth:
                                                                             340,
                                                                     }}
+                                                                    title={
+                                                                        item
+                                                                            .requestDescription
+                                                                    }
                                                                 >
                                                                     {
-                                                                        item.requestDescription
+                                                                        item
+                                                                            .requestDescription
                                                                     }
                                                                 </div>
 
-                                                                {item.requestMeta && (
+                                                                {item
+                                                                    .requestMeta && (
                                                                     <div className="small text-muted mt-1">
                                                                         <i className="bi bi-info-circle me-1" />
 
                                                                         {
-                                                                            item.requestMeta
+                                                                            item
+                                                                                .requestMeta
                                                                         }
                                                                     </div>
                                                                 )}
 
                                                                 <div className="small text-danger fw-bold mt-1">
                                                                     {
-                                                                        item.requestCode
+                                                                        item
+                                                                            .requestCode
                                                                     }
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </td>
 
+                                                    {/* TYPE */}
+
                                                     <td className="py-3">
                                                         <span
                                                             className={`badge rounded-pill bg-${typeConfig.color}-subtle text-${typeConfig.color} px-3 py-2`}
                                                         >
-                                                            {item.requestType ===
-                                                            'humas'
-                                                                ? item.coverageLabel
-                                                                : typeConfig.singularLabel}
+                                                            <i
+                                                                className={`bi ${
+                                                                    item
+                                                                        .serviceIcon ||
+                                                                    typeConfig
+                                                                        .icon
+                                                                } me-2`}
+                                                            />
+
+                                                            {
+                                                                item
+                                                                    .serviceLabel
+                                                            }
                                                         </span>
+
+                                                        {item
+                                                            .requestType ===
+                                                            'borrowing' &&
+                                                            item
+                                                                .sekpimRequestType ===
+                                                                TYPE_BORROW && (
+                                                                <div className="small text-muted mt-2">
+                                                                    <i className="bi bi-arrow-return-left me-1" />
+
+                                                                    Barang wajib dikembalikan
+                                                                </div>
+                                                            )}
+
+                                                        {item
+                                                            .requestType ===
+                                                            'borrowing' &&
+                                                            item
+                                                                .sekpimRequestType ===
+                                                                TYPE_ASSET_REQUEST && (
+                                                                <div className="small text-muted mt-2">
+                                                                    <i className="bi bi-box2-heart-fill me-1" />
+
+                                                                    Tidak perlu dikembalikan
+                                                                </div>
+                                                            )}
                                                     </td>
+
+                                                    {/* DATE */}
 
                                                     <td className="py-3">
                                                         <div className="fw-bold">
                                                             {formatDate(
-                                                                item.requestDate
+                                                                item
+                                                                    .requestDate
                                                             )}
                                                         </div>
 
@@ -1648,10 +2454,13 @@ export default function MyRequestsPage() {
                                                             Diperbarui:{' '}
 
                                                             {formatDateTime(
-                                                                item.updatedDate
+                                                                item
+                                                                    .updatedDate
                                                             )}
                                                         </div>
                                                     </td>
+
+                                                    {/* STATUS */}
 
                                                     <td className="py-3">
                                                         <span
@@ -1662,9 +2471,12 @@ export default function MyRequestsPage() {
                                                             />
 
                                                             {
-                                                                statusConfig.label
+                                                                statusConfig
+                                                                    .label
                                                             }
                                                         </span>
+
+                                                        {/* HUMAS RESULT */}
 
                                                         {hasHumasResult && (
                                                             <div className="mt-2">
@@ -1676,9 +2488,13 @@ export default function MyRequestsPage() {
                                                             </div>
                                                         )}
 
-                                                        {item.status ===
+                                                        {/* REJECTED */}
+
+                                                        {item
+                                                            .status ===
                                                             'rejected' &&
-                                                            item.admin_note && (
+                                                            item
+                                                                .admin_note && (
                                                                 <div
                                                                     className="small text-danger mt-2 text-truncate"
                                                                     style={{
@@ -1686,41 +2502,92 @@ export default function MyRequestsPage() {
                                                                             220,
                                                                     }}
                                                                     title={
-                                                                        item.admin_note
+                                                                        item
+                                                                            .admin_note
                                                                     }
                                                                 >
                                                                     {
-                                                                        item.admin_note
+                                                                        item
+                                                                            .admin_note
                                                                     }
                                                                 </div>
                                                             )}
 
-                                                        {item.requestType ===
-                                                            'merchandise' &&
-                                                            item.status ===
-                                                                'revision' && (
-                                                                <div
-                                                                    className="small text-info-emphasis mt-2 text-truncate"
-                                                                    style={{
-                                                                        maxWidth:
-                                                                            220,
-                                                                    }}
-                                                                    title={
-                                                                        item.admin_note
-                                                                    }
-                                                                >
-                                                                    {item.admin_note ||
-                                                                        'Pengajuan perlu diperbaiki.'}
+                                                        {/* MERCHANDISE REVISION */}
+
+                                                        {isMerchandiseRevision && (
+                                                            <div
+                                                                className="small text-info-emphasis mt-2 text-truncate"
+                                                                style={{
+                                                                    maxWidth:
+                                                                        220,
+                                                                }}
+                                                                title={
+                                                                    item
+                                                                        .admin_note
+                                                                }
+                                                            >
+                                                                {item
+                                                                    .admin_note ||
+                                                                    'Pengajuan perlu diperbaiki.'}
+                                                            </div>
+                                                        )}
+
+                                                        {/* SEKPiM BORROWED */}
+
+                                                        {item
+                                                            .filterType ===
+                                                            'sekpim_borrow' &&
+                                                            item
+                                                                .status ===
+                                                                'borrowed' && (
+                                                                <div className="small text-info-emphasis mt-2">
+                                                                    <i className="bi bi-clock-history me-1" />
+
+                                                                    Menunggu pengembalian barang
+                                                                </div>
+                                                            )}
+
+                                                        {/* SEKPiM RETURNED */}
+
+                                                        {item
+                                                            .filterType ===
+                                                            'sekpim_borrow' &&
+                                                            item
+                                                                .status ===
+                                                                'returned' && (
+                                                                <div className="small text-success mt-2">
+                                                                    <i className="bi bi-check-circle-fill me-1" />
+
+                                                                    Peminjaman telah selesai
+                                                                </div>
+                                                            )}
+
+                                                        {/* ASSET COMPLETED */}
+
+                                                        {item
+                                                            .filterType ===
+                                                            'sekpim_asset_request' &&
+                                                            item
+                                                                .status ===
+                                                                'completed' && (
+                                                                <div className="small text-success mt-2">
+                                                                    <i className="bi bi-check-circle-fill me-1" />
+
+                                                                    Barang telah diserahkan
                                                                 </div>
                                                             )}
                                                     </td>
+
+                                                    {/* ACTION */}
 
                                                     <td className="text-end pe-4 py-3">
                                                         <div className="d-inline-flex flex-wrap justify-content-end gap-2">
                                                             {hasHumasResult && (
                                                                 <a
                                                                     href={
-                                                                        item.resultUrl
+                                                                        item
+                                                                            .resultUrl
                                                                     }
                                                                     target="_blank"
                                                                     rel="noreferrer"
@@ -1737,29 +2604,20 @@ export default function MyRequestsPage() {
                                                                     item
                                                                 )}
                                                                 className={`btn btn-sm rounded-pill px-3 ${
-                                                                    item.requestType ===
-                                                                        'merchandise' &&
-                                                                    item.status ===
-                                                                        'revision'
+                                                                    isMerchandiseRevision
                                                                         ? 'btn-info text-white'
                                                                         : 'btn-outline-danger'
                                                                 }`}
                                                             >
                                                                 <i
                                                                     className={`bi ${
-                                                                        item.requestType ===
-                                                                            'merchandise' &&
-                                                                        item.status ===
-                                                                            'revision'
+                                                                        isMerchandiseRevision
                                                                             ? 'bi-pencil-square'
                                                                             : 'bi-eye-fill'
                                                                     } me-2`}
                                                                 />
 
-                                                                {item.requestType ===
-                                                                    'merchandise' &&
-                                                                item.status ===
-                                                                    'revision'
+                                                                {isMerchandiseRevision
                                                                     ? 'Perbaiki'
                                                                     : 'Detail'}
                                                             </Link>
@@ -1775,6 +2633,8 @@ export default function MyRequestsPage() {
                     )}
                 </div>
 
+                {/* FOOTER */}
+
                 <div className="card-footer bg-white border-0 p-3 p-lg-4">
                     <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
                         <div className="small text-muted">
@@ -1782,7 +2642,8 @@ export default function MyRequestsPage() {
 
                             <strong>
                                 {
-                                    filteredRequests.length
+                                    filteredRequests
+                                        .length
                                 }
                             </strong>{' '}
 
@@ -1790,7 +2651,8 @@ export default function MyRequestsPage() {
 
                             <strong>
                                 {
-                                    requests.length
+                                    requests
+                                        .length
                                 }
                             </strong>{' '}
 
