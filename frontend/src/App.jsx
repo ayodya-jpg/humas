@@ -42,6 +42,8 @@ import SekpimBorrowingRequestPage from './pages/requests/SekpimBorrowingRequestP
 import MyRequestsPage from './pages/requests/MyRequestsPage';
 import MyRequestDetailPage from './pages/requests/MyRequestDetailPage';
 
+import DirectorSchedulePage from './pages/schedule/DirectorSchedulePage';
+
 import UnauthorizedPage from './pages/errors/UnauthorizedPage';
 import NotFoundPage from './pages/errors/NotFoundPage';
 
@@ -97,6 +99,10 @@ function App() {
             <ScrollToTop />
 
             <Routes>
+                {/* =====================================================
+                    PUBLIC
+                ===================================================== */}
+
                 <Route
                     path="/login"
                     element={
@@ -141,6 +147,12 @@ function App() {
                         }
                     />
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Dashboard
+                    |--------------------------------------------------------------------------
+                    */
+
                     <Route
                         path="dashboard"
                         element={
@@ -155,12 +167,47 @@ function App() {
                         }
                     />
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Jadwal Direktur
+                    |--------------------------------------------------------------------------
+                    |
+                    | Semua user login dapat melihat agenda.
+                    | Hak tambah/edit/hapus dikontrol backend melalui can_manage.
+                    |
+                    */
+
+                    <Route
+                        path="director-schedule"
+                        element={
+                            <ProtectedRoute
+                                allowedRoles={
+                                    USER_ROLES
+                                }
+                            >
+                                <DirectorSchedulePage />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Unauthorized
+                    |--------------------------------------------------------------------------
+                    */
+
                     <Route
                         path="unauthorized"
                         element={
                             <UnauthorizedPage />
                         }
                     />
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Pengajuan
+                    |--------------------------------------------------------------------------
+                    */
 
                     <Route
                         path="request/merchandise"
@@ -203,6 +250,12 @@ function App() {
                             </ProtectedRoute>
                         }
                     />
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Riwayat Pengajuan
+                    |--------------------------------------------------------------------------
+                    */
 
                     <Route
                         path="my-requests"
@@ -263,6 +316,12 @@ function App() {
                         }
                     />
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Dashboard
+                    |--------------------------------------------------------------------------
+                    */
+
                     <Route
                         path="dashboard"
                         element={
@@ -277,6 +336,36 @@ function App() {
                         }
                     />
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Jadwal Direktur
+                    |--------------------------------------------------------------------------
+                    |
+                    | Semua role admin dapat membuka kalender.
+                    |
+                    | Backend menentukan apakah user memiliki can_manage.
+                    |
+                    */
+
+                    <Route
+                        path="director-schedule"
+                        element={
+                            <ProtectedRoute
+                                allowedRoles={
+                                    ADMIN_ROLES
+                                }
+                            >
+                                <DirectorSchedulePage />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Unauthorized
+                    |--------------------------------------------------------------------------
+                    */
+
                     <Route
                         path="unauthorized"
                         element={
@@ -284,7 +373,11 @@ function App() {
                         }
                     />
 
-                    {/* Pengajuan admin */}
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Pengajuan Admin
+                    |--------------------------------------------------------------------------
+                    */
 
                     <Route
                         path="request/merchandise"
@@ -328,6 +421,12 @@ function App() {
                         }
                     />
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Riwayat Pengajuan
+                    |--------------------------------------------------------------------------
+                    */
+
                     <Route
                         path="my-requests"
                         element={
@@ -356,7 +455,11 @@ function App() {
                         }
                     />
 
-                    {/* Merchandise */}
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Merchandise
+                    |--------------------------------------------------------------------------
+                    */
 
                     <Route
                         path="orders"
@@ -386,7 +489,11 @@ function App() {
                         }
                     />
 
-                    {/* Humas */}
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Humas
+                    |--------------------------------------------------------------------------
+                    */
 
                     <Route
                         path="humas-services"
@@ -416,13 +523,12 @@ function App() {
                         }
                     />
 
-                    {/*
-                     * Semua role admin dapat membuka
-                     * halaman pengaturan Humas.
-                     *
-                     * Backend tetap membatasi perubahan H-n
-                     * hanya untuk superadmin.
-                     */}
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Pengaturan Layanan
+                    |--------------------------------------------------------------------------
+                    */
+
                     <Route
                         path="humas-settings"
                         element={
@@ -436,7 +542,11 @@ function App() {
                         }
                     />
 
-                    {/* SEKPiM */}
+                    /*
+                    |--------------------------------------------------------------------------
+                    | SEKPiM
+                    |--------------------------------------------------------------------------
+                    */
 
                     <Route
                         path="borrow-requests"
@@ -466,7 +576,11 @@ function App() {
                         }
                     />
 
-                    {/* Kategori */}
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Kategori
+                    |--------------------------------------------------------------------------
+                    */
 
                     <Route
                         path="categories"
@@ -510,7 +624,11 @@ function App() {
                         }
                     />
 
-                    {/* Produk */}
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Produk
+                    |--------------------------------------------------------------------------
+                    */
 
                     <Route
                         path="products"
@@ -554,7 +672,11 @@ function App() {
                         }
                     />
 
-                    {/* User */}
+                    /*
+                    |--------------------------------------------------------------------------
+                    | User Management
+                    |--------------------------------------------------------------------------
+                    */
 
                     <Route
                         path="users"
@@ -606,6 +728,12 @@ function App() {
                         }
                     />
                 </Route>
+
+                /*
+                |--------------------------------------------------------------------------
+                | Global Fallback
+                |--------------------------------------------------------------------------
+                */
 
                 <Route
                     path="*"

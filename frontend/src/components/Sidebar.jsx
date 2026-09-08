@@ -19,18 +19,34 @@ import {
 } from './ProtectedRoute';
 
 const EMPTY_BADGES = {
-    merchandisePending: 0,
-    humasPending: 0,
-    borrowingPending: 0,
-    lowStock: 0,
+    merchandisePending:
+        0,
+
+    humasPending:
+        0,
+
+    borrowingPending:
+        0,
+
+    lowStock:
+        0,
 };
 
 const ROLE_LABELS = {
-    user: 'User',
-    admin: 'Admin',
-    admin_humas: 'Admin Humas',
-    admin_sekpim: 'Admin SEKPiM',
-    superadmin: 'Super Admin',
+    user:
+        'User',
+
+    admin:
+        'Admin',
+
+    admin_humas:
+        'Admin Humas',
+
+    admin_sekpim:
+        'Admin SEKPiM',
+
+    superadmin:
+        'Super Admin',
 };
 
 const ADMIN_ROLES = [
@@ -40,427 +56,466 @@ const ADMIN_ROLES = [
     'superadmin',
 ];
 
-const extractResponseData = (
-    response
-) => {
-    const payload =
-        response?.data?.data;
-
-    if (
-        Array.isArray(
-            payload
-        )
-    ) {
-        return payload;
-    }
-
-    if (
-        payload &&
-        Array.isArray(
-            payload.data
-        )
-    ) {
-        return payload.data;
-    }
-
-    return [];
-};
-
-const getRoleLabel = (
-    role
-) => {
-    return (
-        ROLE_LABELS[
-            role
-        ] ||
-        role ||
-        'Pengguna'
-    );
-};
-
-const createMenuGroups = (
-    basePath,
-    isSuperadmin
-) => [
-    /*
-    |--------------------------------------------------------------------------
-    | UTAMA
-    |--------------------------------------------------------------------------
-    */
-
-    {
-        title:
-            'Utama',
-
-        items: [
-            {
-                label:
-                    'Dashboard',
-
-                icon:
-                    'bi-speedometer2',
-
-                path:
-                    `${basePath}/dashboard`,
-
-                permission:
-                    'dashboard.view',
-
-                badgeKey:
-                    null,
-            },
-        ],
-    },
-
-    /*
-    |--------------------------------------------------------------------------
-    | PENGAJUAN SAYA
-    |--------------------------------------------------------------------------
-    */
-
-    {
-        title:
-            'Pengajuan Saya',
-
-        items: [
-            {
-                label:
-                    'Pengajuan Merchandise',
-
-                icon:
-                    'bi-cart-plus-fill',
-
-                path:
-                    `${basePath}/request/merchandise`,
-
-                permission:
-                    'request.merchandise.create',
-
-                badgeKey:
-                    null,
-            },
-
-            {
-                label:
-                    'Request Liputan Humas',
-
-                icon:
-                    'bi-camera-reels-fill',
-
-                path:
-                    `${basePath}/request/humas-service`,
-
-                permission:
-                    'request.humas.create',
-
-                badgeKey:
-                    null,
-            },
-
-            {
-                label:
-                    'Peminjaman SEKPiM',
-
-                icon:
-                    'bi-box-seam-fill',
-
-                path:
-                    `${basePath}/request/sekpim-borrowing`,
-
-                permission:
-                    'request.borrowing.create',
-
-                badgeKey:
-                    null,
-            },
-
-            {
-                label:
-                    'Riwayat Pengajuan',
-
-                icon:
-                    'bi-clock-history',
-
-                path:
-                    `${basePath}/my-requests`,
-
-                permission:
-                    'request.history.view',
-
-                badgeKey:
-                    null,
-            },
-        ],
-    },
-
-    /*
-    |--------------------------------------------------------------------------
-    | LAYANAN HUMAS
-    |--------------------------------------------------------------------------
-    */
-
-    {
-        title:
-            'Layanan Humas',
-
-        adminOnly:
-            true,
-
-        items: [
-            {
-                label:
-                    'Approval Merchandise',
-
-                icon:
-                    'bi-gift-fill',
-
-                path:
-                    '/admin/orders',
-
-                permission:
-                    'approval.merchandise.view',
-
-                badgeKey:
-                    'merchandisePending',
-            },
-
-            {
-                label:
-                    'Approval Liputan Humas',
-
-                icon:
-                    'bi-camera-reels-fill',
-
-                path:
-                    '/admin/humas-services',
-
-                permission:
-                    'approval.humas.view',
-
-                badgeKey:
-                    'humasPending',
-            },
-        ],
-    },
-
-    /*
-    |--------------------------------------------------------------------------
-    | LAYANAN SEKPIM
-    |--------------------------------------------------------------------------
-    */
-
-    {
-        title:
-            'Layanan SEKPiM',
-
-        adminOnly:
-            true,
-
-        items: [
-            {
-                label:
-                    'Approval Peminjaman',
-
-                icon:
-                    'bi-clipboard-check-fill',
-
-                path:
-                    '/admin/borrow-requests',
-
-                permission:
-                    'approval.borrowing.view',
-
-                badgeKey:
-                    'borrowingPending',
-            },
-        ],
-    },
-
-    /*
-    |--------------------------------------------------------------------------
-    | MASTER DATA
-    |--------------------------------------------------------------------------
-    */
-
-    {
-        title:
-            'Master Data',
-
-        adminOnly:
-            true,
-
-        items: [
-            {
-                label:
-                    'Data Kategori',
-
-                icon:
-                    'bi-tags-fill',
-
-                path:
-                    '/admin/categories',
-
-                permission:
-                    'categories.view',
-
-                badgeKey:
-                    null,
-            },
-
-            {
-                label:
-                    'Data Produk',
-
-                icon:
-                    'bi-boxes',
-
-                path:
-                    '/admin/products',
-
-                permission:
-                    'products.view',
-
-                badgeKey:
-                    'lowStock',
-            },
-        ],
-    },
-
-    /*
-    |--------------------------------------------------------------------------
-    | MANAJEMEN SISTEM
-    |--------------------------------------------------------------------------
-    */
-
-    {
-        title:
-            'Manajemen Sistem',
-
-        adminOnly:
-            true,
-
-        items: [
-            {
-                label:
-                    'Data User',
-
-                icon:
-                    'bi-people-fill',
-
-                path:
-                    '/admin/users',
-
-                permission: [
-                    'users.view',
-                    'users.manage',
-                ],
-
-                badgeKey:
-                    null,
-            },
-
-            {
-                label:
-                    'Tambah User',
-
-                icon:
-                    'bi-person-plus-fill',
-
-                path:
-                    '/admin/users/create',
-
-                superadminOnly:
-                    true,
-
-                permission:
-                    null,
-
-                badgeKey:
-                    null,
-            },
-
-            /*
-             * Pengaturan Layanan sekarang berada
-             * pada Manajemen Sistem karena:
-             *
-             * - mengatur H-n Merchandise
-             * - mengatur H-n Humas
-             * - mengatur H-n Peminjaman SEKPiM
-             * - mengatur H-n Request Barang
-             * - membuka / menutup layanan Humas
-             *
-             * Semua admin boleh membuka halaman.
-             * Hak edit masing-masing setting tetap
-             * diamankan oleh backend.
-             */
-            {
-                label:
-                    'Pengaturan Layanan',
-
-                icon:
-                    'bi-sliders2',
-
-                path:
-                    '/admin/humas-settings',
-
-                adminRoleOnly:
-                    true,
-
-                permission:
-                    null,
-
-                badgeKey:
-                    null,
-            },
-        ],
-    },
-
-    /*
-    |--------------------------------------------------------------------------
-    | AKSES SUPERADMIN
-    |--------------------------------------------------------------------------
-    */
-
-    {
-        title:
-            'Akses Superadmin',
-
-        adminOnly:
-            true,
-
-        superadminOnly:
-            true,
-
-        items: [
-            {
-                label:
-                    'Pengaturan Hak Akses',
-
-                icon:
-                    'bi-shield-lock-fill',
-
-                path:
-                    '/admin/users',
-
-                permission:
-                    null,
-
-                superadminOnly:
-                    true,
-
-                badgeKey:
-                    null,
-            },
-        ],
-    },
-].filter(
+/*
+|--------------------------------------------------------------------------
+| RESPONSE HELPER
+|--------------------------------------------------------------------------
+*/
+
+const extractResponseData =
     (
-        group
-    ) =>
-        !group
-            .superadminOnly ||
+        response
+    ) => {
+        const payload =
+            response
+                ?.data
+                ?.data;
+
+        if (
+            Array.isArray(
+                payload
+            )
+        ) {
+            return payload;
+        }
+
+        if (
+            payload &&
+            Array.isArray(
+                payload.data
+            )
+        ) {
+            return payload
+                .data;
+        }
+
+        return [];
+    };
+
+/*
+|--------------------------------------------------------------------------
+| ROLE LABEL
+|--------------------------------------------------------------------------
+*/
+
+const getRoleLabel =
+    (
+        role
+    ) => {
+        return (
+            ROLE_LABELS[
+                role
+            ] ||
+            role ||
+            'Pengguna'
+        );
+    };
+
+/*
+|--------------------------------------------------------------------------
+| MENU GROUPS
+|--------------------------------------------------------------------------
+*/
+
+const createMenuGroups =
+    (
+        basePath,
         isSuperadmin
-);
+    ) => [
+        /*
+        |--------------------------------------------------------------------------
+        | UTAMA
+        |--------------------------------------------------------------------------
+        */
+
+        {
+            title:
+                'Utama',
+
+            items: [
+                {
+                    label:
+                        'Dashboard',
+
+                    icon:
+                        'bi-speedometer2',
+
+                    path:
+                        `${basePath}/dashboard`,
+
+                    permission:
+                        'dashboard.view',
+
+                    badgeKey:
+                        null,
+                },
+
+                /*
+                 * Jadwal Direktur tersedia untuk
+                 * seluruh user yang sudah login.
+                 *
+                 * Tidak memakai permission frontend.
+                 *
+                 * Hak tambah/edit/hapus ditentukan
+                 * backend melalui can_manage.
+                 */
+                {
+                    label:
+                        'Jadwal Direktur',
+
+                    icon:
+                        'bi-calendar3',
+
+                    path:
+                        `${basePath}/director-schedule`,
+
+                    permission:
+                        null,
+
+                    publicAuthenticated:
+                        true,
+
+                    badgeKey:
+                        null,
+                },
+            ],
+        },
+
+        /*
+        |--------------------------------------------------------------------------
+        | PENGAJUAN SAYA
+        |--------------------------------------------------------------------------
+        */
+
+        {
+            title:
+                'Pengajuan Saya',
+
+            items: [
+                {
+                    label:
+                        'Pengajuan Merchandise',
+
+                    icon:
+                        'bi-cart-plus-fill',
+
+                    path:
+                        `${basePath}/request/merchandise`,
+
+                    permission:
+                        'request.merchandise.create',
+
+                    badgeKey:
+                        null,
+                },
+
+                {
+                    label:
+                        'Request Liputan Humas',
+
+                    icon:
+                        'bi-camera-reels-fill',
+
+                    path:
+                        `${basePath}/request/humas-service`,
+
+                    permission:
+                        'request.humas.create',
+
+                    badgeKey:
+                        null,
+                },
+
+                {
+                    label:
+                        'Peminjaman SEKPiM',
+
+                    icon:
+                        'bi-box-seam-fill',
+
+                    path:
+                        `${basePath}/request/sekpim-borrowing`,
+
+                    permission:
+                        'request.borrowing.create',
+
+                    badgeKey:
+                        null,
+                },
+
+                {
+                    label:
+                        'Riwayat Pengajuan',
+
+                    icon:
+                        'bi-clock-history',
+
+                    path:
+                        `${basePath}/my-requests`,
+
+                    permission:
+                        'request.history.view',
+
+                    badgeKey:
+                        null,
+                },
+            ],
+        },
+
+        /*
+        |--------------------------------------------------------------------------
+        | LAYANAN HUMAS
+        |--------------------------------------------------------------------------
+        */
+
+        {
+            title:
+                'Layanan Humas',
+
+            adminOnly:
+                true,
+
+            items: [
+                {
+                    label:
+                        'Approval Merchandise',
+
+                    icon:
+                        'bi-gift-fill',
+
+                    path:
+                        '/admin/orders',
+
+                    permission:
+                        'approval.merchandise.view',
+
+                    badgeKey:
+                        'merchandisePending',
+                },
+
+                {
+                    label:
+                        'Approval Liputan Humas',
+
+                    icon:
+                        'bi-camera-reels-fill',
+
+                    path:
+                        '/admin/humas-services',
+
+                    permission:
+                        'approval.humas.view',
+
+                    badgeKey:
+                        'humasPending',
+                },
+            ],
+        },
+
+        /*
+        |--------------------------------------------------------------------------
+        | LAYANAN SEKPiM
+        |--------------------------------------------------------------------------
+        */
+
+        {
+            title:
+                'Layanan SEKPiM',
+
+            adminOnly:
+                true,
+
+            items: [
+                {
+                    label:
+                        'Approval SEKPiM',
+
+                    icon:
+                        'bi-clipboard-check-fill',
+
+                    path:
+                        '/admin/borrow-requests',
+
+                    permission:
+                        'approval.borrowing.view',
+
+                    badgeKey:
+                        'borrowingPending',
+                },
+            ],
+        },
+
+        /*
+        |--------------------------------------------------------------------------
+        | MASTER DATA
+        |--------------------------------------------------------------------------
+        */
+
+        {
+            title:
+                'Master Data',
+
+            adminOnly:
+                true,
+
+            items: [
+                {
+                    label:
+                        'Data Kategori',
+
+                    icon:
+                        'bi-tags-fill',
+
+                    path:
+                        '/admin/categories',
+
+                    permission:
+                        'categories.view',
+
+                    badgeKey:
+                        null,
+                },
+
+                {
+                    label:
+                        'Data Produk',
+
+                    icon:
+                        'bi-boxes',
+
+                    path:
+                        '/admin/products',
+
+                    permission:
+                        'products.view',
+
+                    badgeKey:
+                        'lowStock',
+                },
+            ],
+        },
+
+        /*
+        |--------------------------------------------------------------------------
+        | MANAJEMEN SISTEM
+        |--------------------------------------------------------------------------
+        */
+
+        {
+            title:
+                'Manajemen Sistem',
+
+            adminOnly:
+                true,
+
+            items: [
+                {
+                    label:
+                        'Data User',
+
+                    icon:
+                        'bi-people-fill',
+
+                    path:
+                        '/admin/users',
+
+                    permission: [
+                        'users.view',
+                        'users.manage',
+                    ],
+
+                    badgeKey:
+                        null,
+                },
+
+                {
+                    label:
+                        'Tambah User',
+
+                    icon:
+                        'bi-person-plus-fill',
+
+                    path:
+                        '/admin/users/create',
+
+                    superadminOnly:
+                        true,
+
+                    permission:
+                        null,
+
+                    badgeKey:
+                        null,
+                },
+
+                {
+                    label:
+                        'Pengaturan Layanan',
+
+                    icon:
+                        'bi-sliders2',
+
+                    path:
+                        '/admin/humas-settings',
+
+                    adminRoleOnly:
+                        true,
+
+                    permission:
+                        null,
+
+                    badgeKey:
+                        null,
+                },
+            ],
+        },
+
+        /*
+        |--------------------------------------------------------------------------
+        | AKSES SUPERADMIN
+        |--------------------------------------------------------------------------
+        */
+
+        {
+            title:
+                'Akses Superadmin',
+
+            adminOnly:
+                true,
+
+            superadminOnly:
+                true,
+
+            items: [
+                {
+                    label:
+                        'Pengaturan Hak Akses',
+
+                    icon:
+                        'bi-shield-lock-fill',
+
+                    path:
+                        '/admin/users',
+
+                    permission:
+                        null,
+
+                    superadminOnly:
+                        true,
+
+                    badgeKey:
+                        null,
+                },
+            ],
+        },
+    ].filter(
+        (
+            group
+        ) =>
+            !group
+                .superadminOnly ||
+            isSuperadmin
+    );
 
 /*
 |--------------------------------------------------------------------------
@@ -468,42 +523,67 @@ const createMenuGroups = (
 |--------------------------------------------------------------------------
 */
 
-const isItemAllowed = (
-    item,
-    currentUser
-) => {
-    if (
-        item
-            .superadminOnly
-    ) {
-        return (
-            currentUser
-                ?.role ===
-            'superadmin'
-        );
-    }
+const isItemAllowed =
+    (
+        item,
+        currentUser
+    ) => {
+        /*
+         * Menu yang dapat dibuka semua user
+         * setelah login.
+         */
+        if (
+            item
+                .publicAuthenticated
+        ) {
+            return true;
+        }
 
-    if (
-        item
-            .adminRoleOnly
-    ) {
-        return ADMIN_ROLES.includes(
-            currentUser
-                ?.role
-        );
-    }
+        if (
+            item
+                .superadminOnly
+        ) {
+            return (
+                currentUser
+                    ?.role ===
+                'superadmin'
+            );
+        }
 
-    return hasPermission(
-        currentUser,
-        item.permission
-    );
-};
+        if (
+            item
+                .adminRoleOnly
+        ) {
+            return ADMIN_ROLES.includes(
+                currentUser
+                    ?.role
+            );
+        }
+
+        return hasPermission(
+            currentUser,
+            item.permission
+        );
+    };
+
+/*
+|--------------------------------------------------------------------------
+| SIDEBAR
+|--------------------------------------------------------------------------
+*/
 
 export default function Sidebar({
-    sidebarOpen = false,
-    setSidebarOpen = () => {},
-    isSidebarOpen = false,
-    setIsSidebarOpen = () => {},
+    sidebarOpen =
+        false,
+
+    setSidebarOpen =
+        () => {},
+
+    isSidebarOpen =
+        false,
+
+    setIsSidebarOpen =
+        () => {},
 }) {
     const location =
         useLocation();
@@ -511,13 +591,14 @@ export default function Sidebar({
     const [
         badges,
         setBadges,
-    ] = useState(
-        EMPTY_BADGES
-    );
+    ] =
+        useState(
+            EMPTY_BADGES
+        );
 
     /*
      * User selalu dibaca dari localStorage
-     * ketika Sidebar dirender.
+     * saat Sidebar dirender.
      */
     const currentUser =
         getStoredUser();
@@ -713,10 +794,9 @@ export default function Sidebar({
 
                 try {
                     const responses =
-                        await Promise
-                            .allSettled(
-                                requests
-                            );
+                        await Promise.allSettled(
+                            requests
+                        );
 
                     const resultMap =
                         {};
@@ -752,10 +832,6 @@ export default function Sidebar({
                             ] =
                                 [];
 
-                            /*
-                             * Error badge tidak boleh
-                             * menghentikan Sidebar.
-                             */
                             console.error(
                                 `Fetch sidebar badge ${key} error:`,
 
