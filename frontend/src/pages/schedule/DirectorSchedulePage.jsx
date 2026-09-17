@@ -14,7 +14,7 @@ import themePlugin from '@fullcalendar/react/themes/monarch';
 import '@fullcalendar/react/skeleton.css';
 import '@fullcalendar/react/themes/monarch/theme.css';
 import '@fullcalendar/react/themes/monarch/palettes/red.css';
-import '@fullcalendar/react/themes/monarch/palettes/purple.css';
+
 import api from '../../api/axios';
 
 import {
@@ -39,41 +39,72 @@ const AGENDA_TYPES = [
 const getStoredUser = () => {
     try {
         return JSON.parse(
-            localStorage.getItem(
-                'admin_user'
-            ) || '{}'
+            localStorage.getItem('admin_user') || '{}'
         );
     } catch {
         return {};
     }
 };
 
+const getEmptyForm = (
+    date = ''
+) => ({
+    id: null,
+    title: '',
+    description: '',
+    event_date: date,
+    start_time: '09:00',
+    end_time: '10:00',
+    all_day: false,
+    location: '',
+    agenda_type: 'Rapat',
+    color: '#7F1D1D',
+    is_public: true,
+});
+
+const extractErrorMessage = (
+    error
+) => {
+    const data =
+        error?.response?.data;
+
+    if (data?.errors) {
+        const firstError =
+            Object.values(
+                data.errors
+            )
+                .flat()
+                .find(Boolean);
+
+        if (firstError) {
+            return firstError;
+        }
+    }
+
+    return (
+        data?.message ||
+        'Terjadi kesalahan pada server.'
+    );
+};
+
 const formatDate = (
     value
 ) => {
-    if (
-        !value
-    ) {
+    if (!value) {
         return '-';
     }
 
     if (
-        typeof value ===
-        'string' &&
-        /^\d{4}-\d{2}-\d{2}$/.test(
-            value
-        )
+        typeof value === 'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(value)
     ) {
         const [
             year,
             month,
             day,
-        ] =
-            value
-                .split('-')
-                .map(
-                    Number
-                );
+        ] = value
+            .split('-')
+            .map(Number);
 
         return new Date(
             year,
@@ -82,118 +113,16 @@ const formatDate = (
         ).toLocaleDateString(
             'id-ID',
             {
-                day:
-                    '2-digit',
-
-                month:
-                    'long',
-
-                year:
-                    'numeric',
+                weekday: 'long',
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
             }
         );
     }
 
-    const date =
-        new Date(
-            value
-        );
-
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-        return '-';
-    }
-
-    return date
-        .toLocaleDateString(
-            'id-ID',
-            {
-                day:
-                    '2-digit',
-
-                month:
-                    'long',
-
-                year:
-                    'numeric',
-            }
-        );
+    return '-';
 };
-
-const extractErrorMessage = (
-    error
-) => {
-    const data =
-        error
-            ?.response
-            ?.data;
-
-    if (
-        data
-            ?.errors
-    ) {
-        const firstError =
-            Object.values(
-                data.errors
-            )
-                .flat()
-                .find(
-                    Boolean
-                );
-
-        if (
-            firstError
-        ) {
-            return firstError;
-        }
-    }
-
-    return (
-        data
-            ?.message ||
-        'Terjadi kesalahan pada server.'
-    );
-};
-
-const getEmptyForm = (
-    date = ''
-) => ({
-    id:
-        null,
-
-    title:
-        '',
-
-    description:
-        '',
-
-    event_date:
-        date,
-
-    start_time:
-        '09:00',
-
-    end_time:
-        '10:00',
-
-    all_day:
-        false,
-
-    location:
-        '',
-
-    agenda_type:
-        'Rapat',
-
-    color:
-        '#7F1D1D',
-
-    is_public:
-        true,
-});
 
 export default function DirectorSchedulePage() {
     const currentUser =
@@ -206,66 +135,44 @@ export default function DirectorSchedulePage() {
     const [
         events,
         setEvents,
-    ] =
-        useState(
-            []
-        );
+    ] = useState([]);
 
     const [
         canManage,
         setCanManage,
-    ] =
-        useState(
-            false
-        );
+    ] = useState(false);
 
     const [
         loading,
         setLoading,
-    ] =
-        useState(
-            true
-        );
+    ] = useState(true);
 
     const [
         modalOpen,
         setModalOpen,
-    ] =
-        useState(
-            false
-        );
+    ] = useState(false);
 
     const [
         detailMode,
         setDetailMode,
-    ] =
-        useState(
-            false
-        );
-
-    const [
-        form,
-        setForm,
-    ] =
-        useState(
-            getEmptyForm()
-        );
-
-    const [
-        saving,
-        setSaving,
-    ] =
-        useState(
-            false
-        );
+    ] = useState(false);
 
     const [
         selectedEvent,
         setSelectedEvent,
-    ] =
-        useState(
-            null
-        );
+    ] = useState(null);
+
+    const [
+        form,
+        setForm,
+    ] = useState(
+        getEmptyForm()
+    );
+
+    const [
+        saving,
+        setSaving,
+    ] = useState(false);
 
     const userCanPotentiallyManage =
         [
@@ -274,13 +181,12 @@ export default function DirectorSchedulePage() {
             'admin_sekpim',
             'superadmin',
         ].includes(
-            currentUser
-                ?.role
+            currentUser?.role
         );
 
     /*
     |--------------------------------------------------------------------------
-    | LOAD
+    | LOAD EVENTS
     |--------------------------------------------------------------------------
     */
 
@@ -288,9 +194,7 @@ export default function DirectorSchedulePage() {
         useCallback(
             async () => {
                 try {
-                    setLoading(
-                        true
-                    );
+                    setLoading(true);
 
                     const response =
                         await api.get(
@@ -298,39 +202,27 @@ export default function DirectorSchedulePage() {
                         );
 
                     const data =
-                        response
-                            ?.data
-                            ?.data ||
+                        response?.data?.data ||
                         {};
 
-                    const nextEvents =
-                        Array.isArray(
-                            data
-                                ?.events
-                        )
-                            ? data
-                                .events
-                            : [];
-
                     setEvents(
-                        nextEvents
+                        Array.isArray(
+                            data.events
+                        )
+                            ? data.events
+                            : []
                     );
 
                     setCanManage(
                         Boolean(
-                            data
-                                ?.can_manage
+                            data.can_manage
                         )
                     );
-                } catch (
-                error
-                ) {
+                } catch (error) {
                     console.error(
                         'Load director schedule error:',
-                        error
-                            ?.response
-                            ?.data ||
-                        error
+                        error?.response?.data ||
+                            error
                     );
 
                     await showErrorAlert(
@@ -340,9 +232,7 @@ export default function DirectorSchedulePage() {
                         )
                     );
                 } finally {
-                    setLoading(
-                        false
-                    );
+                    setLoading(false);
                 }
             },
             []
@@ -363,124 +253,88 @@ export default function DirectorSchedulePage() {
     |--------------------------------------------------------------------------
     */
 
-    const openCreateModal =
-        (
-            date = ''
-        ) => {
-            setSelectedEvent(
-                null
-            );
+    const openCreateModal = (
+        date = ''
+    ) => {
+        setSelectedEvent(null);
+        setDetailMode(false);
 
-            setDetailMode(
-                false
-            );
+        setForm(
+            getEmptyForm(
+                date
+            )
+        );
 
-            setForm(
-                getEmptyForm(
-                    date
-                )
-            );
+        setModalOpen(true);
+    };
 
-            setModalOpen(
-                true
-            );
-        };
+    const openDetailModal = (
+        event
+    ) => {
+        setSelectedEvent(
+            event
+        );
 
-    const openDetailModal =
-        (
-            eventData
-        ) => {
-            setSelectedEvent(
-                eventData
-            );
+        setForm({
+            id:
+                event.id,
 
-            setForm({
-                id:
-                    eventData
-                        .id,
+            title:
+                event.title ||
+                '',
 
-                title:
-                    eventData
-                        .title ||
-                    '',
+            description:
+                event.description ||
+                '',
 
-                description:
-                    eventData
-                        .description ||
-                    '',
+            event_date:
+                event.event_date ||
+                '',
 
-                event_date:
-                    eventData
-                        .event_date ||
-                    '',
+            start_time:
+                event.start_time ||
+                '09:00',
 
-                start_time:
-                    eventData
-                        .start_time ||
-                    '09:00',
+            end_time:
+                event.end_time ||
+                '10:00',
 
-                end_time:
-                    eventData
-                        .end_time ||
-                    '10:00',
+            all_day:
+                Boolean(
+                    event.all_day
+                ),
 
-                all_day:
-                    Boolean(
-                        eventData
-                            .all_day
-                    ),
+            location:
+                event.location ||
+                '',
 
-                location:
-                    eventData
-                        .location ||
-                    '',
+            agenda_type:
+                event.agenda_type ||
+                'Rapat',
 
-                agenda_type:
-                    eventData
-                        .agenda_type ||
-                    'Rapat',
+            color:
+                event.color ||
+                '#7F1D1D',
 
-                color:
-                    eventData
-                        .color ||
-                    '#7F1D1D',
+            is_public:
+                Boolean(
+                    event.is_public
+                ),
+        });
 
-                is_public:
-                    Boolean(
-                        eventData
-                            .is_public
-                    ),
-            });
+        setDetailMode(true);
+        setModalOpen(true);
+    };
 
-            setDetailMode(
-                true
-            );
+    const closeModal = () => {
+        if (saving) {
+            return;
+        }
 
-            setModalOpen(
-                true
-            );
-        };
-
-    const closeModal =
-        () => {
-            if (
-                saving
-            ) {
-                return;
-            }
-
-            setModalOpen(
-                false
-            );
-
-            setSelectedEvent(
-                null
-            );
-
-            setDetailMode(
-                false
-            );
-        };
+        setModalOpen(false);
+        setSelectedEvent(null);
+        setDetailMode(false);
+    };
 
     /*
     |--------------------------------------------------------------------------
@@ -488,90 +342,24 @@ export default function DirectorSchedulePage() {
     |--------------------------------------------------------------------------
     */
 
-    const handleFormChange =
-        (
-            field,
-            value
-        ) => {
-            setForm(
-                (
-                    previous
-                ) => ({
-                    ...previous,
-
-                    [field]:
-                        value,
-                })
-            );
-        };
-
-    /*
-    |--------------------------------------------------------------------------
-    | CALENDAR ACTION
-    |--------------------------------------------------------------------------
-    */
-
-    const handleDateClick =
-        (
-            info
-        ) => {
-            if (
-                !canManage
-            ) {
-                return;
-            }
-
-            openCreateModal(
-                info.dateStr
-            );
-        };
-
-    const handleEventClick =
-        (
-            info
-        ) => {
-            const eventId =
-                Number(
-                    info
-                        .event
-                        .id
-                );
-
-            const eventData =
-                events.find(
-                    (
-                        item
-                    ) =>
-                        Number(
-                            item
-                                .id
-                        ) ===
-                        eventId
-                );
-
-            if (
-                !eventData
-            ) {
-                return;
-            }
-
-            openDetailModal(
-                eventData
-            );
-        };
-
-    /*
-    |--------------------------------------------------------------------------
-    | VALIDATION
-    |--------------------------------------------------------------------------
-    */
+    const handleFormChange = (
+        field,
+        value
+    ) => {
+        setForm(
+            (
+                previous
+            ) => ({
+                ...previous,
+                [field]: value,
+            })
+        );
+    };
 
     const validateForm =
         async () => {
             if (
-                !form
-                    .title
-                    .trim()
+                !form.title.trim()
             ) {
                 await showWarningAlert(
                     'Judul Belum Diisi',
@@ -581,10 +369,7 @@ export default function DirectorSchedulePage() {
                 return false;
             }
 
-            if (
-                !form
-                    .event_date
-            ) {
+            if (!form.event_date) {
                 await showWarningAlert(
                     'Tanggal Belum Dipilih',
                     'Tanggal agenda wajib dipilih.'
@@ -593,15 +378,10 @@ export default function DirectorSchedulePage() {
                 return false;
             }
 
-            if (
-                !form
-                    .all_day
-            ) {
+            if (!form.all_day) {
                 if (
-                    !form
-                        .start_time ||
-                    !form
-                        .end_time
+                    !form.start_time ||
+                    !form.end_time
                 ) {
                     await showWarningAlert(
                         'Jam Belum Lengkap',
@@ -612,10 +392,8 @@ export default function DirectorSchedulePage() {
                 }
 
                 if (
-                    form
-                        .end_time <=
-                    form
-                        .start_time
+                    form.end_time <=
+                    form.start_time
                 ) {
                     await showWarningAlert(
                         'Jam Tidak Valid',
@@ -631,6 +409,50 @@ export default function DirectorSchedulePage() {
 
     /*
     |--------------------------------------------------------------------------
+    | CALENDAR ACTION
+    |--------------------------------------------------------------------------
+    */
+
+    const handleDateClick = (
+        info
+    ) => {
+        if (!canManage) {
+            return;
+        }
+
+        openCreateModal(
+            info.dateStr
+        );
+    };
+
+    const handleEventClick = (
+        info
+    ) => {
+        const id =
+            Number(
+                info.event.id
+            );
+
+        const event =
+            events.find(
+                (
+                    item
+                ) =>
+                    Number(
+                        item.id
+                    ) ===
+                    id
+            );
+
+        if (event) {
+            openDetailModal(
+                event
+            );
+        }
+    };
+
+    /*
+    |--------------------------------------------------------------------------
     | SAVE
     |--------------------------------------------------------------------------
     */
@@ -643,7 +465,7 @@ export default function DirectorSchedulePage() {
             ) {
                 await showErrorAlert(
                     'Akses Ditolak',
-                    'Akun tidak memiliki izin untuk mengelola Jadwal Direktur.'
+                    'Akun tidak memiliki izin mengelola Jadwal Direktur.'
                 );
 
                 return;
@@ -657,8 +479,7 @@ export default function DirectorSchedulePage() {
 
             const isEdit =
                 Boolean(
-                    form
-                        .id
+                    form.id
                 );
 
             const confirmation =
@@ -670,8 +491,8 @@ export default function DirectorSchedulePage() {
 
                     text:
                         isEdit
-                            ? 'Perubahan agenda akan langsung tampil pada kalender.'
-                            : 'Agenda baru akan langsung tampil pada kalender.',
+                            ? 'Perubahan akan langsung tampil di kalender.'
+                            : 'Agenda akan langsung ditambahkan ke kalender.',
 
                     confirmButtonText:
                         isEdit
@@ -689,77 +510,59 @@ export default function DirectorSchedulePage() {
                 });
 
             if (
-                !confirmation
-                    .isConfirmed
+                !confirmation.isConfirmed
             ) {
                 return;
             }
 
             const payload = {
                 title:
-                    form
-                        .title
-                        .trim(),
+                    form.title.trim(),
 
                 description:
-                    form
-                        .description
-                        .trim() ||
+                    form.description.trim() ||
                     null,
 
                 event_date:
-                    form
-                        .event_date,
-
-                start_time:
-                    form
-                        .all_day
-                        ? null
-                        : form
-                            .start_time,
-
-                end_time:
-                    form
-                        .all_day
-                        ? null
-                        : form
-                            .end_time,
+                    form.event_date,
 
                 all_day:
                     Boolean(
-                        form
-                            .all_day
+                        form.all_day
                     ),
 
+                start_time:
+                    form.all_day
+                        ? null
+                        : form.start_time,
+
+                end_time:
+                    form.all_day
+                        ? null
+                        : form.end_time,
+
                 location:
-                    form
-                        .location
-                        .trim() ||
+                    form.location.trim() ||
                     null,
 
                 agenda_type:
-                    form
-                        .agenda_type,
+                    form.agenda_type,
 
                 color:
-                    form
-                        .color,
+                    form.color,
 
                 is_public:
                     Boolean(
-                        form
-                            .is_public
+                        form.is_public
                     ),
             };
 
             try {
-                setSaving(
-                    true
-                );
+                setSaving(true);
 
                 showLoadingAlert(
                     isEdit
-                        ? 'Menyimpan Perubahan'
+                        ? 'Menyimpan Agenda'
                         : 'Menambahkan Agenda',
 
                     'Mohon tunggu sebentar.'
@@ -768,13 +571,13 @@ export default function DirectorSchedulePage() {
                 const response =
                     isEdit
                         ? await api.put(
-                            `/event-schedules/${form.id}`,
-                            payload
-                        )
+                              `/event-schedules/${form.id}`,
+                              payload
+                          )
                         : await api.post(
-                            '/event-schedules',
-                            payload
-                        );
+                              '/event-schedules',
+                              payload
+                          );
 
                 closeAlert();
 
@@ -783,38 +586,20 @@ export default function DirectorSchedulePage() {
                         ? 'Agenda Diperbarui'
                         : 'Agenda Ditambahkan',
 
-                    response
-                        ?.data
-                        ?.message ||
-                    (
-                        isEdit
-                            ? 'Agenda berhasil diperbarui.'
-                            : 'Agenda berhasil ditambahkan.'
-                    )
+                    response?.data?.message ||
+                        'Data agenda berhasil disimpan.'
                 );
 
-                setModalOpen(
-                    false
-                );
-
-                setSelectedEvent(
-                    null
-                );
-
-                setDetailMode(
-                    false
-                );
+                setModalOpen(false);
+                setSelectedEvent(null);
+                setDetailMode(false);
 
                 await loadEvents();
-            } catch (
-            error
-            ) {
+            } catch (error) {
                 console.error(
-                    'Save agenda error:',
-                    error
-                        ?.response
-                        ?.data ||
-                    error
+                    'Save director schedule error:',
+                    error?.response?.data ||
+                        error
                 );
 
                 closeAlert();
@@ -826,9 +611,7 @@ export default function DirectorSchedulePage() {
                     )
                 );
             } finally {
-                setSaving(
-                    false
-                );
+                setSaving(false);
             }
         };
 
@@ -869,59 +652,40 @@ export default function DirectorSchedulePage() {
                 });
 
             if (
-                !confirmation
-                    .isConfirmed
+                !confirmation.isConfirmed
             ) {
                 return;
             }
 
             try {
-                setSaving(
-                    true
-                );
+                setSaving(true);
 
                 showLoadingAlert(
                     'Menghapus Agenda',
                     'Mohon tunggu sebentar.'
                 );
 
-                const response =
-                    await api.delete(
-                        `/event-schedules/${selectedEvent.id}`
-                    );
+                await api.delete(
+                    `/event-schedules/${selectedEvent.id}`
+                );
 
                 closeAlert();
 
                 await showSuccessAlert(
                     'Agenda Dihapus',
-                    response
-                        ?.data
-                        ?.message ||
                     'Agenda berhasil dihapus.'
                 );
 
-                setModalOpen(
-                    false
-                );
-
-                setSelectedEvent(
-                    null
-                );
-
-                setDetailMode(
-                    false
-                );
+                setModalOpen(false);
+                setSelectedEvent(null);
+                setDetailMode(false);
 
                 await loadEvents();
-            } catch (
-            error
-            ) {
+            } catch (error) {
                 console.error(
-                    'Delete agenda error:',
-                    error
-                        ?.response
-                        ?.data ||
-                    error
+                    'Delete director schedule error:',
+                    error?.response?.data ||
+                        error
                 );
 
                 closeAlert();
@@ -933,15 +697,13 @@ export default function DirectorSchedulePage() {
                     )
                 );
             } finally {
-                setSaving(
-                    false
-                );
+                setSaving(false);
             }
         };
 
     /*
     |--------------------------------------------------------------------------
-    | FULLCALENDAR DATA
+    | CALENDAR DATA
     |--------------------------------------------------------------------------
     */
 
@@ -954,39 +716,34 @@ export default function DirectorSchedulePage() {
                     ) => ({
                         id:
                             String(
-                                item
-                                    .id
+                                item.id
                             ),
 
                         title:
-                            item
-                                .title,
+                            item.title,
 
                         start:
-                            item
-                                .start,
+                            item.start,
 
                         end:
-                            item
-                                .end,
+                            item.end,
 
                         allDay:
                             Boolean(
-                                item
-                                    .allDay
+                                item.allDay ??
+                                    item.all_day
                             ),
 
                         backgroundColor:
-                            item
-                                .backgroundColor ||
-                            item
-                                .color,
+                            item.color ||
+                            '#7F1D1D',
 
                         borderColor:
-                            item
-                                .borderColor ||
-                            item
-                                .color,
+                            item.color ||
+                            '#7F1D1D',
+
+                        textColor:
+                            '#ffffff',
                     })
                 ),
             [
@@ -1000,220 +757,163 @@ export default function DirectorSchedulePage() {
     |--------------------------------------------------------------------------
     */
 
-    if (
-        loading
-    ) {
+    if (loading) {
         return (
-            <div className="card border-0 shadow-sm rounded-5">
-                <div className="card-body p-5 text-center">
+            <div className="card border-0 shadow-sm rounded-4">
+                <div className="card-body py-5 text-center">
                     <div className="spinner-border text-danger mb-3" />
 
-                    <h5 className="fw-bold mb-1">
+                    <h5 className="fw-black mb-0">
                         Memuat Jadwal Direktur
                     </h5>
-
-                    <p className="text-muted mb-0">
-                        Mohon tunggu sebentar.
-                    </p>
                 </div>
             </div>
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | VIEW
-    |--------------------------------------------------------------------------
-    */
-
     return (
-        <div className="container-fluid px-0">
-            {/* HERO */}
+        <div className="director-schedule-page">
+            {/* =====================================================
+                HEADER
+            ===================================================== */}
 
-            <section
-                className="card border-0 shadow-sm rounded-5 overflow-hidden mb-4"
-                style={{
-                    background:
-                        'linear-gradient(135deg, #111827 0%, #7f1d1d 58%, #dc2626 120%)',
-                }}
-            >
-                <div className="card-body p-4 p-lg-5 text-white">
-                    <div className="row align-items-center g-4">
-                        <div className="col-lg-8">
-                            <span className="badge bg-white text-danger rounded-pill px-3 py-2 mb-3">
-                                JADWAL DIREKTUR
-                            </span>
+            <section className="director-schedule-top">
+                <div>
+                    <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
+                        <span className="badge rounded-pill bg-danger-subtle text-danger px-3 py-2">
+                            SEKRETARIAT PIMPINAN
+                        </span>
 
-                            <h1 className="display-6 fw-black mb-3">
-                                Agenda &amp; Jadwal Direktur
-                            </h1>
+                        <span className="badge rounded-pill bg-white text-dark border px-3 py-2">
+                            <i className="bi bi-calendar-event me-2" />
 
-                            <p
-                                className="text-white-50 mb-0"
-                                style={{
-                                    maxWidth:
-                                        760,
+                            {events.length} Agenda
+                        </span>
+                    </div>
 
-                                    lineHeight:
-                                        1.8,
-                                }}
-                            >
-                                Lihat agenda Direktur dalam tampilan kalender bulanan, mingguan, atau harian.
-                            </p>
-                        </div>
+                    <h2 className="fw-black mb-1">
+                        Jadwal Direktur
+                    </h2>
 
-                        <div className="col-lg-4 text-lg-end">
-                            {canManage && (
-                                <button
-                                    type="button"
-                                    className="btn btn-light text-danger fw-bold rounded-pill px-4"
-                                    onClick={() =>
-                                        openCreateModal()
-                                    }
-                                >
-                                    <i className="bi bi-plus-lg me-2" />
+                    <p className="text-muted mb-0">
+                        Kalender agenda dan kegiatan Direktur Telkom University Surabaya.
+                    </p>
+                </div>
 
-                                    Tambah Agenda
-                                </button>
-                            )}
-                        </div>
+                {canManage && (
+                    <button
+                        type="button"
+                        className="btn btn-danger rounded-pill director-add-button"
+                        onClick={() =>
+                            openCreateModal()
+                        }
+                    >
+                        <i className="bi bi-plus-lg me-2" />
+
+                        Tambah Agenda
+                    </button>
+                )}
+            </section>
+
+            {/* =====================================================
+                CALENDAR
+            ===================================================== */}
+
+            <section className="card border-0 shadow-sm director-calendar-card">
+                <div className="card-body director-calendar-body">
+                    <div className="director-calendar-viewport">
+                        <FullCalendar
+                            plugins={[
+                                themePlugin,
+                                dayGridPlugin,
+                                timeGridPlugin,
+                                interactionPlugin,
+                            ]}
+                            initialView="dayGridMonth"
+                            locale="id"
+                            firstDay={1}
+                            height="100%"
+                            expandRows
+                            events={
+                                calendarEvents
+                            }
+                            dateClick={
+                                handleDateClick
+                            }
+                            eventClick={
+                                handleEventClick
+                            }
+                            headerToolbar={{
+                                start:
+                                    'prev,next today',
+
+                                center:
+                                    'title',
+
+                                end:
+                                    'dayGridMonth,timeGridWeek,timeGridDay',
+                            }}
+                            buttons={{
+                                today: {
+                                    text:
+                                        'Hari Ini',
+                                },
+
+                                dayGridMonth: {
+                                    text:
+                                        'Bulan',
+                                },
+
+                                timeGridWeek: {
+                                    text:
+                                        'Minggu',
+                                },
+
+                                timeGridDay: {
+                                    text:
+                                        'Hari',
+                                },
+                            }}
+                            eventTimeFormat={{
+                                hour:
+                                    '2-digit',
+
+                                minute:
+                                    '2-digit',
+
+                                hour12:
+                                    false,
+                            }}
+                            slotLabelFormat={{
+                                hour:
+                                    '2-digit',
+
+                                minute:
+                                    '2-digit',
+
+                                hour12:
+                                    false,
+                            }}
+                            slotMinTime="06:00:00"
+                            slotMaxTime="22:00:00"
+                            slotDuration="00:30:00"
+                            nowIndicator
+                            navLinks
+                            selectable={
+                                canManage
+                            }
+                            dayMaxEvents={3}
+                            fixedWeekCount={
+                                false
+                            }
+                        />
                     </div>
                 </div>
             </section>
 
-            {/* SUMMARY */}
-
-            <section className="row g-3 mb-4">
-                <div className="col-md-4">
-                    <div className="card border-0 shadow-sm rounded-4 h-100">
-                        <div className="card-body p-4">
-                            <div className="small text-muted mb-1">
-                                Total Agenda
-                            </div>
-
-                            <div className="fs-2 fw-black">
-                                {
-                                    events.length
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-md-4">
-                    <div className="card border-0 shadow-sm rounded-4 h-100">
-                        <div className="card-body p-4">
-                            <div className="small text-muted mb-1">
-                                Agenda Publik
-                            </div>
-
-                            <div className="fs-2 fw-black text-success">
-                                {
-                                    events.filter(
-                                        (
-                                            item
-                                        ) =>
-                                            item
-                                                .is_public
-                                    ).length
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-md-4">
-                    <div className="card border-0 shadow-sm rounded-4 h-100">
-                        <div className="card-body p-4">
-                            <div className="small text-muted mb-1">
-                                Mode Akses
-                            </div>
-
-                            <div className="fs-5 fw-black">
-                                {canManage
-                                    ? 'Kelola Agenda'
-                                    : 'Lihat Agenda'}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* CALENDAR */}
-
-            <section className="card border-0 shadow-sm rounded-5">
-                <div className="card-body p-3 p-lg-4">
-                    <FullCalendar
-                        plugins={[
-                            themePlugin,
-                            dayGridPlugin,
-                            timeGridPlugin,
-                            interactionPlugin,
-                        ]}
-                        initialView="dayGridMonth"
-                        firstDay={1}
-                        height="auto"
-                        events={
-                            calendarEvents
-                        }
-                        dateClick={
-                            handleDateClick
-                        }
-                        eventClick={
-                            handleEventClick
-                        }
-                        headerToolbar={{
-                            start:
-                                'prev,next today',
-
-                            center:
-                                'title',
-
-                            end:
-                                'dayGridMonth,timeGridWeek,timeGridDay',
-                        }}
-                        buttons={{
-                            today: {
-                                text:
-                                    'Hari Ini',
-                            },
-
-                            dayGridMonth: {
-                                text:
-                                    'Bulan',
-                            },
-
-                            timeGridWeek: {
-                                text:
-                                    'Minggu',
-                            },
-
-                            timeGridDay: {
-                                text:
-                                    'Hari',
-                            },
-                        }}
-                        eventTimeFormat={{
-                            hour:
-                                '2-digit',
-
-                            minute:
-                                '2-digit',
-
-                            hour12:
-                                false,
-                        }}
-                        dayMaxEvents
-                        nowIndicator
-                        navLinks
-                        selectable={
-                            canManage
-                        }
-                    />
-                </div>
-            </section>
-
-            {/* MODAL */}
+            {/* =====================================================
+                MODAL
+            ===================================================== */}
 
             {modalOpen && (
                 <div
@@ -1221,24 +921,33 @@ export default function DirectorSchedulePage() {
                     tabIndex="-1"
                     style={{
                         background:
-                            'rgba(15, 23, 42, .55)',
+                            'rgba(15, 23, 42, .58)',
                     }}
                 >
                     <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
                         <div className="modal-content border-0 rounded-5 shadow-lg overflow-hidden">
+                            <div
+                                style={{
+                                    height:
+                                        7,
+
+                                    background:
+                                        form.color ||
+                                        '#7F1D1D',
+                                }}
+                            />
+
                             <div className="modal-header border-0 p-4 pb-2">
                                 <div>
-                                    <span className="badge bg-danger-subtle text-danger rounded-pill px-3 py-2 mb-2">
+                                    <span className="badge rounded-pill bg-danger-subtle text-danger px-3 py-2 mb-2">
                                         {form.id
                                             ? 'DETAIL AGENDA'
                                             : 'AGENDA BARU'}
                                     </span>
 
-                                    <h4 className="modal-title fw-black">
+                                    <h4 className="fw-black mb-0">
                                         {form.id
-                                            ? form
-                                                .title ||
-                                            'Detail Agenda'
+                                            ? form.title
                                             : 'Tambah Agenda Direktur'}
                                     </h4>
                                 </div>
@@ -1259,43 +968,39 @@ export default function DirectorSchedulePage() {
                                 {detailMode ? (
                                     <div className="row g-3">
                                         <div className="col-12">
-                                            <div className="p-4 rounded-4 bg-light border">
-                                                <div className="small text-muted mb-1">
+                                            <div className="p-4 rounded-4 bg-light">
+                                                <div className="text-muted mb-1">
                                                     Judul Agenda
                                                 </div>
 
-                                                <div className="fs-5 fw-black">
-                                                    {
-                                                        form.title
-                                                    }
+                                                <div className="fs-4 fw-black">
+                                                    {form.title}
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="col-md-6">
-                                            <div className="p-3 rounded-4 bg-light border h-100">
-                                                <div className="small text-muted mb-1">
+                                            <div className="p-3 rounded-4 bg-light h-100">
+                                                <div className="text-muted mb-1">
                                                     Tanggal
                                                 </div>
 
-                                                <div className="fw-bold">
+                                                <div className="fw-black fs-5">
                                                     {formatDate(
-                                                        form
-                                                            .event_date
+                                                        form.event_date
                                                     )}
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="col-md-6">
-                                            <div className="p-3 rounded-4 bg-light border h-100">
-                                                <div className="small text-muted mb-1">
+                                            <div className="p-3 rounded-4 bg-light h-100">
+                                                <div className="text-muted mb-1">
                                                     Waktu
                                                 </div>
 
-                                                <div className="fw-bold">
-                                                    {form
-                                                        .all_day
+                                                <div className="fw-black fs-5">
+                                                    {form.all_day
                                                         ? 'Sepanjang Hari'
                                                         : `${form.start_time} - ${form.end_time}`}
                                                 </div>
@@ -1303,36 +1008,33 @@ export default function DirectorSchedulePage() {
                                         </div>
 
                                         <div className="col-md-6">
-                                            <div className="p-3 rounded-4 bg-light border h-100">
-                                                <div className="small text-muted mb-1">
+                                            <div className="p-3 rounded-4 bg-light h-100">
+                                                <div className="text-muted mb-1">
                                                     Kategori
                                                 </div>
 
-                                                <div className="fw-bold">
-                                                    {
-                                                        form.agenda_type
-                                                    }
+                                                <div className="fw-black fs-5">
+                                                    {form.agenda_type}
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="col-md-6">
-                                            <div className="p-3 rounded-4 bg-light border h-100">
-                                                <div className="small text-muted mb-1">
+                                            <div className="p-3 rounded-4 bg-light h-100">
+                                                <div className="text-muted mb-1">
                                                     Lokasi
                                                 </div>
 
-                                                <div className="fw-bold">
-                                                    {form
-                                                        .location ||
+                                                <div className="fw-black fs-5">
+                                                    {form.location ||
                                                         '-'}
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="col-12">
-                                            <div className="p-3 rounded-4 bg-light border">
-                                                <div className="small text-muted mb-1">
+                                            <div className="p-3 rounded-4 bg-light">
+                                                <div className="text-muted mb-1">
                                                     Deskripsi
                                                 </div>
 
@@ -1345,8 +1047,7 @@ export default function DirectorSchedulePage() {
                                                             1.8,
                                                     }}
                                                 >
-                                                    {form
-                                                        .description ||
+                                                    {form.description ||
                                                         '-'}
                                                 </div>
                                             </div>
@@ -1354,24 +1055,23 @@ export default function DirectorSchedulePage() {
 
                                         <div className="col-12">
                                             <span
-                                                className={`badge rounded-pill px-3 py-2 ${form
-                                                        .is_public
+                                                className={`badge rounded-pill px-3 py-2 fs-6 ${
+                                                    form.is_public
                                                         ? 'bg-success-subtle text-success'
                                                         : 'bg-secondary-subtle text-secondary'
-                                                    }`}
+                                                }`}
                                             >
                                                 <i
-                                                    className={`bi ${form
-                                                            .is_public
+                                                    className={`bi ${
+                                                        form.is_public
                                                             ? 'bi-globe2'
                                                             : 'bi-lock-fill'
-                                                        } me-2`}
+                                                    } me-2`}
                                                 />
 
-                                                {form
-                                                    .is_public
-                                                    ? 'Agenda Publik'
-                                                    : 'Hanya User Login'}
+                                                {form.is_public
+                                                    ? 'Tampil di Login'
+                                                    : 'Hanya Internal'}
                                             </span>
                                         </div>
                                     </div>
@@ -1384,20 +1084,17 @@ export default function DirectorSchedulePage() {
 
                                             <input
                                                 type="text"
-                                                className="form-control"
-                                                maxLength="255"
+                                                className="form-control form-control-lg"
                                                 value={
-                                                    form
-                                                        .title
+                                                    form.title
                                                 }
+                                                maxLength="255"
                                                 onChange={(
                                                     event
                                                 ) =>
                                                     handleFormChange(
                                                         'title',
-                                                        event
-                                                            .target
-                                                            .value
+                                                        event.target.value
                                                     )
                                                 }
                                             />
@@ -1410,19 +1107,16 @@ export default function DirectorSchedulePage() {
 
                                             <input
                                                 type="date"
-                                                className="form-control"
+                                                className="form-control form-control-lg"
                                                 value={
-                                                    form
-                                                        .event_date
+                                                    form.event_date
                                                 }
                                                 onChange={(
                                                     event
                                                 ) =>
                                                     handleFormChange(
                                                         'event_date',
-                                                        event
-                                                            .target
-                                                            .value
+                                                        event.target.value
                                                     )
                                                 }
                                             />
@@ -1434,19 +1128,16 @@ export default function DirectorSchedulePage() {
                                             </label>
 
                                             <select
-                                                className="form-select"
+                                                className="form-select form-select-lg"
                                                 value={
-                                                    form
-                                                        .agenda_type
+                                                    form.agenda_type
                                                 }
                                                 onChange={(
                                                     event
                                                 ) =>
                                                     handleFormChange(
                                                         'agenda_type',
-                                                        event
-                                                            .target
-                                                            .value
+                                                        event.target.value
                                                     )
                                                 }
                                             >
@@ -1462,9 +1153,7 @@ export default function DirectorSchedulePage() {
                                                                 agendaType
                                                             }
                                                         >
-                                                            {
-                                                                agendaType
-                                                            }
+                                                            {agendaType}
                                                         </option>
                                                     )
                                                 )}
@@ -1476,86 +1165,76 @@ export default function DirectorSchedulePage() {
                                                 <input
                                                     className="form-check-input"
                                                     type="checkbox"
+                                                    id="agendaAllDay"
                                                     checked={
-                                                        form
-                                                            .all_day
+                                                        form.all_day
                                                     }
                                                     onChange={(
                                                         event
                                                     ) =>
                                                         handleFormChange(
                                                             'all_day',
-                                                            event
-                                                                .target
-                                                                .checked
+                                                            event.target.checked
                                                         )
                                                     }
-                                                    id="allDaySchedule"
                                                 />
 
                                                 <label
                                                     className="form-check-label fw-bold"
-                                                    htmlFor="allDaySchedule"
+                                                    htmlFor="agendaAllDay"
                                                 >
-                                                    Agenda sepanjang hari
+                                                    Sepanjang Hari
                                                 </label>
                                             </div>
                                         </div>
 
-                                        {!form
-                                            .all_day && (
-                                                <>
-                                                    <div className="col-md-6">
-                                                        <label className="form-label fw-bold">
-                                                            Jam Mulai
-                                                        </label>
+                                        {!form.all_day && (
+                                            <>
+                                                <div className="col-md-6">
+                                                    <label className="form-label fw-bold">
+                                                        Jam Mulai
+                                                    </label>
 
-                                                        <input
-                                                            type="time"
-                                                            className="form-control"
-                                                            value={
-                                                                form
-                                                                    .start_time
-                                                            }
-                                                            onChange={(
-                                                                event
-                                                            ) =>
-                                                                handleFormChange(
-                                                                    'start_time',
-                                                                    event
-                                                                        .target
-                                                                        .value
-                                                                )
-                                                            }
-                                                        />
-                                                    </div>
+                                                    <input
+                                                        type="time"
+                                                        className="form-control form-control-lg"
+                                                        value={
+                                                            form.start_time
+                                                        }
+                                                        onChange={(
+                                                            event
+                                                        ) =>
+                                                            handleFormChange(
+                                                                'start_time',
+                                                                event.target.value
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
 
-                                                    <div className="col-md-6">
-                                                        <label className="form-label fw-bold">
-                                                            Jam Selesai
-                                                        </label>
+                                                <div className="col-md-6">
+                                                    <label className="form-label fw-bold">
+                                                        Jam Selesai
+                                                    </label>
 
-                                                        <input
-                                                            type="time"
-                                                            className="form-control"
-                                                            value={
-                                                                form
-                                                                    .end_time
-                                                            }
-                                                            onChange={(
-                                                                event
-                                                            ) =>
-                                                                handleFormChange(
-                                                                    'end_time',
-                                                                    event
-                                                                        .target
-                                                                        .value
-                                                                )
-                                                            }
-                                                        />
-                                                    </div>
-                                                </>
-                                            )}
+                                                    <input
+                                                        type="time"
+                                                        className="form-control form-control-lg"
+                                                        value={
+                                                            form.end_time
+                                                        }
+                                                        onChange={(
+                                                            event
+                                                        ) =>
+                                                            handleFormChange(
+                                                                'end_time',
+                                                                event.target.value
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
 
                                         <div className="col-md-8">
                                             <label className="form-label fw-bold">
@@ -1564,46 +1243,42 @@ export default function DirectorSchedulePage() {
 
                                             <input
                                                 type="text"
-                                                className="form-control"
-                                                maxLength="255"
+                                                className="form-control form-control-lg"
                                                 value={
-                                                    form
-                                                        .location
+                                                    form.location
                                                 }
                                                 onChange={(
                                                     event
                                                 ) =>
                                                     handleFormChange(
                                                         'location',
-                                                        event
-                                                            .target
-                                                            .value
+                                                        event.target.value
                                                     )
                                                 }
-                                                placeholder="Contoh: Ruang Direktur"
                                             />
                                         </div>
 
                                         <div className="col-md-4">
                                             <label className="form-label fw-bold">
-                                                Warna Event
+                                                Warna Agenda
                                             </label>
 
                                             <input
                                                 type="color"
                                                 className="form-control form-control-color w-100"
+                                                style={{
+                                                    height:
+                                                        48,
+                                                }}
                                                 value={
-                                                    form
-                                                        .color
+                                                    form.color
                                                 }
                                                 onChange={(
                                                     event
                                                 ) =>
                                                     handleFormChange(
                                                         'color',
-                                                        event
-                                                            .target
-                                                            .value
+                                                        event.target.value
                                                     )
                                                 }
                                             />
@@ -1617,19 +1292,15 @@ export default function DirectorSchedulePage() {
                                             <textarea
                                                 className="form-control"
                                                 rows="5"
-                                                maxLength="5000"
                                                 value={
-                                                    form
-                                                        .description
+                                                    form.description
                                                 }
                                                 onChange={(
                                                     event
                                                 ) =>
                                                     handleFormChange(
                                                         'description',
-                                                        event
-                                                            .target
-                                                            .value
+                                                        event.target.value
                                                     )
                                                 }
                                             />
@@ -1640,33 +1311,26 @@ export default function DirectorSchedulePage() {
                                                 <input
                                                     className="form-check-input"
                                                     type="checkbox"
+                                                    id="agendaPublic"
                                                     checked={
-                                                        form
-                                                            .is_public
+                                                        form.is_public
                                                     }
                                                     onChange={(
                                                         event
                                                     ) =>
                                                         handleFormChange(
                                                             'is_public',
-                                                            event
-                                                                .target
-                                                                .checked
+                                                            event.target.checked
                                                         )
                                                     }
-                                                    id="publicSchedule"
                                                 />
 
                                                 <label
                                                     className="form-check-label fw-bold"
-                                                    htmlFor="publicSchedule"
+                                                    htmlFor="agendaPublic"
                                                 >
-                                                    Tampilkan di halaman login
+                                                    Tampilkan di halaman Login
                                                 </label>
-                                            </div>
-
-                                            <div className="form-text">
-                                                Jika dimatikan, agenda hanya dapat dilihat setelah user login.
                                             </div>
                                         </div>
                                     </div>
@@ -1705,7 +1369,7 @@ export default function DirectorSchedulePage() {
                                                         saving
                                                     }
                                                 >
-                                                    <i className="bi bi-pencil-square me-2" />
+                                                    <i className="bi bi-pencil-fill me-2" />
 
                                                     Edit Agenda
                                                 </button>
@@ -1768,6 +1432,465 @@ export default function DirectorSchedulePage() {
                     </div>
                 </div>
             )}
+
+            {/* =====================================================
+                STYLE
+            ===================================================== */}
+
+            <style>
+                {`
+                    /*
+                    |--------------------------------------------------------------------------
+                    | PAGE
+                    |--------------------------------------------------------------------------
+                    */
+
+                    .director-schedule-page {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 14px;
+                        min-height: 0;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | HEADER
+                    |--------------------------------------------------------------------------
+                    */
+
+                    .director-schedule-top {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        flex-wrap: wrap;
+                        gap: 16px;
+
+                        margin-bottom: 0;
+
+                        flex-shrink: 0;
+                    }
+
+                    .director-schedule-top h2 {
+                        font-size: 2rem;
+                        line-height: 1.1;
+                    }
+
+                    .director-schedule-top p {
+                        font-size: 1rem;
+                    }
+
+                    .director-add-button {
+                        min-height: 46px;
+                        padding-left: 24px;
+                        padding-right: 24px;
+                        font-size: 1rem;
+                        font-weight: 800;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CALENDAR CARD
+                    |--------------------------------------------------------------------------
+                    */
+
+                    .director-calendar-card {
+                        border-radius: 24px !important;
+                        overflow: hidden;
+                        min-height: 0;
+                    }
+
+                    .director-calendar-body {
+                        padding: 16px !important;
+                        min-height: 0;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | 1 SCREEN CALENDAR
+                    |--------------------------------------------------------------------------
+                    |
+                    | Ini bagian terpenting.
+                    |
+                    | Tinggi kalender mengikuti tinggi viewport,
+                    | bukan tinggi content tanggal.
+                    |
+                    */
+
+                    .director-calendar-viewport {
+                        height: calc(100vh - 255px);
+                        min-height: 500px;
+                        max-height: 760px;
+                    }
+
+                    .director-calendar-viewport > div,
+                    .director-calendar-viewport .fc {
+                        height: 100%;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | BASE FONT
+                    |--------------------------------------------------------------------------
+                    */
+
+                    .director-calendar-card .fc {
+                        font-size: 1.08rem;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | TOOLBAR
+                    |--------------------------------------------------------------------------
+                    */
+
+                    .director-calendar-card .fc-toolbar {
+                        margin-bottom: 14px !important;
+                        gap: 12px;
+                    }
+
+                    .director-calendar-card .fc-toolbar-title {
+                        font-size: 2rem !important;
+                        font-weight: 900 !important;
+                        line-height: 1 !important;
+                        text-transform: capitalize;
+                    }
+
+                    .director-calendar-card .fc-button {
+                        min-height: 42px;
+                        border-radius: 999px !important;
+
+                        font-size: .95rem !important;
+                        font-weight: 800 !important;
+
+                        padding-left: 17px !important;
+                        padding-right: 17px !important;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | DAY NAME
+                    |--------------------------------------------------------------------------
+                    */
+
+                    .director-calendar-card .fc-col-header-cell {
+                        background: #f8fafc;
+
+                        padding-top: 9px;
+                        padding-bottom: 9px;
+                    }
+
+                    .director-calendar-card .fc-col-header-cell-cushion {
+                        font-size: 1rem;
+                        font-weight: 900;
+
+                        color: #475569;
+
+                        text-decoration: none;
+
+                        text-transform: uppercase;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | MONTH CELLS
+                    |--------------------------------------------------------------------------
+                    |
+                    | JANGAN kasih min-height besar di sini.
+                    | FullCalendar akan membagi tinggi otomatis.
+                    |
+                    */
+
+                    .director-calendar-card .fc-daygrid-day-frame {
+                        min-height: 0 !important;
+                    }
+
+                    .director-calendar-card .fc-daygrid-day-number {
+                        padding: 8px 10px;
+
+                        font-size: 1.05rem;
+                        font-weight: 900;
+
+                        color: #1f2937;
+
+                        text-decoration: none;
+                    }
+
+                    .director-calendar-card .fc-day-today {
+                        background: #fff7f7 !important;
+                    }
+
+                    .director-calendar-card .fc-day-today .fc-daygrid-day-number {
+                        min-width: 30px;
+                        min-height: 30px;
+
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+
+                        border-radius: 999px;
+
+                        background: #7f1d1d;
+                        color: #ffffff !important;
+
+                        margin: 4px;
+                        padding: 4px 8px;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | EVENTS
+                    |--------------------------------------------------------------------------
+                    */
+
+                    .director-calendar-card .fc-event {
+                        border-radius: 7px !important;
+
+                        padding: 3px 5px !important;
+                        margin: 2px 4px !important;
+
+                        font-size: .92rem !important;
+                        font-weight: 800;
+
+                        line-height: 1.3;
+
+                        cursor: pointer;
+                    }
+
+                    .director-calendar-card .fc-event-main {
+                        overflow: hidden;
+                    }
+
+                    .director-calendar-card .fc-event-time {
+                        font-size: .9rem !important;
+                        font-weight: 900;
+                    }
+
+                    .director-calendar-card .fc-event-title {
+                        font-size: .92rem !important;
+                        font-weight: 800;
+
+                        overflow: hidden;
+                        white-space: nowrap;
+                        text-overflow: ellipsis;
+                    }
+
+                    .director-calendar-card .fc-daygrid-more-link {
+                        margin-left: 5px;
+
+                        color: #b91c1c;
+
+                        font-size: .85rem;
+                        font-weight: 900;
+
+                        text-decoration: none;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | GRID
+                    |--------------------------------------------------------------------------
+                    */
+
+                    .director-calendar-card .fc-scrollgrid {
+                        border-radius: 14px;
+                        overflow: hidden;
+                    }
+
+                    .director-calendar-card .fc-theme-standard td,
+                    .director-calendar-card .fc-theme-standard th {
+                        border-color: #e5e7eb;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | WEEK / DAY VIEW
+                    |--------------------------------------------------------------------------
+                    */
+
+                    .director-calendar-card .fc-timegrid-axis {
+                        font-size: .9rem;
+                        font-weight: 700;
+                    }
+
+                    .director-calendar-card .fc-timegrid-slot-label {
+                        font-size: .9rem;
+                        font-weight: 700;
+                    }
+
+                    .director-calendar-card .fc-timegrid-slot {
+                        height: 2.7rem;
+                    }
+
+                    .director-calendar-card .fc-timegrid-event {
+                        font-size: .9rem !important;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | LARGE SCREEN
+                    |--------------------------------------------------------------------------
+                    */
+
+                    @media (min-width: 1500px) {
+                        .director-calendar-viewport {
+                            height: calc(100vh - 245px);
+                            max-height: 820px;
+                        }
+
+                        .director-calendar-card .fc-toolbar-title {
+                            font-size: 2.15rem !important;
+                        }
+
+                        .director-calendar-card .fc-col-header-cell-cushion {
+                            font-size: 1.05rem;
+                        }
+
+                        .director-calendar-card .fc-daygrid-day-number {
+                            font-size: 1.08rem;
+                        }
+
+                        .director-calendar-card .fc-event {
+                            font-size: .95rem !important;
+                        }
+
+                        .director-calendar-card .fc-event-title {
+                            font-size: .95rem !important;
+                        }
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | LAPTOP
+                    |--------------------------------------------------------------------------
+                    */
+
+                    @media (
+                        min-width: 992px
+                    ) and (
+                        max-height: 800px
+                    ) {
+                        .director-schedule-top h2 {
+                            font-size: 1.7rem;
+                        }
+
+                        .director-schedule-top p {
+                            font-size: .9rem;
+                        }
+
+                        .director-calendar-viewport {
+                            height: calc(100vh - 225px);
+                            min-height: 460px;
+                        }
+
+                        .director-calendar-card .fc-toolbar {
+                            margin-bottom: 8px !important;
+                        }
+
+                        .director-calendar-card .fc-toolbar-title {
+                            font-size: 1.7rem !important;
+                        }
+
+                        .director-calendar-card .fc-col-header-cell {
+                            padding-top: 6px;
+                            padding-bottom: 6px;
+                        }
+
+                        .director-calendar-card .fc-event {
+                            font-size: .82rem !important;
+                            padding: 2px 4px !important;
+                        }
+
+                        .director-calendar-card .fc-event-title {
+                            font-size: .82rem !important;
+                        }
+
+                        .director-calendar-card .fc-event-time {
+                            font-size: .8rem !important;
+                        }
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | TABLET
+                    |--------------------------------------------------------------------------
+                    */
+
+                    @media (max-width: 991.98px) {
+                        .director-calendar-viewport {
+                            height: auto;
+                            min-height: 720px;
+                            max-height: none;
+                        }
+
+                        .director-calendar-card .fc-toolbar {
+                            flex-direction: column;
+                        }
+
+                        .director-calendar-card .fc-toolbar-chunk {
+                            display: flex;
+                            justify-content: center;
+                        }
+
+                        .director-calendar-card .fc-daygrid-day-frame {
+                            min-height: 90px !important;
+                        }
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | MOBILE
+                    |--------------------------------------------------------------------------
+                    */
+
+                    @media (max-width: 767.98px) {
+                        .director-schedule-top h2 {
+                            font-size: 1.6rem;
+                        }
+
+                        .director-calendar-body {
+                            padding: 10px !important;
+                        }
+
+                        .director-calendar-card .fc {
+                            font-size: .82rem;
+                        }
+
+                        .director-calendar-card .fc-toolbar-title {
+                            font-size: 1.35rem !important;
+                        }
+
+                        .director-calendar-card .fc-button {
+                            min-height: 36px;
+
+                            padding-left: 10px !important;
+                            padding-right: 10px !important;
+
+                            font-size: .72rem !important;
+                        }
+
+                        .director-calendar-card .fc-col-header-cell-cushion {
+                            font-size: .75rem;
+                        }
+
+                        .director-calendar-card .fc-daygrid-day-number {
+                            font-size: .8rem;
+
+                            padding: 5px;
+                        }
+
+                        .director-calendar-card .fc-event {
+                            padding: 2px 3px !important;
+
+                            font-size: .65rem !important;
+                        }
+
+                        .director-calendar-card .fc-event-title,
+                        .director-calendar-card .fc-event-time {
+                            font-size: .65rem !important;
+                        }
+                    }
+                `}
+            </style>
         </div>
     );
 }
