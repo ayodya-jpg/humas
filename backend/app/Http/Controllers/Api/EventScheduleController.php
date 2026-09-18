@@ -4,40 +4,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\EventSchedule;
-use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Throwable;
+use Illuminate\Validation\ValidationException;
 
 class EventScheduleController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN ROLES
-    |--------------------------------------------------------------------------
-    |
-    | Role berikut dapat:
-    | - tambah agenda
-    | - edit agenda
-    | - hapus agenda
-    |
-    */
-
     private const ADMIN_ROLES = [
         'admin',
         'admin_humas',
         'admin_sekpim',
         'superadmin',
     ];
-
-    /*
-    |--------------------------------------------------------------------------
-    | AGENDA TYPES
-    |--------------------------------------------------------------------------
-    */
 
     private const AGENDA_TYPES = [
         'Rapat',
@@ -53,116 +32,77 @@ class EventScheduleController extends Controller
     |--------------------------------------------------------------------------
     | PUBLIC INDEX
     |--------------------------------------------------------------------------
-    |
-    | Tidak membutuhkan login.
-    |
-    | Digunakan untuk:
-    | - halaman login
-    | - agenda direktur terdekat
-    |
-    | Contoh:
-    |
-    | GET /api/event-schedules/public
-    |
-    | GET /api/event-schedules/public?upcoming=1&limit=5
-    |
-    | GET /api/event-schedules/public?start=2026-09-01&end=2026-09-30
-    |
     */
 
-    public function publicIndex(
-        Request $request
-    ): JsonResponse {
-        $validated =
-            $request->validate([
-                'start' => [
-                    'nullable',
-                    'date_format:Y-m-d',
-                ],
+    public function publicIndex(Request $request)
+    {
+        $validated = $request->validate([
+            'start' => ['nullable', 'date'],
+            'end' => ['nullable', 'date'],
+            'upcoming' => ['nullable', 'boolean'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
 
-                'end' => [
-                    'nullable',
-                    'date_format:Y-m-d',
-                    'after_or_equal:start',
-                ],
+        $query = EventSchedule::query()
+            ->where('is_public', true);
 
-                'upcoming' => [
-                    'nullable',
-                    'boolean',
-                ],
-
-                'limit' => [
-                    'nullable',
-                    'integer',
-                    'min:1',
-                    'max:100',
-                ],
-            ]);
-
-        $query =
-            EventSchedule::query()
-                ->where(
-                    'is_public',
-                    true
-                );
-
-        $this->applyDateFilters(
-            $query,
-            $validated,
-            true
-        );
-
-        $limit =
-            isset(
-                $validated[
-                    'limit'
-                ]
-            )
-                ? (int)
-                    $validated[
-                        'limit'
-                    ]
-                : null;
-
-        if (
-            $limit !==
-            null
-        ) {
-            $query->limit(
-                $limit
+        if (!empty($validated['start'])) {
+            $query->whereDate(
+                'event_date',
+                '>=',
+                $validated['start']
             );
         }
 
-        $events =
-            $query
-                ->orderBy(
-                    'event_date'
-                )
-                ->orderByRaw(
-                    'CASE WHEN all_day = 1 THEN 0 ELSE 1 END'
-                )
-                ->orderBy(
-                    'start_time'
-                )
-                ->get();
+        if (!empty($validated['end'])) {
+            $query->whereDate(
+                'event_date',
+                '<=',
+                $validated['end']
+            );
+        }
+
+        if (
+            filter_var(
+                $validated['upcoming'] ?? false,
+                FILTER_VALIDATE_BOOLEAN
+            )
+        ) {
+            $query->whereDate(
+                'event_date',
+                '>=',
+                now()->toDateString()
+            );
+        }
+
+        $query
+            ->orderBy('event_date')
+            ->orderByRaw(
+                'CASE WHEN all_day = 1 THEN 0 ELSE 1 END'
+            )
+            ->orderBy('start_time');
+
+        if (!empty($validated['limit'])) {
+            $query->limit(
+                (int) $validated['limit']
+            );
+        }
+
+        $events = $query
+            ->get()
+            ->map(
+                fn (EventSchedule $event) =>
+                    $this->transformEvent(
+                        $event,
+                        false
+                    )
+            )
+            ->values();
 
         return response()->json([
-            'success' =>
-                true,
-
-            'message' =>
-                'Jadwal Direktur berhasil diambil.',
-
-            'data' =>
-                $events->map(
-                    fn (
-                        EventSchedule $event
-                    ) =>
-                        $this->transformEvent(
-                            $event,
-                            false
-                        )
-                )->values(),
+            'success' => true,
+            'message' => 'Jadwal Direktur berhasil diambil.',
+            'data' => $events,
         ]);
     }
 
@@ -170,154 +110,102 @@ class EventScheduleController extends Controller
     |--------------------------------------------------------------------------
     | AUTHENTICATED INDEX
     |--------------------------------------------------------------------------
-    |
-    | Seluruh user yang sudah login dapat melihat agenda.
-    |
-    | Admin juga menerima flag can_manage.
-    |
     */
 
-    public function index(
-        Request $request
-    ): JsonResponse {
-        $validated =
-            $request->validate([
-                'start' => [
-                    'nullable',
-                    'date_format:Y-m-d',
-                ],
+    public function index(Request $request)
+    {
+        $validated = $request->validate([
+            'start' => ['nullable', 'date'],
+            'end' => ['nullable', 'date'],
+            'agenda_type' => [
+                'nullable',
+                Rule::in(self::AGENDA_TYPES),
+            ],
+            'search' => ['nullable', 'string', 'max:255'],
+        ]);
 
-                'end' => [
-                    'nullable',
-                    'date_format:Y-m-d',
-                    'after_or_equal:start',
-                ],
-
-                'agenda_type' => [
-                    'nullable',
-                    'string',
-                    'max:100',
-                ],
-
-                'search' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
+        $query = EventSchedule::query()
+            ->with([
+                'createdBy:id,name',
+                'updatedBy:id,name',
             ]);
 
-        $query =
-            EventSchedule::query()
-                ->with([
-                    'createdBy:id,name,username',
-                    'updatedBy:id,name,username',
-                ]);
-
-        $this->applyDateFilters(
-            $query,
-            $validated,
-            false
-        );
-
-        if (
-            !empty(
-                $validated[
-                    'agenda_type'
-                ] ?? null
-            )
-        ) {
-            $query->where(
-                'agenda_type',
-                $validated[
-                    'agenda_type'
-                ]
+        if (!empty($validated['start'])) {
+            $query->whereDate(
+                'event_date',
+                '>=',
+                $validated['start']
             );
         }
 
-        if (
-            !empty(
-                $validated[
-                    'search'
-                ] ?? null
-            )
-        ) {
-            $keyword =
+        if (!empty($validated['end'])) {
+            $query->whereDate(
+                'event_date',
+                '<=',
+                $validated['end']
+            );
+        }
+
+        if (!empty($validated['agenda_type'])) {
+            $query->where(
+                'agenda_type',
+                $validated['agenda_type']
+            );
+        }
+
+        if (!empty($validated['search'])) {
+            $search =
                 trim(
-                    $validated[
-                        'search'
-                    ]
+                    $validated['search']
                 );
 
             $query->where(
-                function (
-                    Builder $builder
-                ) use (
-                    $keyword
-                ): void {
-                    $builder
+                function ($subQuery) use ($search) {
+                    $subQuery
                         ->where(
                             'title',
                             'like',
-                            "%{$keyword}%"
+                            "%{$search}%"
                         )
                         ->orWhere(
                             'description',
                             'like',
-                            "%{$keyword}%"
+                            "%{$search}%"
                         )
                         ->orWhere(
                             'location',
                             'like',
-                            "%{$keyword}%"
-                        )
-                        ->orWhere(
-                            'agenda_type',
-                            'like',
-                            "%{$keyword}%"
+                            "%{$search}%"
                         );
                 }
             );
         }
 
-        $events =
-            $query
-                ->orderBy(
-                    'event_date'
-                )
-                ->orderByRaw(
-                    'CASE WHEN all_day = 1 THEN 0 ELSE 1 END'
-                )
-                ->orderBy(
-                    'start_time'
-                )
-                ->get();
+        $events = $query
+            ->orderBy('event_date')
+            ->orderByRaw(
+                'CASE WHEN all_day = 1 THEN 0 ELSE 1 END'
+            )
+            ->orderBy('start_time')
+            ->get()
+            ->map(
+                fn (EventSchedule $event) =>
+                    $this->transformEvent(
+                        $event,
+                        true
+                    )
+            )
+            ->values();
 
         return response()->json([
-            'success' =>
-                true,
-
-            'message' =>
-                'Jadwal Direktur berhasil diambil.',
-
+            'success' => true,
+            'message' => 'Jadwal Direktur berhasil diambil.',
             'data' => [
-                'events' =>
-                    $events->map(
-                        fn (
-                            EventSchedule $event
-                        ) =>
-                            $this->transformEvent(
-                                $event,
-                                true
-                            )
-                    )->values(),
-
-                'agenda_types' =>
-                    self::AGENDA_TYPES,
-
-                'can_manage' =>
-                    $this->canManage(
-                        $request
-                    ),
+                'events' => $events,
+                'agenda_types' => self::AGENDA_TYPES,
+                'can_manage' => $this->canManage(
+                    $request
+                ),
             ],
         ]);
     }
@@ -331,31 +219,19 @@ class EventScheduleController extends Controller
     public function show(
         Request $request,
         EventSchedule $eventSchedule
-    ): JsonResponse {
+    ) {
         $eventSchedule->load([
-            'createdBy:id,name,username',
-            'updatedBy:id,name,username',
+            'createdBy:id,name',
+            'updatedBy:id,name',
         ]);
 
         return response()->json([
-            'success' =>
-                true,
-
-            'message' =>
-                'Detail agenda berhasil diambil.',
-
-            'data' =>
-                $this->transformEvent(
-                    $eventSchedule,
-                    true
-                ),
-
-            'access' => [
-                'can_manage' =>
-                    $this->canManage(
-                        $request
-                    ),
-            ],
+            'success' => true,
+            'message' => 'Detail Jadwal Direktur berhasil diambil.',
+            'data' => $this->transformEvent(
+                $eventSchedule,
+                true
+            ),
         ]);
     }
 
@@ -365,92 +241,72 @@ class EventScheduleController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function store(
-        Request $request
-    ): JsonResponse {
-        if (
-            !$this->canManage(
-                $request
-            )
-        ) {
-            return $this->forbiddenResponse();
-        }
+    public function store(Request $request)
+    {
+        $this->ensureCanManage(
+            $request
+        );
 
         $validated =
-            $this->validateEvent(
+            $this->validatePayload(
                 $request
             );
 
-        try {
-            $event =
-                DB::transaction(
-                    function () use (
-                        $validated,
-                        $request
-                    ): EventSchedule {
-                        $data =
-                            $this->normalizeEventData(
-                                $validated
-                            );
-
-                        $data[
-                            'created_by'
-                        ] =
-                            $request
-                                ->user()
-                                ->id;
-
-                        $data[
-                            'updated_by'
-                        ] =
-                            $request
-                                ->user()
-                                ->id;
-
-                        return EventSchedule::create(
-                            $data
-                        );
-                    }
-                );
-
-            $event->load([
-                'createdBy:id,name,username',
-                'updatedBy:id,name,username',
-            ]);
-
-            return response()->json([
-                'success' =>
-                    true,
-
-                'message' =>
-                    'Agenda Direktur berhasil ditambahkan.',
-
-                'data' =>
-                    $this->transformEvent(
-                        $event,
-                        true
-                    ),
-            ], 201);
-        } catch (
-            Throwable $error
-        ) {
-            report(
-                $error
+        $validated =
+            $this->normalizePayload(
+                $validated
             );
 
-            return response()->json([
-                'success' =>
-                    false,
+        $event = DB::transaction(
+            function () use (
+                $validated,
+                $request
+            ) {
+                /*
+                 * Lock seluruh agenda pada tanggal tersebut.
+                 *
+                 * Selain untuk membaca bentrok, ini membantu
+                 * mencegah dua admin menyimpan agenda
+                 * pada slot yang sama secara bersamaan.
+                 */
+                $conflict =
+                    $this->findConflict(
+                        $validated,
+                        null,
+                        true
+                    );
 
-                'message' =>
-                    app()->isLocal()
-                        ? $error->getMessage()
-                        : 'Agenda Direktur gagal ditambahkan.',
+                if ($conflict) {
+                    $this->throwScheduleConflict(
+                        $conflict
+                    );
+                }
 
-                'data' =>
-                    null,
-            ], 500);
-        }
+                $validated['created_by'] =
+                    $request->user()->id;
+
+                $validated['updated_by'] =
+                    $request->user()->id;
+
+                return EventSchedule::create(
+                    $validated
+                );
+            }
+        );
+
+        $event->load([
+            'createdBy:id,name',
+            'updatedBy:id,name',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Agenda Direktur berhasil ditambahkan.',
+            'data' => $this->transformEvent(
+                $event,
+                true
+            ),
+        ], 201);
     }
 
     /*
@@ -462,144 +318,86 @@ class EventScheduleController extends Controller
     public function update(
         Request $request,
         EventSchedule $eventSchedule
-    ): JsonResponse {
-        if (
-            !$this->canManage(
-                $request
-            )
-        ) {
-            return $this->forbiddenResponse();
-        }
+    ) {
+        $this->ensureCanManage(
+            $request
+        );
 
         $validated =
-            $this->validateEvent(
+            $this->validatePayload(
                 $request
             );
 
-        try {
-            DB::transaction(
-                function () use (
-                    $validated,
-                    $request,
-                    $eventSchedule
-                ): void {
-                    $data =
-                        $this->normalizeEventData(
-                            $validated
-                        );
+        $validated =
+            $this->normalizePayload(
+                $validated
+            );
 
-                    $data[
-                        'updated_by'
-                    ] =
-                        $request
-                            ->user()
-                            ->id;
+        DB::transaction(
+            function () use (
+                $validated,
+                $request,
+                $eventSchedule
+            ) {
+                $conflict =
+                    $this->findConflict(
+                        $validated,
+                        $eventSchedule->id,
+                        true
+                    );
 
-                    $eventSchedule->update(
-                        $data
+                if ($conflict) {
+                    $this->throwScheduleConflict(
+                        $conflict
                     );
                 }
-            );
 
-            $eventSchedule
-                ->refresh()
-                ->load([
-                    'createdBy:id,name,username',
-                    'updatedBy:id,name,username',
-                ]);
+                $validated['updated_by'] =
+                    $request->user()->id;
 
-            return response()->json([
-                'success' =>
-                    true,
+                $eventSchedule->update(
+                    $validated
+                );
+            }
+        );
 
-                'message' =>
-                    'Agenda Direktur berhasil diperbarui.',
+        $eventSchedule->refresh();
 
-                'data' =>
-                    $this->transformEvent(
-                        $eventSchedule,
-                        true
-                    ),
-            ]);
-        } catch (
-            Throwable $error
-        ) {
-            report(
-                $error
-            );
+        $eventSchedule->load([
+            'createdBy:id,name',
+            'updatedBy:id,name',
+        ]);
 
-            return response()->json([
-                'success' =>
-                    false,
-
-                'message' =>
-                    app()->isLocal()
-                        ? $error->getMessage()
-                        : 'Agenda Direktur gagal diperbarui.',
-
-                'data' =>
-                    null,
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Agenda Direktur berhasil diperbarui.',
+            'data' => $this->transformEvent(
+                $eventSchedule,
+                true
+            ),
+        ]);
     }
 
     /*
     |--------------------------------------------------------------------------
-    | DESTROY
+    | DELETE
     |--------------------------------------------------------------------------
     */
 
     public function destroy(
         Request $request,
         EventSchedule $eventSchedule
-    ): JsonResponse {
-        if (
-            !$this->canManage(
-                $request
-            )
-        ) {
-            return $this->forbiddenResponse();
-        }
+    ) {
+        $this->ensureCanManage(
+            $request
+        );
 
-        try {
-            DB::transaction(
-                function () use (
-                    $eventSchedule
-                ): void {
-                    $eventSchedule->delete();
-                }
-            );
+        $eventSchedule->delete();
 
-            return response()->json([
-                'success' =>
-                    true,
-
-                'message' =>
-                    'Agenda Direktur berhasil dihapus.',
-
-                'data' =>
-                    null,
-            ]);
-        } catch (
-            Throwable $error
-        ) {
-            report(
-                $error
-            );
-
-            return response()->json([
-                'success' =>
-                    false,
-
-                'message' =>
-                    app()->isLocal()
-                        ? $error->getMessage()
-                        : 'Agenda Direktur gagal dihapus.',
-
-                'data' =>
-                    null,
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Agenda Direktur berhasil dihapus.',
+        ]);
     }
 
     /*
@@ -608,511 +406,377 @@ class EventScheduleController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    private function validateEvent(
+    private function validatePayload(
         Request $request
     ): array {
-        return $request->validate([
-            'title' => [
-                'required',
-                'string',
-                'max:255',
-            ],
+        $validated =
+            $request->validate([
+                'title' => [
+                    'required',
+                    'string',
+                    'max:255',
+                ],
 
-            'description' => [
-                'nullable',
-                'string',
-                'max:5000',
-            ],
+                'description' => [
+                    'nullable',
+                    'string',
+                    'max:5000',
+                ],
 
-            'event_date' => [
-                'required',
-                'date_format:Y-m-d',
-            ],
+                'event_date' => [
+                    'required',
+                    'date',
+                ],
 
-            'all_day' => [
-                'required',
-                'boolean',
-            ],
+                'start_time' => [
+                    'nullable',
+                    'date_format:H:i',
+                ],
 
-            'start_time' => [
-                Rule::requiredIf(
-                    !$request->boolean(
-                        'all_day'
-                    )
-                ),
+                'end_time' => [
+                    'nullable',
+                    'date_format:H:i',
+                ],
 
-                'nullable',
-                'date_format:H:i',
-            ],
+                'all_day' => [
+                    'required',
+                    'boolean',
+                ],
 
-            'end_time' => [
-                Rule::requiredIf(
-                    !$request->boolean(
-                        'all_day'
-                    )
-                ),
+                'location' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
 
-                'nullable',
-                'date_format:H:i',
-            ],
+                'agenda_type' => [
+                    'required',
+                    Rule::in(
+                        self::AGENDA_TYPES
+                    ),
+                ],
 
-            'location' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+                'color' => [
+                    'required',
+                    'string',
+                    'regex:/^#[0-9A-Fa-f]{6}$/',
+                ],
 
-            'agenda_type' => [
-                'required',
-                'string',
+                'is_public' => [
+                    'required',
+                    'boolean',
+                ],
+            ]);
 
-                Rule::in(
-                    self::AGENDA_TYPES
-                ),
-            ],
-
-            'color' => [
-                'nullable',
-                'string',
-                'regex:/^#[0-9A-Fa-f]{6}$/',
-            ],
-
-            'is_public' => [
-                'required',
-                'boolean',
-            ],
-        ], [
-            'title.required' =>
-                'Judul agenda wajib diisi.',
-
-            'title.max' =>
-                'Judul agenda maksimal 255 karakter.',
-
-            'event_date.required' =>
-                'Tanggal agenda wajib dipilih.',
-
-            'event_date.date_format' =>
-                'Format tanggal agenda tidak valid.',
-
-            'all_day.required' =>
-                'Jenis waktu agenda wajib ditentukan.',
-
-            'start_time.required' =>
-                'Jam mulai wajib diisi.',
-
-            'start_time.date_format' =>
-                'Format jam mulai tidak valid.',
-
-            'end_time.required' =>
-                'Jam selesai wajib diisi.',
-
-            'end_time.date_format' =>
-                'Format jam selesai tidak valid.',
-
-            'agenda_type.required' =>
-                'Kategori agenda wajib dipilih.',
-
-            'agenda_type.in' =>
-                'Kategori agenda tidak valid.',
-
-            'color.regex' =>
-                'Format warna agenda tidak valid.',
-
-            'is_public.required' =>
-                'Status publik agenda wajib ditentukan.',
-        ]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | NORMALIZE EVENT DATA
-    |--------------------------------------------------------------------------
-    */
-
-    private function normalizeEventData(
-        array $validated
-    ): array {
         $allDay =
-            (bool)
-                $validated[
-                    'all_day'
-                ];
+            filter_var(
+                $validated['all_day'],
+                FILTER_VALIDATE_BOOLEAN
+            );
 
-        if (
-            !$allDay
-        ) {
-            $start =
-                Carbon::createFromFormat(
-                    'H:i',
-                    $validated[
-                        'start_time'
-                    ]
-                );
-
-            $end =
-                Carbon::createFromFormat(
-                    'H:i',
-                    $validated[
-                        'end_time'
-                    ]
-                );
+        if (!$allDay) {
+            if (
+                empty(
+                    $validated['start_time']
+                ) ||
+                empty(
+                    $validated['end_time']
+                )
+            ) {
+                throw ValidationException::withMessages([
+                    'start_time' => [
+                        'Jam mulai dan jam selesai wajib diisi.',
+                    ],
+                ]);
+            }
 
             if (
-                $end
-                    ->lessThanOrEqualTo(
-                        $start
-                    )
+                $validated['end_time'] <=
+                $validated['start_time']
             ) {
-                abort(
-                    422,
-                    'Jam selesai harus setelah jam mulai.'
-                );
+                throw ValidationException::withMessages([
+                    'end_time' => [
+                        'Jam selesai harus setelah jam mulai.',
+                    ],
+                ]);
             }
         }
 
-        return [
-            'title' =>
-                trim(
-                    $validated[
-                        'title'
-                    ]
-                ),
-
-            'description' =>
-                isset(
-                    $validated[
-                        'description'
-                    ]
-                )
-                    ? trim(
-                        $validated[
-                            'description'
-                        ]
-                    )
-                    : null,
-
-            'event_date' =>
-                $validated[
-                    'event_date'
-                ],
-
-            'all_day' =>
-                $allDay,
-
-            'start_time' =>
-                $allDay
-                    ? null
-                    : $validated[
-                        'start_time'
-                    ],
-
-            'end_time' =>
-                $allDay
-                    ? null
-                    : $validated[
-                        'end_time'
-                    ],
-
-            'location' =>
-                isset(
-                    $validated[
-                        'location'
-                    ]
-                )
-                    ? trim(
-                        $validated[
-                            'location'
-                        ]
-                    )
-                    : null,
-
-            'agenda_type' =>
-                $validated[
-                    'agenda_type'
-                ],
-
-            'color' =>
-                $validated[
-                    'color'
-                ] ??
-                '#7F1D1D',
-
-            'is_public' =>
-                (bool)
-                    $validated[
-                        'is_public'
-                    ],
-        ];
+        return $validated;
     }
 
     /*
     |--------------------------------------------------------------------------
-    | APPLY DATE FILTER
+    | NORMALIZE
     |--------------------------------------------------------------------------
     */
 
-    private function applyDateFilters(
-        Builder $query,
-        array $validated,
-        bool $public
-    ): void {
-        if (
-            !empty(
-                $validated[
-                    'start'
-                ] ?? null
-            )
-        ) {
-            $query->whereDate(
-                'event_date',
-                '>=',
-                $validated[
-                    'start'
-                ]
+    private function normalizePayload(
+        array $validated
+    ): array {
+        $validated['title'] =
+            trim(
+                $validated['title']
             );
-        }
+
+        $validated['description'] =
+            isset(
+                $validated['description']
+            )
+                ? trim(
+                    $validated['description']
+                )
+                : null;
 
         if (
-            !empty(
-                $validated[
-                    'end'
-                ] ?? null
-            )
+            $validated['description'] === ''
         ) {
-            $query->whereDate(
-                'event_date',
-                '<=',
-                $validated[
-                    'end'
-                ]
+            $validated['description'] =
+                null;
+        }
+
+        $validated['location'] =
+            isset(
+                $validated['location']
+            )
+                ? trim(
+                    $validated['location']
+                )
+                : null;
+
+        if (
+            $validated['location'] === ''
+        ) {
+            $validated['location'] =
+                null;
+        }
+
+        $validated['all_day'] =
+            filter_var(
+                $validated['all_day'],
+                FILTER_VALIDATE_BOOLEAN
+            );
+
+        $validated['is_public'] =
+            filter_var(
+                $validated['is_public'],
+                FILTER_VALIDATE_BOOLEAN
+            );
+
+        if (
+            $validated['all_day']
+        ) {
+            $validated['start_time'] =
+                null;
+
+            $validated['end_time'] =
+                null;
+        }
+
+        return $validated;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CONFLICT CHECK
+    |--------------------------------------------------------------------------
+    |
+    | Aturan:
+    |
+    | 1. Agenda hanya dibandingkan dengan tanggal yang sama.
+    |
+    | 2. Jika salah satu agenda adalah "Sepanjang Hari",
+    |    maka dianggap bentrok dengan semua agenda pada tanggal itu.
+    |
+    | 3. Untuk agenda berdasarkan jam:
+    |
+    |       new_start < existing_end
+    |       DAN
+    |       new_end > existing_start
+    |
+    | Contoh:
+    |
+    | 09:00 - 10:00 + 09:30 - 11:00 = BENTROK
+    | 09:00 - 10:00 + 10:00 - 11:00 = AMAN
+    |
+    */
+
+    private function findConflict(
+        array $payload,
+        ?int $excludeId = null,
+        bool $lockForUpdate = false
+    ): ?EventSchedule {
+        $query =
+            EventSchedule::query()
+                ->whereDate(
+                    'event_date',
+                    $payload['event_date']
+                );
+
+        /*
+         * Saat edit jangan membandingkan
+         * agenda dengan dirinya sendiri.
+         */
+        if ($excludeId !== null) {
+            $query->where(
+                'id',
+                '!=',
+                $excludeId
             );
         }
 
         /*
-         * Untuk halaman login.
-         *
-         * Jika upcoming=1 dan start tidak dikirim,
-         * otomatis mulai dari hari ini.
+         * Lock row tanggal tersebut ketika
+         * dipanggil dari STORE / UPDATE.
+         */
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        /*
+         * Agenda baru Sepanjang Hari:
+         * agenda apa pun pada tanggal tersebut
+         * dianggap bentrok.
          */
         if (
-            $public &&
-            !empty(
-                $validated[
-                    'upcoming'
-                ] ?? false
-            ) &&
-            empty(
-                $validated[
-                    'start'
-                ] ?? null
-            )
+            $payload['all_day']
         ) {
-            $query->whereDate(
-                'event_date',
-                '>=',
-                now()
-                    ->startOfDay()
-                    ->toDateString()
-            );
+            return $query
+                ->orderByRaw(
+                    'CASE WHEN all_day = 1 THEN 0 ELSE 1 END'
+                )
+                ->orderBy('start_time')
+                ->first();
         }
+
+        /*
+         * Agenda baru memiliki jam.
+         *
+         * Bentrok apabila:
+         * - agenda existing Sepanjang Hari
+         * ATAU
+         * - rentang jam saling overlap.
+         */
+        return $query
+            ->where(
+                function ($subQuery) use ($payload) {
+                    $subQuery
+                        ->where(
+                            'all_day',
+                            true
+                        )
+                        ->orWhere(
+                            function ($timeQuery) use ($payload) {
+                                $timeQuery
+                                    ->where(
+                                        'all_day',
+                                        false
+                                    )
+                                    ->where(
+                                        'start_time',
+                                        '<',
+                                        $payload['end_time']
+                                    )
+                                    ->where(
+                                        'end_time',
+                                        '>',
+                                        $payload['start_time']
+                                    );
+                            }
+                        );
+                }
+            )
+            ->orderByRaw(
+                'CASE WHEN all_day = 1 THEN 0 ELSE 1 END'
+            )
+            ->orderBy('start_time')
+            ->first();
     }
 
     /*
     |--------------------------------------------------------------------------
-    | TRANSFORM EVENT
+    | THROW CONFLICT
     |--------------------------------------------------------------------------
-    |
-    | Format ini nantinya langsung mudah dipakai FullCalendar.
-    |
     */
 
-    private function transformEvent(
-        EventSchedule $event,
-        bool $includeAdminData
-    ): array {
-        $eventDate =
-            $event
-                ->event_date
-                ->format(
-                    'Y-m-d'
-                );
-
-        $start =
-            $event
-                ->all_day
-                ? $eventDate
+    private function throwScheduleConflict(
+        EventSchedule $conflict
+    ): void {
+        $timeText =
+            $conflict->all_day
+                ? 'Sepanjang Hari'
                 : sprintf(
-                    '%sT%s',
-                    $eventDate,
+                    '%s - %s',
                     substr(
-                        (string)
-                            $event
-                                ->start_time,
+                        (string) $conflict->start_time,
+                        0,
+                        5
+                    ),
+                    substr(
+                        (string) $conflict->end_time,
                         0,
                         5
                     )
                 );
 
-        $end =
-            $event
-                ->all_day
-                ? null
-                : sprintf(
-                    '%sT%s',
-                    $eventDate,
-                    substr(
-                        (string)
-                            $event
-                                ->end_time,
-                        0,
-                        5
-                    )
-                );
+        response()
+            ->json([
+                'success' => false,
 
-        $data = [
-            'id' =>
-                $event
-                    ->id,
+                'code' =>
+                    'SCHEDULE_CONFLICT',
 
-            'title' =>
-                $event
-                    ->title,
+                'message' =>
+                    'Agenda tidak dapat disimpan karena waktu yang dipilih bertabrakan dengan agenda Direktur yang sudah ada.',
 
-            'description' =>
-                $event
-                    ->description,
-
-            'event_date' =>
-                $eventDate,
-
-            'start_time' =>
-                $event
-                    ->start_time
-                    ? substr(
-                        (string)
-                            $event
-                                ->start_time,
-                        0,
-                        5
-                    )
-                    : null,
-
-            'end_time' =>
-                $event
-                    ->end_time
-                    ? substr(
-                        (string)
-                            $event
-                                ->end_time,
-                        0,
-                        5
-                    )
-                    : null,
-
-            'all_day' =>
-                (bool)
-                    $event
-                        ->all_day,
-
-            'location' =>
-                $event
-                    ->location,
-
-            'agenda_type' =>
-                $event
-                    ->agenda_type,
-
-            'color' =>
-                $event
-                    ->color,
-
-            'is_public' =>
-                (bool)
-                    $event
-                        ->is_public,
-
-            /*
-             * FullCalendar-compatible fields.
-             */
-            'start' =>
-                $start,
-
-            'end' =>
-                $end,
-
-            'allDay' =>
-                (bool)
-                    $event
-                        ->all_day,
-
-            'backgroundColor' =>
-                $event
-                    ->color,
-
-            'borderColor' =>
-                $event
-                    ->color,
-
-            'created_at' =>
-                $event
-                    ->created_at,
-
-            'updated_at' =>
-                $event
-                    ->updated_at,
-        ];
-
-        if (
-            $includeAdminData
-        ) {
-            $data[
-                'created_by'
-            ] =
-                $event
-                    ->createdBy
-                    ? [
+                'data' => [
+                    'conflict' => [
                         'id' =>
-                            $event
-                                ->createdBy
-                                ->id,
+                            $conflict->id,
 
-                        'name' =>
-                            $event
-                                ->createdBy
-                                ->name,
+                        'title' =>
+                            $conflict->title,
 
-                        'username' =>
-                            $event
-                                ->createdBy
-                                ->username,
-                    ]
-                    : null;
+                        'event_date' =>
+                            $conflict
+                                ->event_date
+                                ->format(
+                                    'Y-m-d'
+                                ),
 
-            $data[
-                'updated_by'
-            ] =
-                $event
-                    ->updatedBy
-                    ? [
-                        'id' =>
-                            $event
-                                ->updatedBy
-                                ->id,
+                        'start_time' =>
+                            $conflict->start_time
+                                ? substr(
+                                    (string) $conflict->start_time,
+                                    0,
+                                    5
+                                )
+                                : null,
 
-                        'name' =>
-                            $event
-                                ->updatedBy
-                                ->name,
+                        'end_time' =>
+                            $conflict->end_time
+                                ? substr(
+                                    (string) $conflict->end_time,
+                                    0,
+                                    5
+                                )
+                                : null,
 
-                        'username' =>
-                            $event
-                                ->updatedBy
-                                ->username,
-                    ]
-                    : null;
-        }
+                        'all_day' =>
+                            (bool) $conflict->all_day,
 
-        return $data;
+                        'time_text' =>
+                            $timeText,
+
+                        'location' =>
+                            $conflict->location,
+
+                        'agenda_type' =>
+                            $conflict->agenda_type,
+                    ],
+                ],
+            ], 409)
+            ->throwResponse();
     }
 
     /*
@@ -1125,32 +789,169 @@ class EventScheduleController extends Controller
         Request $request
     ): bool {
         $user =
-            $request
-                ->user();
+            $request->user();
 
-        return (
-            $user !==
-                null &&
-            in_array(
-                $user
-                    ->role,
-                self::ADMIN_ROLES,
-                true
-            )
+        if (!$user) {
+            return false;
+        }
+
+        return in_array(
+            $user->role,
+            self::ADMIN_ROLES,
+            true
         );
     }
 
-    private function forbiddenResponse(): JsonResponse
-    {
-        return response()->json([
-            'success' =>
-                false,
+    private function ensureCanManage(
+        Request $request
+    ): void {
+        abort_unless(
+            $this->canManage(
+                $request
+            ),
+            403,
+            'Anda tidak memiliki akses untuk mengelola Jadwal Direktur.'
+        );
+    }
 
-            'message' =>
-                'Kamu tidak memiliki izin untuk mengelola Jadwal Direktur.',
+    /*
+    |--------------------------------------------------------------------------
+    | TRANSFORM
+    |--------------------------------------------------------------------------
+    */
 
-            'data' =>
-                null,
-        ], 403);
+    private function transformEvent(
+        EventSchedule $event,
+        bool $includeAdminData = false
+    ): array {
+        $date =
+            $event
+                ->event_date
+                ->format(
+                    'Y-m-d'
+                );
+
+        $startTime =
+            $event->start_time
+                ? substr(
+                    (string) $event->start_time,
+                    0,
+                    5
+                )
+                : null;
+
+        $endTime =
+            $event->end_time
+                ? substr(
+                    (string) $event->end_time,
+                    0,
+                    5
+                )
+                : null;
+
+        $start =
+            $event->all_day
+                ? $date
+                : $date .
+                    'T' .
+                    $startTime .
+                    ':00';
+
+        $end =
+            $event->all_day
+                ? null
+                : $date .
+                    'T' .
+                    $endTime .
+                    ':00';
+
+        $data = [
+            'id' =>
+                $event->id,
+
+            'title' =>
+                $event->title,
+
+            'description' =>
+                $event->description,
+
+            'event_date' =>
+                $date,
+
+            'start_time' =>
+                $startTime,
+
+            'end_time' =>
+                $endTime,
+
+            'all_day' =>
+                (bool) $event->all_day,
+
+            'allDay' =>
+                (bool) $event->all_day,
+
+            'location' =>
+                $event->location,
+
+            'agenda_type' =>
+                $event->agenda_type,
+
+            'color' =>
+                $event->color,
+
+            'is_public' =>
+                (bool) $event->is_public,
+
+            /*
+             * FullCalendar format.
+             */
+            'start' =>
+                $start,
+
+            'end' =>
+                $end,
+
+            'backgroundColor' =>
+                $event->color,
+
+            'borderColor' =>
+                $event->color,
+        ];
+
+        if (
+            $includeAdminData
+        ) {
+            $data['created_by'] =
+                $event->created_by;
+
+            $data['updated_by'] =
+                $event->updated_by;
+
+            $data['created_by_user'] =
+                $event->relationLoaded(
+                    'createdBy'
+                )
+                    ? $event->createdBy
+                    : null;
+
+            $data['updated_by_user'] =
+                $event->relationLoaded(
+                    'updatedBy'
+                )
+                    ? $event->updatedBy
+                    : null;
+
+            $data['created_at'] =
+                optional(
+                    $event->created_at
+                )->toISOString();
+
+            $data['updated_at'] =
+                optional(
+                    $event->updated_at
+                )->toISOString();
+        }
+
+        return $data;
     }
 }
