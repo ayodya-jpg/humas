@@ -2,6 +2,7 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 
@@ -720,6 +721,9 @@ const getEventEndDate = (
 */
 
 export default function DirectorSchedulePage() {
+    const calendarRef =
+        useRef(null);
+
     const currentUser =
         useMemo(
             () =>
@@ -784,6 +788,18 @@ export default function DirectorSchedulePage() {
         useState(
             'Semua'
         );
+
+    /*
+    |--------------------------------------------------------------------------
+    | SEARCH
+    |--------------------------------------------------------------------------
+    */
+
+    const [
+        searchTerm,
+        setSearchTerm,
+    ] =
+        useState('');
 
     const [
         now,
@@ -910,7 +926,27 @@ export default function DirectorSchedulePage() {
 
     /*
     |--------------------------------------------------------------------------
-    | TODAY
+    | GO TO TODAY
+    |--------------------------------------------------------------------------
+    */
+
+    const handleGoToday =
+        () => {
+            const calendarApi =
+                calendarRef
+                    .current
+                    ?.getApi();
+
+            if (
+                calendarApi
+            ) {
+                calendarApi.today();
+            }
+        };
+
+    /*
+    |--------------------------------------------------------------------------
+    | TODAY EVENTS
     |--------------------------------------------------------------------------
     */
 
@@ -980,7 +1016,7 @@ export default function DirectorSchedulePage() {
 
     /*
     |--------------------------------------------------------------------------
-    | NEXT / ACTIVE AGENDA
+    | NEAREST AGENDA
     |--------------------------------------------------------------------------
     */
 
@@ -1087,7 +1123,7 @@ export default function DirectorSchedulePage() {
 
     /*
     |--------------------------------------------------------------------------
-    | FILTER COUNTS
+    | CATEGORY COUNTS
     |--------------------------------------------------------------------------
     */
 
@@ -1124,32 +1160,76 @@ export default function DirectorSchedulePage() {
 
     /*
     |--------------------------------------------------------------------------
-    | FILTERED EVENTS
+    | FILTER + SEARCH
     |--------------------------------------------------------------------------
+    |
+    | Search hanya memengaruhi event yang terlihat.
+    |
+    | Validasi bentrok tetap memakai array `events`,
+    | bukan `filteredEvents`.
+    |
     */
 
     const filteredEvents =
         useMemo(
             () => {
-                if (
-                    activeFilter ===
-                    'Semua'
-                ) {
-                    return events;
-                }
+                const keyword =
+                    searchTerm
+                        .trim()
+                        .toLowerCase();
 
                 return events.filter(
                     (
                         event
-                    ) =>
-                        event
-                            .agenda_type ===
-                        activeFilter
+                    ) => {
+                        const matchesCategory =
+                            activeFilter ===
+                                'Semua' ||
+                            event
+                                .agenda_type ===
+                                activeFilter;
+
+                        if (
+                            !matchesCategory
+                        ) {
+                            return false;
+                        }
+
+                        if (
+                            !keyword
+                        ) {
+                            return true;
+                        }
+
+                        const title =
+                            String(
+                                event
+                                    .title ||
+                                    ''
+                            ).toLowerCase();
+
+                        const location =
+                            String(
+                                event
+                                    .location ||
+                                    ''
+                            ).toLowerCase();
+
+                        return (
+                            title.includes(
+                                keyword
+                            ) ||
+                            location.includes(
+                                keyword
+                            )
+                        );
+                    }
                 );
             },
             [
                 events,
                 activeFilter,
+                searchTerm,
             ]
         );
 
@@ -1270,7 +1350,7 @@ export default function DirectorSchedulePage() {
 
     /*
     |--------------------------------------------------------------------------
-    | SUGGESTED TIME
+    | SUGGESTED AVAILABLE TIMES
     |--------------------------------------------------------------------------
     */
 
@@ -2219,9 +2299,7 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
 
     return (
         <div className="director-schedule-page">
-            {/* =====================================================
-                HEADER
-            ===================================================== */}
+            {/* HEADER */}
 
             <section className="director-schedule-top">
                 <div>
@@ -2261,9 +2339,7 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                 )}
             </section>
 
-            {/* =====================================================
-                OVERVIEW + FILTER
-            ===================================================== */}
+            {/* OVERVIEW */}
 
             <section className="schedule-overview-panel">
                 <div className="schedule-filter-area">
@@ -2271,27 +2347,72 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                         <div>
                             <div className="schedule-filter-title">
                                 <i className="bi bi-funnel-fill me-2" />
-                                Filter Agenda
+
+                                Filter & Pencarian
                             </div>
 
                             <div className="schedule-filter-subtitle">
-                                Saring agenda berdasarkan kategori.
+                                Menampilkan{' '}
+                                <strong>
+                                    {filteredEvents.length}
+                                </strong>{' '}
+                                dari{' '}
+                                <strong>
+                                    {events.length}
+                                </strong>{' '}
+                                agenda.
                             </div>
                         </div>
 
-                        <div className="schedule-filter-result">
-                            <strong>
-                                {
-                                    filteredEvents.length
+                        <div className="schedule-filter-tools">
+                            <div className="schedule-search-wrapper">
+                                <i className="bi bi-search schedule-search-icon" />
+
+                                <input
+                                    type="text"
+                                    className="schedule-search-input"
+                                    placeholder="Cari judul / lokasi..."
+                                    value={
+                                        searchTerm
+                                    }
+                                    onChange={(
+                                        event
+                                    ) =>
+                                        setSearchTerm(
+                                            event.target.value
+                                        )
+                                    }
+                                />
+
+                                {searchTerm && (
+                                    <button
+                                        type="button"
+                                        className="schedule-search-clear"
+                                        onClick={() =>
+                                            setSearchTerm(
+                                                ''
+                                            )
+                                        }
+                                        title="Hapus pencarian"
+                                    >
+                                        <i className="bi bi-x-lg" />
+                                    </button>
+                                )}
+                            </div>
+
+                            <button
+                                type="button"
+                                className="schedule-today-button"
+                                onClick={
+                                    handleGoToday
                                 }
-                            </strong>{' '}
-                            dari{' '}
-                            <strong>
-                                {
-                                    events.length
-                                }
-                            </strong>{' '}
-                            agenda
+                            >
+                                <i className="bi bi-calendar2-day-fill" />
+
+                                <span>
+                                    Ke Hari Ini
+                                </span>
+                            </button>
                         </div>
                     </div>
 
@@ -2421,10 +2542,6 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                     </div>
                 </div>
 
-                {/* =================================================
-                    SUMMARY
-                ================================================= */}
-
                 <div className="schedule-summary-area">
                     <div className="schedule-mini-card schedule-mini-today">
                         <div className="schedule-mini-icon">
@@ -2542,14 +2659,15 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                 </div>
             </section>
 
-            {/* =====================================================
-                CALENDAR
-            ===================================================== */}
+            {/* CALENDAR */}
 
             <section className="card border-0 shadow-sm director-calendar-card">
                 <div className="card-body director-calendar-body">
                     <div className="director-calendar-viewport">
                         <FullCalendar
+                            ref={
+                                calendarRef
+                            }
                             plugins={[
                                 themePlugin,
                                 dayGridPlugin,
@@ -2572,7 +2690,7 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                             }
                             headerToolbar={{
                                 start:
-                                    'prev,next today',
+                                    'prev,next',
 
                                 center:
                                     'title',
@@ -2581,11 +2699,6 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                                     'dayGridMonth,timeGridWeek,timeGridDay',
                             }}
                             buttons={{
-                                today: {
-                                    text:
-                                        'Hari Ini',
-                                },
-
                                 dayGridMonth: {
                                     text:
                                         'Bulan',
@@ -2638,9 +2751,7 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                 </div>
             </section>
 
-            {/* =====================================================
-                MODAL
-            ===================================================== */}
+            {/* MODAL */}
 
             {modalOpen && (
                 <div
@@ -3393,10 +3504,6 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                 </div>
             )}
 
-            {/* =====================================================
-                STYLE
-            ===================================================== */}
-
             <style>
                 {`
                     .director-schedule-page {
@@ -3405,12 +3512,6 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                         gap: 12px;
                         min-height: 0;
                     }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | HEADER
-                    |--------------------------------------------------------------------------
-                    */
 
                     .director-schedule-top {
                         display: flex;
@@ -3441,7 +3542,7 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
 
                     /*
                     |--------------------------------------------------------------------------
-                    | OVERVIEW PANEL
+                    | OVERVIEW
                     |--------------------------------------------------------------------------
                     */
 
@@ -3450,76 +3551,157 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                         grid-template-columns:
                             minmax(0, 1.65fr)
                             minmax(330px, .75fr);
-
                         gap: 10px;
                     }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | FILTER AREA
+                    | FILTER
                     |--------------------------------------------------------------------------
                     */
 
                     .schedule-filter-area {
                         min-width: 0;
-
                         background: #ffffff;
-
                         border: 1px solid #e5e7eb;
                         border-radius: 18px;
-
-                        padding: 12px 14px;
-
+                        padding: 11px 13px;
                         box-shadow:
                             0 4px 20px
-                            rgba(
-                                15,
-                                23,
-                                42,
-                                .04
-                            );
+                            rgba(15, 23, 42, .04);
                     }
 
                     .schedule-filter-header {
                         display: flex;
                         justify-content: space-between;
                         align-items: center;
-
                         gap: 12px;
-
-                        margin-bottom: 9px;
+                        margin-bottom: 8px;
                     }
 
                     .schedule-filter-title {
                         font-size: .92rem;
                         font-weight: 900;
-
                         color: #1f2937;
                     }
 
                     .schedule-filter-subtitle {
-                        font-size: .74rem;
-
+                        font-size: .72rem;
                         color: #94a3b8;
-
                         margin-top: 1px;
                     }
 
-                    .schedule-filter-result {
+                    /*
+                    |--------------------------------------------------------------------------
+                    | SEARCH
+                    |--------------------------------------------------------------------------
+                    */
+
+                    .schedule-filter-tools {
+                        display: flex;
+                        align-items: center;
+                        gap: 7px;
                         flex-shrink: 0;
-
-                        font-size: .75rem;
-
-                        color: #64748b;
-
-                        background: #f8fafc;
-
-                        border: 1px solid #e2e8f0;
-
-                        padding: 5px 10px;
-
-                        border-radius: 999px;
                     }
+
+                    .schedule-search-wrapper {
+                        width: 215px;
+                        height: 34px;
+                        position: relative;
+                        display: flex;
+                        align-items: center;
+                    }
+
+                    .schedule-search-icon {
+                        position: absolute;
+                        left: 11px;
+                        color: #94a3b8;
+                        font-size: .78rem;
+                        pointer-events: none;
+                    }
+
+                    .schedule-search-input {
+                        width: 100%;
+                        height: 34px;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 999px;
+                        background: #f8fafc;
+                        outline: none;
+                        padding: 0 34px 0 31px;
+                        font-size: .75rem;
+                        font-weight: 600;
+                        color: #334155;
+                        transition:
+                            border-color .15s ease,
+                            box-shadow .15s ease,
+                            background .15s ease;
+                    }
+
+                    .schedule-search-input:focus {
+                        background: #ffffff;
+                        border-color: #7f1d1d;
+                        box-shadow:
+                            0 0 0 3px
+                            rgba(127, 29, 29, .08);
+                    }
+
+                    .schedule-search-input::placeholder {
+                        color: #94a3b8;
+                    }
+
+                    .schedule-search-clear {
+                        position: absolute;
+                        right: 5px;
+                        width: 25px;
+                        height: 25px;
+                        border: 0;
+                        border-radius: 50%;
+                        background: transparent;
+                        color: #94a3b8;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: .65rem;
+                    }
+
+                    .schedule-search-clear:hover {
+                        background: #e2e8f0;
+                        color: #334155;
+                    }
+
+                    .schedule-today-button {
+                        height: 34px;
+                        flex-shrink: 0;
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 6px;
+                        border: 1px solid #fecaca;
+                        background: #fff7f7;
+                        color: #7f1d1d;
+                        border-radius: 999px;
+                        padding: 0 12px;
+                        font-size: .73rem;
+                        font-weight: 900;
+                        transition:
+                            transform .15s ease,
+                            background .15s ease,
+                            box-shadow .15s ease;
+                    }
+
+                    .schedule-today-button:hover {
+                        transform: translateY(-1px);
+                        background: #fee2e2;
+                        box-shadow:
+                            0 5px 12px
+                            rgba(127, 29, 29, .09);
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | FILTER BUTTONS
+                    |--------------------------------------------------------------------------
+                    */
 
                     .schedule-filter-list {
                         display: flex;
@@ -3530,66 +3712,27 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                     .schedule-filter-button {
                         display: inline-flex;
                         align-items: center;
-
                         gap: 6px;
-
-                        min-height: 32px;
-
-                        border:
-                            1px solid
-                            #e2e8f0;
-
-                        background:
-                            #ffffff;
-
-                        color:
-                            #475569;
-
-                        border-radius:
-                            999px;
-
-                        padding:
-                            3px
-                            7px
-                            3px
-                            4px;
-
-                        font-size:
-                            .72rem;
-
-                        font-weight:
-                            800;
-
+                        min-height: 31px;
+                        border: 1px solid #e2e8f0;
+                        background: #ffffff;
+                        color: #475569;
+                        border-radius: 999px;
+                        padding: 3px 7px 3px 4px;
+                        font-size: .7rem;
+                        font-weight: 800;
                         transition:
-                            transform
-                                .15s
-                                ease,
-                            box-shadow
-                                .15s
-                                ease,
-                            border-color
-                                .15s
-                                ease,
-                            background
-                                .15s
-                                ease;
+                            transform .15s ease,
+                            box-shadow .15s ease,
+                            border-color .15s ease,
+                            background .15s ease;
                     }
 
                     .schedule-filter-button:hover {
-                        transform:
-                            translateY(
-                                -1px
-                            );
-
+                        transform: translateY(-1px);
                         box-shadow:
                             0 5px 12px
-                            rgba(
-                                15,
-                                23,
-                                42,
-                                .08
-                            );
-
+                            rgba(15, 23, 42, .08);
                         border-color:
                             var(
                                 --agenda-filter-color,
@@ -3598,154 +3741,80 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                     }
 
                     .schedule-filter-button.active {
-                        border-color:
-                            #7f1d1d;
-
-                        background:
-                            #fff7f7;
-
-                        color:
-                            #7f1d1d;
+                        border-color: #7f1d1d;
+                        background: #fff7f7;
+                        color: #7f1d1d;
                     }
 
                     .schedule-filter-icon {
-                        width: 24px;
-                        height: 24px;
-
-                        flex:
-                            0 0 24px;
-
-                        display:
-                            inline-flex;
-
-                        align-items:
-                            center;
-
-                        justify-content:
-                            center;
-
-                        border-radius:
-                            50%;
-
-                        color:
-                            #ffffff;
-
-                        font-size:
-                            .64rem;
+                        width: 23px;
+                        height: 23px;
+                        flex: 0 0 23px;
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 50%;
+                        color: #ffffff;
+                        font-size: .61rem;
                     }
 
                     .schedule-filter-icon-all {
-                        background:
-                            #7f1d1d;
+                        background: #7f1d1d;
                     }
 
                     .schedule-filter-count {
-                        min-width:
-                            20px;
-
-                        height:
-                            20px;
-
-                        display:
-                            inline-flex;
-
-                        align-items:
-                            center;
-
-                        justify-content:
-                            center;
-
-                        padding:
-                            0 5px;
-
-                        border-radius:
-                            999px;
-
-                        background:
-                            #f1f5f9;
-
-                        color:
-                            #64748b;
-
-                        font-size:
-                            .64rem;
-
-                        font-weight:
-                            900;
+                        min-width: 19px;
+                        height: 19px;
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 0 5px;
+                        border-radius: 999px;
+                        background: #f1f5f9;
+                        color: #64748b;
+                        font-size: .61rem;
+                        font-weight: 900;
                     }
 
                     .schedule-filter-button.active
                     .schedule-filter-count {
-                        background:
-                            #7f1d1d;
-
-                        color:
-                            #ffffff;
+                        background: #7f1d1d;
+                        color: #ffffff;
                     }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | SUMMARY AREA
+                    | SUMMARY
                     |--------------------------------------------------------------------------
                     */
 
                     .schedule-summary-area {
                         display: grid;
-
                         grid-template-columns:
                             1fr 1.35fr;
-
                         gap: 8px;
                     }
 
                     .schedule-mini-card {
                         width: 100%;
-
                         min-width: 0;
-
-                        border:
-                            1px solid
-                            #e5e7eb;
-
-                        border-radius:
-                            18px;
-
-                        background:
-                            #ffffff;
-
-                        padding:
-                            12px;
-
-                        display:
-                            flex;
-
-                        align-items:
-                            center;
-
+                        border: 1px solid #e5e7eb;
+                        border-radius: 18px;
+                        background: #ffffff;
+                        padding: 12px;
+                        display: flex;
+                        align-items: center;
                         gap: 10px;
-
-                        text-align:
-                            left;
-
-                        color:
-                            inherit;
-
+                        text-align: left;
+                        color: inherit;
                         box-shadow:
                             0 4px 20px
-                            rgba(
-                                15,
-                                23,
-                                42,
-                                .04
-                            );
+                            rgba(15, 23, 42, .04);
                     }
 
                     button.schedule-mini-card {
-                        appearance:
-                            none;
-
-                        font-family:
-                            inherit;
+                        appearance: none;
+                        font-family: inherit;
                     }
 
                     button.schedule-mini-card:disabled {
@@ -3759,9 +3828,7 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                                 #fff7f7,
                                 #ffffff
                             );
-
-                        border-color:
-                            #fecaca;
+                        border-color: #fecaca;
                     }
 
                     .schedule-mini-next {
@@ -3774,73 +3841,37 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                     }
 
                     .schedule-mini-clickable {
-                        cursor:
-                            pointer;
-
+                        cursor: pointer;
                         transition:
-                            transform
-                                .15s
-                                ease,
-                            box-shadow
-                                .15s
-                                ease,
-                            border-color
-                                .15s
-                                ease;
+                            transform .15s ease,
+                            box-shadow .15s ease,
+                            border-color .15s ease;
                     }
 
                     .schedule-mini-clickable:hover {
-                        transform:
-                            translateY(
-                                -2px
-                            );
-
-                        border-color:
-                            #d1d5db;
-
+                        transform: translateY(-2px);
+                        border-color: #d1d5db;
                         box-shadow:
                             0 8px 22px
-                            rgba(
-                                15,
-                                23,
-                                42,
-                                .09
-                            );
+                            rgba(15, 23, 42, .09);
                     }
 
                     .schedule-mini-icon {
                         width: 39px;
                         height: 39px;
-
-                        flex:
-                            0 0 39px;
-
-                        display:
-                            flex;
-
-                        align-items:
-                            center;
-
-                        justify-content:
-                            center;
-
-                        border-radius:
-                            12px;
-
-                        color:
-                            #ffffff;
-
-                        background:
-                            #7f1d1d;
-
-                        font-size:
-                            1rem;
+                        flex: 0 0 39px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 12px;
+                        color: #ffffff;
+                        background: #7f1d1d;
+                        font-size: 1rem;
                     }
 
                     .schedule-mini-next
                     .schedule-mini-icon {
-                        background:
-                            #334155;
+                        background: #334155;
                     }
 
                     .schedule-mini-content {
@@ -3849,116 +3880,55 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                     }
 
                     .schedule-mini-label {
-                        color:
-                            #64748b;
-
-                        font-size:
-                            .67rem;
-
-                        line-height:
-                            1;
-
-                        font-weight:
-                            800;
-
-                        text-transform:
-                            uppercase;
-
-                        letter-spacing:
-                            .04em;
-
-                        margin-bottom:
-                            5px;
+                        color: #64748b;
+                        font-size: .67rem;
+                        line-height: 1;
+                        font-weight: 800;
+                        text-transform: uppercase;
+                        letter-spacing: .04em;
+                        margin-bottom: 5px;
                     }
 
                     .schedule-mini-main {
-                        display:
-                            flex;
-
-                        align-items:
-                            baseline;
-
+                        display: flex;
+                        align-items: baseline;
                         gap: 4px;
-
-                        font-size:
-                            .76rem;
-
-                        font-weight:
-                            800;
-
-                        color:
-                            #475569;
+                        font-size: .76rem;
+                        font-weight: 800;
+                        color: #475569;
                     }
 
                     .schedule-mini-number {
-                        font-size:
-                            1.55rem;
-
-                        line-height:
-                            1;
-
-                        font-weight:
-                            900;
-
-                        color:
-                            #7f1d1d;
+                        font-size: 1.55rem;
+                        line-height: 1;
+                        font-weight: 900;
+                        color: #7f1d1d;
                     }
 
                     .schedule-mini-description {
-                        margin-top:
-                            4px;
-
-                        color:
-                            #64748b;
-
-                        font-size:
-                            .69rem;
-
-                        line-height:
-                            1.3;
-
-                        white-space:
-                            nowrap;
-
-                        overflow:
-                            hidden;
-
-                        text-overflow:
-                            ellipsis;
+                        margin-top: 4px;
+                        color: #64748b;
+                        font-size: .69rem;
+                        line-height: 1.3;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
                     }
 
                     .schedule-next-title {
-                        color:
-                            #1f2937;
-
-                        font-size:
-                            .82rem;
-
-                        line-height:
-                            1.25;
-
-                        font-weight:
-                            900;
-
-                        white-space:
-                            nowrap;
-
-                        overflow:
-                            hidden;
-
-                        text-overflow:
-                            ellipsis;
+                        color: #1f2937;
+                        font-size: .82rem;
+                        line-height: 1.25;
+                        font-weight: 900;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
                     }
 
                     .schedule-mini-arrow {
-                        flex-shrink:
-                            0;
-
-                        color:
-                            #94a3b8;
-
-                        font-size:
-                            .9rem;
+                        flex-shrink: 0;
+                        color: #94a3b8;
+                        font-size: .9rem;
                     }
 
                     /*
@@ -3968,391 +3938,200 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                     */
 
                     .director-calendar-card {
-                        border-radius:
-                            24px !important;
-
-                        overflow:
-                            hidden;
-
-                        min-height:
-                            0;
+                        border-radius: 24px !important;
+                        overflow: hidden;
+                        min-height: 0;
                     }
 
                     .director-calendar-body {
-                        padding:
-                            14px !important;
-
-                        min-height:
-                            0;
+                        padding: 14px !important;
+                        min-height: 0;
                     }
 
                     .director-calendar-viewport {
-                        height:
-                            calc(
-                                100vh - 365px
-                            );
-
-                        min-height:
-                            450px;
-
-                        max-height:
-                            720px;
+                        height: calc(100vh - 365px);
+                        min-height: 450px;
+                        max-height: 720px;
                     }
 
                     .director-calendar-viewport > div,
                     .director-calendar-viewport .fc {
-                        height:
-                            100%;
+                        height: 100%;
                     }
 
                     .director-calendar-card .fc {
-                        font-size:
-                            1.08rem;
+                        font-size: 1.08rem;
                     }
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | TOOLBAR
-                    |--------------------------------------------------------------------------
-                    */
-
-                    .director-calendar-card
-                    .fc-toolbar {
-                        margin-bottom:
-                            12px !important;
-
-                        gap:
-                            12px;
+                    .director-calendar-card .fc-toolbar {
+                        margin-bottom: 12px !important;
+                        gap: 12px;
                     }
 
                     .director-calendar-card
                     .fc-toolbar-title {
-                        font-size:
-                            2rem !important;
-
-                        font-weight:
-                            900 !important;
-
-                        line-height:
-                            1 !important;
-
-                        text-transform:
-                            capitalize;
+                        font-size: 2rem !important;
+                        font-weight: 900 !important;
+                        line-height: 1 !important;
+                        text-transform: capitalize;
                     }
 
                     .director-calendar-card
                     .fc-button {
-                        min-height:
-                            40px;
-
-                        border-radius:
-                            999px !important;
-
-                        font-size:
-                            .92rem !important;
-
-                        font-weight:
-                            800 !important;
-
-                        padding-left:
-                            16px !important;
-
-                        padding-right:
-                            16px !important;
+                        min-height: 40px;
+                        border-radius: 999px !important;
+                        font-size: .92rem !important;
+                        font-weight: 800 !important;
+                        padding-left: 16px !important;
+                        padding-right: 16px !important;
                     }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | CALENDAR HEADER
-                    |--------------------------------------------------------------------------
-                    */
 
                     .director-calendar-card
                     .fc-col-header-cell {
-                        background:
-                            #f8fafc;
-
-                        padding-top:
-                            8px;
-
-                        padding-bottom:
-                            8px;
+                        background: #f8fafc;
+                        padding-top: 8px;
+                        padding-bottom: 8px;
                     }
 
                     .director-calendar-card
                     .fc-col-header-cell-cushion {
-                        font-size:
-                            1rem;
-
-                        font-weight:
-                            900;
-
-                        color:
-                            #475569;
-
-                        text-decoration:
-                            none;
-
-                        text-transform:
-                            uppercase;
+                        font-size: 1rem;
+                        font-weight: 900;
+                        color: #475569;
+                        text-decoration: none;
+                        text-transform: uppercase;
                     }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | DAY
-                    |--------------------------------------------------------------------------
-                    */
 
                     .director-calendar-card
                     .fc-daygrid-day-frame {
-                        min-height:
-                            0 !important;
+                        min-height: 0 !important;
                     }
 
                     .director-calendar-card
                     .fc-daygrid-day-number {
-                        padding:
-                            8px 10px;
-
-                        font-size:
-                            1.05rem;
-
-                        font-weight:
-                            900;
-
-                        color:
-                            #1f2937;
-
-                        text-decoration:
-                            none;
+                        padding: 8px 10px;
+                        font-size: 1.05rem;
+                        font-weight: 900;
+                        color: #1f2937;
+                        text-decoration: none;
                     }
 
                     .director-calendar-card
                     .fc-day-today {
-                        background:
-                            #fff7f7 !important;
+                        background: #fff7f7 !important;
                     }
 
                     .director-calendar-card
                     .fc-day-today
                     .fc-daygrid-day-number {
-                        min-width:
-                            30px;
-
-                        min-height:
-                            30px;
-
-                        display:
-                            inline-flex;
-
-                        align-items:
-                            center;
-
-                        justify-content:
-                            center;
-
-                        border-radius:
-                            999px;
-
-                        background:
-                            #7f1d1d;
-
-                        color:
-                            #ffffff !important;
-
-                        margin:
-                            4px;
-
-                        padding:
-                            4px 8px;
+                        min-width: 30px;
+                        min-height: 30px;
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 999px;
+                        background: #7f1d1d;
+                        color: #ffffff !important;
+                        margin: 4px;
+                        padding: 4px 8px;
                     }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | EVENT
-                    |--------------------------------------------------------------------------
-                    */
 
                     .director-calendar-card
                     .fc-event {
-                        border-radius:
-                            7px !important;
-
-                        padding:
-                            3px 5px !important;
-
-                        margin:
-                            2px 4px !important;
-
-                        font-size:
-                            .92rem !important;
-
-                        font-weight:
-                            800;
-
-                        line-height:
-                            1.3;
-
-                        cursor:
-                            pointer;
+                        border-radius: 7px !important;
+                        padding: 3px 5px !important;
+                        margin: 2px 4px !important;
+                        font-size: .92rem !important;
+                        font-weight: 800;
+                        line-height: 1.3;
+                        cursor: pointer;
                     }
 
                     .director-calendar-card
                     .fc-event-main {
-                        overflow:
-                            hidden;
+                        overflow: hidden;
                     }
 
                     .director-calendar-card
                     .fc-event-time {
-                        font-size:
-                            .9rem !important;
-
-                        font-weight:
-                            900;
+                        font-size: .9rem !important;
+                        font-weight: 900;
                     }
 
                     .director-calendar-card
                     .fc-event-title {
-                        font-size:
-                            .92rem !important;
-
-                        font-weight:
-                            800;
-
-                        overflow:
-                            hidden;
-
-                        white-space:
-                            nowrap;
-
-                        text-overflow:
-                            ellipsis;
+                        font-size: .92rem !important;
+                        font-weight: 800;
+                        overflow: hidden;
+                        white-space: nowrap;
+                        text-overflow: ellipsis;
                     }
 
                     .director-calendar-card
                     .fc-daygrid-more-link {
-                        margin-left:
-                            5px;
-
-                        color:
-                            #b91c1c;
-
-                        font-size:
-                            .85rem;
-
-                        font-weight:
-                            900;
-
-                        text-decoration:
-                            none;
+                        margin-left: 5px;
+                        color: #b91c1c;
+                        font-size: .85rem;
+                        font-weight: 900;
+                        text-decoration: none;
                     }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | GRID
-                    |--------------------------------------------------------------------------
-                    */
 
                     .director-calendar-card
                     .fc-scrollgrid {
-                        border-radius:
-                            14px;
-
-                        overflow:
-                            hidden;
+                        border-radius: 14px;
+                        overflow: hidden;
                     }
 
                     .director-calendar-card
                     .fc-theme-standard td,
                     .director-calendar-card
                     .fc-theme-standard th {
-                        border-color:
-                            #e5e7eb;
+                        border-color: #e5e7eb;
                     }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | WEEK / DAY
-                    |--------------------------------------------------------------------------
-                    */
 
                     .director-calendar-card
                     .fc-timegrid-axis,
                     .director-calendar-card
                     .fc-timegrid-slot-label {
-                        font-size:
-                            .9rem;
-
-                        font-weight:
-                            700;
+                        font-size: .9rem;
+                        font-weight: 700;
                     }
 
                     .director-calendar-card
                     .fc-timegrid-slot {
-                        height:
-                            2.7rem;
+                        height: 2.7rem;
                     }
 
                     .director-calendar-card
                     .fc-timegrid-event {
-                        font-size:
-                            .9rem !important;
+                        font-size: .9rem !important;
                     }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | CATEGORY PREVIEW
+                    | CATEGORY
                     |--------------------------------------------------------------------------
                     */
 
                     .agenda-category-preview {
-                        display:
-                            flex;
-
-                        align-items:
-                            center;
-
-                        gap:
-                            12px;
-
-                        border:
-                            1px solid;
-
-                        border-radius:
-                            16px;
-
-                        padding:
-                            12px 14px;
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        border: 1px solid;
+                        border-radius: 16px;
+                        padding: 12px 14px;
                     }
 
                     .agenda-category-icon {
-                        width:
-                            42px;
-
-                        height:
-                            42px;
-
-                        flex:
-                            0 0 42px;
-
-                        display:
-                            flex;
-
-                        align-items:
-                            center;
-
-                        justify-content:
-                            center;
-
-                        border-radius:
-                            12px;
-
-                        color:
-                            #ffffff;
-
-                        font-size:
-                            1.15rem;
+                        width: 42px;
+                        height: 42px;
+                        flex: 0 0 42px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 12px;
+                        color: #ffffff;
+                        font-size: 1.15rem;
                     }
 
                     /*
@@ -4362,115 +4141,63 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                     */
 
                     .schedule-availability {
-                        display:
-                            flex;
-
-                        align-items:
-                            flex-start;
-
-                        gap:
-                            14px;
-
-                        border-radius:
-                            16px;
-
-                        padding:
-                            14px 16px;
-
-                        border:
-                            1px solid transparent;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 14px;
+                        border-radius: 16px;
+                        padding: 14px 16px;
+                        border: 1px solid transparent;
                     }
 
                     .schedule-availability-icon {
-                        width:
-                            40px;
-
-                        height:
-                            40px;
-
-                        flex:
-                            0 0 40px;
-
-                        display:
-                            flex;
-
-                        align-items:
-                            center;
-
-                        justify-content:
-                            center;
-
-                        border-radius:
-                            12px;
-
-                        font-size:
-                            1.15rem;
+                        width: 40px;
+                        height: 40px;
+                        flex: 0 0 40px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 12px;
+                        font-size: 1.15rem;
                     }
 
                     .schedule-availability-success {
-                        background:
-                            #ecfdf5;
-
-                        border-color:
-                            #a7f3d0;
-
-                        color:
-                            #065f46;
+                        background: #ecfdf5;
+                        border-color: #a7f3d0;
+                        color: #065f46;
                     }
 
                     .schedule-availability-success
                     .schedule-availability-icon {
-                        background:
-                            #d1fae5;
+                        background: #d1fae5;
                     }
 
                     .schedule-availability-warning {
-                        background:
-                            #fffbeb;
-
-                        border-color:
-                            #fde68a;
-
-                        color:
-                            #92400e;
+                        background: #fffbeb;
+                        border-color: #fde68a;
+                        color: #92400e;
                     }
 
                     .schedule-availability-warning
                     .schedule-availability-icon {
-                        background:
-                            #fef3c7;
+                        background: #fef3c7;
                     }
 
                     .schedule-availability-danger {
-                        background:
-                            #fef2f2;
-
-                        border-color:
-                            #fecaca;
-
-                        color:
-                            #991b1b;
+                        background: #fef2f2;
+                        border-color: #fecaca;
+                        color: #991b1b;
                     }
 
                     .schedule-availability-danger
                     .schedule-availability-icon {
-                        background:
-                            #fee2e2;
+                        background: #fee2e2;
                     }
 
                     .schedule-conflict-detail {
-                        display:
-                            grid;
-
-                        gap:
-                            3px;
-
-                        padding:
-                            10px 12px;
-
-                        border-radius:
-                            10px;
-
+                        display: grid;
+                        gap: 3px;
+                        padding: 10px 12px;
+                        border-radius: 10px;
                         background:
                             rgba(
                                 255,
@@ -4481,22 +4208,14 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                     }
 
                     .schedule-suggestion-button {
-                        color:
-                            #065f46 !important;
-
-                        background:
-                            #ffffff !important;
-
-                        border-color:
-                            #a7f3d0 !important;
-
-                        font-weight:
-                            800 !important;
+                        color: #065f46 !important;
+                        background: #ffffff !important;
+                        border-color: #a7f3d0 !important;
+                        font-weight: 800 !important;
                     }
 
                     .schedule-suggestion-button:hover {
-                        background:
-                            #d1fae5 !important;
+                        background: #d1fae5 !important;
                     }
 
                     /*
@@ -4505,215 +4224,169 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                     |--------------------------------------------------------------------------
                     */
 
-                    @media (
-                        min-width:
-                            1500px
-                    ) {
+                    @media (min-width: 1500px) {
                         .schedule-overview-panel {
                             grid-template-columns:
-                                minmax(
-                                    0,
-                                    1.75fr
-                                )
-                                minmax(
-                                    380px,
-                                    .7fr
-                                );
+                                minmax(0, 1.75fr)
+                                minmax(380px, .7fr);
                         }
 
                         .director-calendar-viewport {
-                            height:
-                                calc(
-                                    100vh - 355px
-                                );
-
-                            max-height:
-                                790px;
+                            height: calc(100vh - 355px);
+                            max-height: 790px;
                         }
 
                         .director-calendar-card
                         .fc-toolbar-title {
-                            font-size:
-                                2.15rem !important;
+                            font-size: 2.15rem !important;
                         }
 
                         .director-calendar-card
                         .fc-col-header-cell-cushion {
-                            font-size:
-                                1.05rem;
+                            font-size: 1.05rem;
                         }
 
                         .director-calendar-card
                         .fc-daygrid-day-number {
-                            font-size:
-                                1.08rem;
+                            font-size: 1.08rem;
                         }
 
                         .director-calendar-card
                         .fc-event,
                         .director-calendar-card
                         .fc-event-title {
-                            font-size:
-                                .95rem !important;
+                            font-size: .95rem !important;
                         }
                     }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | LAPTOP / SHORT SCREEN
+                    | SHORT SCREEN
                     |--------------------------------------------------------------------------
                     */
 
                     @media (
-                        min-width:
-                            992px
+                        min-width: 992px
                     ) and (
-                        max-height:
-                            850px
+                        max-height: 850px
                     ) {
                         .director-schedule-page {
-                            gap:
-                                8px;
+                            gap: 8px;
                         }
 
                         .director-schedule-top h2 {
-                            font-size:
-                                1.6rem;
+                            font-size: 1.6rem;
                         }
 
                         .director-schedule-top p {
-                            font-size:
-                                .84rem;
+                            font-size: .84rem;
                         }
 
                         .schedule-filter-area,
                         .schedule-mini-card {
-                            padding:
-                                8px 10px;
+                            padding: 8px 10px;
                         }
 
                         .schedule-filter-header {
-                            margin-bottom:
-                                5px;
+                            margin-bottom: 5px;
                         }
 
                         .schedule-filter-subtitle {
-                            display:
-                                none;
+                            font-size: .65rem;
+                        }
+
+                        .schedule-search-wrapper {
+                            width: 185px;
+                            height: 30px;
+                        }
+
+                        .schedule-search-input,
+                        .schedule-today-button {
+                            height: 30px;
+                        }
+
+                        .schedule-search-input {
+                            font-size: .68rem;
+                        }
+
+                        .schedule-today-button {
+                            font-size: .66rem;
                         }
 
                         .schedule-filter-button {
-                            min-height:
-                                29px;
-
-                            font-size:
-                                .68rem;
+                            min-height: 28px;
+                            font-size: .66rem;
                         }
 
                         .schedule-filter-icon {
-                            width:
-                                21px;
-
-                            height:
-                                21px;
-
-                            flex-basis:
-                                21px;
-
-                            font-size:
-                                .57rem;
+                            width: 20px;
+                            height: 20px;
+                            flex-basis: 20px;
+                            font-size: .55rem;
                         }
 
                         .schedule-filter-count {
-                            min-width:
-                                18px;
-
-                            height:
-                                18px;
-
-                            font-size:
-                                .6rem;
+                            min-width: 18px;
+                            height: 18px;
+                            font-size: .58rem;
                         }
 
                         .schedule-mini-icon {
-                            width:
-                                34px;
-
-                            height:
-                                34px;
-
-                            flex-basis:
-                                34px;
+                            width: 34px;
+                            height: 34px;
+                            flex-basis: 34px;
                         }
 
                         .schedule-mini-number {
-                            font-size:
-                                1.3rem;
+                            font-size: 1.3rem;
                         }
 
                         .schedule-mini-label {
-                            font-size:
-                                .6rem;
+                            font-size: .6rem;
                         }
 
                         .schedule-mini-description,
                         .schedule-next-title {
-                            font-size:
-                                .65rem;
+                            font-size: .65rem;
                         }
 
                         .director-calendar-viewport {
-                            height:
-                                calc(
-                                    100vh - 310px
-                                );
-
-                            min-height:
-                                420px;
+                            height: calc(100vh - 310px);
+                            min-height: 420px;
                         }
 
                         .director-calendar-card
                         .fc-toolbar {
-                            margin-bottom:
-                                7px !important;
+                            margin-bottom: 7px !important;
                         }
 
                         .director-calendar-card
                         .fc-toolbar-title {
-                            font-size:
-                                1.6rem !important;
+                            font-size: 1.6rem !important;
                         }
 
                         .director-calendar-card
                         .fc-button {
-                            min-height:
-                                35px;
-
-                            font-size:
-                                .78rem !important;
+                            min-height: 35px;
+                            font-size: .78rem !important;
                         }
 
                         .director-calendar-card
                         .fc-col-header-cell {
-                            padding-top:
-                                5px;
-
-                            padding-bottom:
-                                5px;
+                            padding-top: 5px;
+                            padding-bottom: 5px;
                         }
 
                         .director-calendar-card
                         .fc-event,
                         .director-calendar-card
                         .fc-event-title {
-                            font-size:
-                                .79rem !important;
+                            font-size: .79rem !important;
                         }
 
                         .director-calendar-card
                         .fc-event-time {
-                            font-size:
-                                .76rem !important;
+                            font-size: .76rem !important;
                         }
                     }
 
@@ -4723,13 +4396,9 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                     |--------------------------------------------------------------------------
                     */
 
-                    @media (
-                        max-width:
-                            1250px
-                    ) {
+                    @media (max-width: 1250px) {
                         .schedule-overview-panel {
-                            grid-template-columns:
-                                1fr;
+                            grid-template-columns: 1fr;
                         }
 
                         .schedule-summary-area {
@@ -4738,14 +4407,9 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                         }
 
                         .director-calendar-viewport {
-                            height:
-                                auto;
-
-                            min-height:
-                                650px;
-
-                            max-height:
-                                none;
+                            height: auto;
+                            min-height: 650px;
+                            max-height: none;
                         }
                     }
 
@@ -4755,42 +4419,39 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                     |--------------------------------------------------------------------------
                     */
 
-                    @media (
-                        max-width:
-                            991.98px
-                    ) {
+                    @media (max-width: 991.98px) {
                         .schedule-filter-header {
-                            align-items:
-                                flex-start;
+                            align-items: stretch;
+                            flex-direction: column;
+                        }
 
-                            flex-direction:
-                                column;
+                        .schedule-filter-tools {
+                            width: 100%;
+                        }
+
+                        .schedule-search-wrapper {
+                            width: auto;
+                            flex: 1;
                         }
 
                         .director-calendar-viewport {
-                            min-height:
-                                720px;
+                            min-height: 720px;
                         }
 
                         .director-calendar-card
                         .fc-toolbar {
-                            flex-direction:
-                                column;
+                            flex-direction: column;
                         }
 
                         .director-calendar-card
                         .fc-toolbar-chunk {
-                            display:
-                                flex;
-
-                            justify-content:
-                                center;
+                            display: flex;
+                            justify-content: center;
                         }
 
                         .director-calendar-card
                         .fc-daygrid-day-frame {
-                            min-height:
-                                90px !important;
+                            min-height: 90px !important;
                         }
                     }
 
@@ -4800,104 +4461,82 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                     |--------------------------------------------------------------------------
                     */
 
-                    @media (
-                        max-width:
-                            767.98px
-                    ) {
+                    @media (max-width: 767.98px) {
                         .director-schedule-top h2 {
-                            font-size:
-                                1.6rem;
+                            font-size: 1.6rem;
                         }
 
                         .schedule-filter-area {
-                            padding:
-                                11px;
+                            padding: 11px;
+                        }
+
+                        .schedule-filter-tools {
+                            flex-direction: column;
+                            align-items: stretch;
+                        }
+
+                        .schedule-search-wrapper {
+                            width: 100%;
+                        }
+
+                        .schedule-today-button {
+                            width: 100%;
                         }
 
                         .schedule-filter-list {
-                            flex-wrap:
-                                nowrap;
-
-                            overflow-x:
-                                auto;
-
-                            padding-bottom:
-                                4px;
-
-                            scrollbar-width:
-                                none;
+                            flex-wrap: nowrap;
+                            overflow-x: auto;
+                            padding-bottom: 4px;
+                            scrollbar-width: none;
                         }
 
                         .schedule-filter-list::-webkit-scrollbar {
-                            display:
-                                none;
+                            display: none;
                         }
 
                         .schedule-filter-button {
-                            flex-shrink:
-                                0;
-                        }
-
-                        .schedule-filter-result {
-                            font-size:
-                                .7rem;
+                            flex-shrink: 0;
                         }
 
                         .schedule-summary-area {
-                            grid-template-columns:
-                                1fr;
+                            grid-template-columns: 1fr;
                         }
 
                         .schedule-mini-card {
-                            min-height:
-                                74px;
+                            min-height: 74px;
                         }
 
                         .director-calendar-body {
-                            padding:
-                                10px !important;
+                            padding: 10px !important;
                         }
 
                         .director-calendar-card
                         .fc {
-                            font-size:
-                                .82rem;
+                            font-size: .82rem;
                         }
 
                         .director-calendar-card
                         .fc-toolbar-title {
-                            font-size:
-                                1.35rem !important;
+                            font-size: 1.35rem !important;
                         }
 
                         .director-calendar-card
                         .fc-button {
-                            min-height:
-                                36px;
-
-                            padding-left:
-                                10px !important;
-
-                            padding-right:
-                                10px !important;
-
-                            font-size:
-                                .72rem !important;
+                            min-height: 36px;
+                            padding-left: 10px !important;
+                            padding-right: 10px !important;
+                            font-size: .72rem !important;
                         }
 
                         .director-calendar-card
                         .fc-col-header-cell-cushion {
-                            font-size:
-                                .75rem;
+                            font-size: .75rem;
                         }
 
                         .director-calendar-card
                         .fc-daygrid-day-number {
-                            font-size:
-                                .8rem;
-
-                            padding:
-                                5px;
+                            font-size: .8rem;
+                            padding: 5px;
                         }
 
                         .director-calendar-card
@@ -4906,8 +4545,7 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                         .fc-event-title,
                         .director-calendar-card
                         .fc-event-time {
-                            font-size:
-                                .65rem !important;
+                            font-size: .65rem !important;
                         }
                     }
                 `}

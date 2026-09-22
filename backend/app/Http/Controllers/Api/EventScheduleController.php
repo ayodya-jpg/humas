@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\EventSchedule;
+use App\Models\EventScheduleHistory;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -28,6 +30,19 @@ class EventScheduleController extends Controller
         'Lainnya',
     ];
 
+    private const AUDITABLE_FIELDS = [
+        'title',
+        'description',
+        'event_date',
+        'start_time',
+        'end_time',
+        'all_day',
+        'location',
+        'agenda_type',
+        'color',
+        'is_public',
+    ];
+
     /*
     |--------------------------------------------------------------------------
     | PUBLIC INDEX
@@ -37,14 +52,34 @@ class EventScheduleController extends Controller
     public function publicIndex(Request $request)
     {
         $validated = $request->validate([
-            'start' => ['nullable', 'date'],
-            'end' => ['nullable', 'date'],
-            'upcoming' => ['nullable', 'boolean'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'start' => [
+                'nullable',
+                'date',
+            ],
+
+            'end' => [
+                'nullable',
+                'date',
+            ],
+
+            'upcoming' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'limit' => [
+                'nullable',
+                'integer',
+                'min:1',
+                'max:100',
+            ],
         ]);
 
         $query = EventSchedule::query()
-            ->where('is_public', true);
+            ->where(
+                'is_public',
+                true
+            );
 
         if (!empty($validated['start'])) {
             $query->whereDate(
@@ -101,27 +136,46 @@ class EventScheduleController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Jadwal Direktur berhasil diambil.',
-            'data' => $events,
+
+            'message' =>
+                'Jadwal Direktur berhasil diambil.',
+
+            'data' =>
+                $events,
         ]);
     }
 
     /*
     |--------------------------------------------------------------------------
-    | AUTHENTICATED INDEX
+    | INDEX
     |--------------------------------------------------------------------------
     */
 
     public function index(Request $request)
     {
         $validated = $request->validate([
-            'start' => ['nullable', 'date'],
-            'end' => ['nullable', 'date'],
+            'start' => [
+                'nullable',
+                'date',
+            ],
+
+            'end' => [
+                'nullable',
+                'date',
+            ],
+
             'agenda_type' => [
                 'nullable',
-                Rule::in(self::AGENDA_TYPES),
+                Rule::in(
+                    self::AGENDA_TYPES
+                ),
             ],
-            'search' => ['nullable', 'string', 'max:255'],
+
+            'search' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
         ]);
 
         $query = EventSchedule::query()
@@ -199,13 +253,21 @@ class EventScheduleController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Jadwal Direktur berhasil diambil.',
+
+            'message' =>
+                'Jadwal Direktur berhasil diambil.',
+
             'data' => [
-                'events' => $events,
-                'agenda_types' => self::AGENDA_TYPES,
-                'can_manage' => $this->canManage(
-                    $request
-                ),
+                'events' =>
+                    $events,
+
+                'agenda_types' =>
+                    self::AGENDA_TYPES,
+
+                'can_manage' =>
+                    $this->canManage(
+                        $request
+                    ),
             ],
         ]);
     }
@@ -214,6 +276,9 @@ class EventScheduleController extends Controller
     |--------------------------------------------------------------------------
     | SHOW
     |--------------------------------------------------------------------------
+    |
+    | Detail agenda sekaligus mengambil audit trail.
+    |
     */
 
     public function show(
@@ -223,15 +288,41 @@ class EventScheduleController extends Controller
         $eventSchedule->load([
             'createdBy:id,name',
             'updatedBy:id,name',
+
+            'histories' => function ($query) {
+                $query
+                    ->with([
+                        'user:id,name',
+                    ])
+                    ->latest();
+            },
         ]);
+
+        $data =
+            $this->transformEvent(
+                $eventSchedule,
+                true
+            );
+
+        $data['histories'] =
+            $eventSchedule
+                ->histories
+                ->map(
+                    fn (EventScheduleHistory $history) =>
+                        $this->transformHistory(
+                            $history
+                        )
+                )
+                ->values();
 
         return response()->json([
             'success' => true,
-            'message' => 'Detail Jadwal Direktur berhasil diambil.',
-            'data' => $this->transformEvent(
-                $eventSchedule,
-                true
-            ),
+
+            'message' =>
+                'Detail Jadwal Direktur berhasil diambil.',
+
+            'data' =>
+                $data,
         ]);
     }
 
@@ -262,13 +353,6 @@ class EventScheduleController extends Controller
                 $validated,
                 $request
             ) {
-                /*
-                 * Lock seluruh agenda pada tanggal tersebut.
-                 *
-                 * Selain untuk membaca bentrok, ini membantu
-                 * mencegah dua admin menyimpan agenda
-                 * pada slot yang sama secara bersamaan.
-                 */
                 $conflict =
                     $this->findConflict(
                         $validated,
@@ -288,9 +372,40 @@ class EventScheduleController extends Controller
                 $validated['updated_by'] =
                     $request->user()->id;
 
-                return EventSchedule::create(
-                    $validated
-                );
+                $event =
+                    EventSchedule::create(
+                        $validated
+                    );
+
+                /*
+                 * Audit CREATE.
+                 */
+                EventScheduleHistory::create([
+                    'event_schedule_id' =>
+                        $event->id,
+
+                    'user_id' =>
+                        $request->user()->id,
+
+                    'action' =>
+                        'created',
+
+                    'event_title' =>
+                        $event->title,
+
+                    'old_values' =>
+                        null,
+
+                    'new_values' =>
+                        $this->getAuditSnapshot(
+                            $event
+                        ),
+
+                    'description' =>
+                        'Agenda Direktur dibuat.',
+                ]);
+
+                return $event;
             }
         );
 
@@ -301,11 +416,15 @@ class EventScheduleController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Agenda Direktur berhasil ditambahkan.',
-            'data' => $this->transformEvent(
-                $event,
-                true
-            ),
+
+            'message' =>
+                'Agenda Direktur berhasil ditambahkan.',
+
+            'data' =>
+                $this->transformEvent(
+                    $event,
+                    true
+                ),
         ], 201);
     }
 
@@ -352,12 +471,68 @@ class EventScheduleController extends Controller
                     );
                 }
 
+                /*
+                 * Simpan snapshot sebelum update.
+                 */
+                $oldValues =
+                    $this->getAuditSnapshot(
+                        $eventSchedule
+                    );
+
                 $validated['updated_by'] =
                     $request->user()->id;
 
                 $eventSchedule->update(
                     $validated
                 );
+
+                $eventSchedule->refresh();
+
+                $newValues =
+                    $this->getAuditSnapshot(
+                        $eventSchedule
+                    );
+
+                /*
+                 * Hanya menyimpan field yang benar-benar berubah.
+                 */
+                $changes =
+                    $this->getChangedAuditValues(
+                        $oldValues,
+                        $newValues
+                    );
+
+                if (
+                    !empty(
+                        $changes['old']
+                    ) ||
+                    !empty(
+                        $changes['new']
+                    )
+                ) {
+                    EventScheduleHistory::create([
+                        'event_schedule_id' =>
+                            $eventSchedule->id,
+
+                        'user_id' =>
+                            $request->user()->id,
+
+                        'action' =>
+                            'updated',
+
+                        'event_title' =>
+                            $eventSchedule->title,
+
+                        'old_values' =>
+                            $changes['old'],
+
+                        'new_values' =>
+                            $changes['new'],
+
+                        'description' =>
+                            'Agenda Direktur diperbarui.',
+                    ]);
+                }
             }
         );
 
@@ -370,17 +545,21 @@ class EventScheduleController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Agenda Direktur berhasil diperbarui.',
-            'data' => $this->transformEvent(
-                $eventSchedule,
-                true
-            ),
+
+            'message' =>
+                'Agenda Direktur berhasil diperbarui.',
+
+            'data' =>
+                $this->transformEvent(
+                    $eventSchedule,
+                    true
+                ),
         ]);
     }
 
     /*
     |--------------------------------------------------------------------------
-    | DELETE
+    | DESTROY
     |--------------------------------------------------------------------------
     */
 
@@ -392,17 +571,61 @@ class EventScheduleController extends Controller
             $request
         );
 
-        $eventSchedule->delete();
+        DB::transaction(
+            function () use (
+                $request,
+                $eventSchedule
+            ) {
+                /*
+                 * Snapshot terakhir sebelum agenda dihapus.
+                 */
+                $oldValues =
+                    $this->getAuditSnapshot(
+                        $eventSchedule
+                    );
+
+                EventScheduleHistory::create([
+                    'event_schedule_id' =>
+                        $eventSchedule->id,
+
+                    'user_id' =>
+                        $request->user()->id,
+
+                    'action' =>
+                        'deleted',
+
+                    'event_title' =>
+                        $eventSchedule->title,
+
+                    'old_values' =>
+                        $oldValues,
+
+                    'new_values' =>
+                        null,
+
+                    'description' =>
+                        'Agenda Direktur dihapus.',
+                ]);
+
+                /*
+                 * Karena FK histories menggunakan nullOnDelete,
+                 * histori tetap tersimpan setelah event dihapus.
+                 */
+                $eventSchedule->delete();
+            }
+        );
 
         return response()->json([
             'success' => true,
-            'message' => 'Agenda Direktur berhasil dihapus.',
+
+            'message' =>
+                'Agenda Direktur berhasil dihapus.',
         ]);
     }
 
     /*
     |--------------------------------------------------------------------------
-    | VALIDATION
+    | VALIDATE PAYLOAD
     |--------------------------------------------------------------------------
     */
 
@@ -507,7 +730,7 @@ class EventScheduleController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | NORMALIZE
+    | NORMALIZE PAYLOAD
     |--------------------------------------------------------------------------
     */
 
@@ -580,25 +803,6 @@ class EventScheduleController extends Controller
     |--------------------------------------------------------------------------
     | CONFLICT CHECK
     |--------------------------------------------------------------------------
-    |
-    | Aturan:
-    |
-    | 1. Agenda hanya dibandingkan dengan tanggal yang sama.
-    |
-    | 2. Jika salah satu agenda adalah "Sepanjang Hari",
-    |    maka dianggap bentrok dengan semua agenda pada tanggal itu.
-    |
-    | 3. Untuk agenda berdasarkan jam:
-    |
-    |       new_start < existing_end
-    |       DAN
-    |       new_end > existing_start
-    |
-    | Contoh:
-    |
-    | 09:00 - 10:00 + 09:30 - 11:00 = BENTROK
-    | 09:00 - 10:00 + 10:00 - 11:00 = AMAN
-    |
     */
 
     private function findConflict(
@@ -613,11 +817,9 @@ class EventScheduleController extends Controller
                     $payload['event_date']
                 );
 
-        /*
-         * Saat edit jangan membandingkan
-         * agenda dengan dirinya sendiri.
-         */
-        if ($excludeId !== null) {
+        if (
+            $excludeId !== null
+        ) {
             $query->where(
                 'id',
                 '!=',
@@ -625,19 +827,12 @@ class EventScheduleController extends Controller
             );
         }
 
-        /*
-         * Lock row tanggal tersebut ketika
-         * dipanggil dari STORE / UPDATE.
-         */
-        if ($lockForUpdate) {
+        if (
+            $lockForUpdate
+        ) {
             $query->lockForUpdate();
         }
 
-        /*
-         * Agenda baru Sepanjang Hari:
-         * agenda apa pun pada tanggal tersebut
-         * dianggap bentrok.
-         */
         if (
             $payload['all_day']
         ) {
@@ -645,18 +840,12 @@ class EventScheduleController extends Controller
                 ->orderByRaw(
                     'CASE WHEN all_day = 1 THEN 0 ELSE 1 END'
                 )
-                ->orderBy('start_time')
+                ->orderBy(
+                    'start_time'
+                )
                 ->first();
         }
 
-        /*
-         * Agenda baru memiliki jam.
-         *
-         * Bentrok apabila:
-         * - agenda existing Sepanjang Hari
-         * ATAU
-         * - rentang jam saling overlap.
-         */
         return $query
             ->where(
                 function ($subQuery) use ($payload) {
@@ -689,7 +878,9 @@ class EventScheduleController extends Controller
             ->orderByRaw(
                 'CASE WHEN all_day = 1 THEN 0 ELSE 1 END'
             )
-            ->orderBy('start_time')
+            ->orderBy(
+                'start_time'
+            )
             ->first();
     }
 
@@ -702,26 +893,37 @@ class EventScheduleController extends Controller
     private function throwScheduleConflict(
         EventSchedule $conflict
     ): void {
+        $startTime =
+            $conflict->start_time
+                ? substr(
+                    (string) $conflict->start_time,
+                    0,
+                    5
+                )
+                : null;
+
+        $endTime =
+            $conflict->end_time
+                ? substr(
+                    (string) $conflict->end_time,
+                    0,
+                    5
+                )
+                : null;
+
         $timeText =
             $conflict->all_day
                 ? 'Sepanjang Hari'
                 : sprintf(
                     '%s - %s',
-                    substr(
-                        (string) $conflict->start_time,
-                        0,
-                        5
-                    ),
-                    substr(
-                        (string) $conflict->end_time,
-                        0,
-                        5
-                    )
+                    $startTime,
+                    $endTime
                 );
 
-        response()
-            ->json([
-                'success' => false,
+        throw new HttpResponseException(
+            response()->json([
+                'success' =>
+                    false,
 
                 'code' =>
                     'SCHEDULE_CONFLICT',
@@ -745,22 +947,10 @@ class EventScheduleController extends Controller
                                 ),
 
                         'start_time' =>
-                            $conflict->start_time
-                                ? substr(
-                                    (string) $conflict->start_time,
-                                    0,
-                                    5
-                                )
-                                : null,
+                            $startTime,
 
                         'end_time' =>
-                            $conflict->end_time
-                                ? substr(
-                                    (string) $conflict->end_time,
-                                    0,
-                                    5
-                                )
-                                : null,
+                            $endTime,
 
                         'all_day' =>
                             (bool) $conflict->all_day,
@@ -776,7 +966,171 @@ class EventScheduleController extends Controller
                     ],
                 ],
             ], 409)
-            ->throwResponse();
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AUDIT SNAPSHOT
+    |--------------------------------------------------------------------------
+    */
+
+    private function getAuditSnapshot(
+        EventSchedule $event
+    ): array {
+        $snapshot = [];
+
+        foreach (
+            self::AUDITABLE_FIELDS
+            as $field
+        ) {
+            $value =
+                $event->{$field};
+
+            if (
+                $field === 'event_date' &&
+                $value
+            ) {
+                $value =
+                    $event
+                        ->event_date
+                        ->format(
+                            'Y-m-d'
+                        );
+            }
+
+            if (
+                in_array(
+                    $field,
+                    [
+                        'start_time',
+                        'end_time',
+                    ],
+                    true
+                ) &&
+                $value
+            ) {
+                $value =
+                    substr(
+                        (string) $value,
+                        0,
+                        5
+                    );
+            }
+
+            if (
+                in_array(
+                    $field,
+                    [
+                        'all_day',
+                        'is_public',
+                    ],
+                    true
+                )
+            ) {
+                $value =
+                    (bool) $value;
+            }
+
+            $snapshot[$field] =
+                $value;
+        }
+
+        return $snapshot;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AUDIT CHANGES
+    |--------------------------------------------------------------------------
+    */
+
+    private function getChangedAuditValues(
+        array $oldValues,
+        array $newValues
+    ): array {
+        $oldChanges = [];
+        $newChanges = [];
+
+        foreach (
+            self::AUDITABLE_FIELDS
+            as $field
+        ) {
+            $old =
+                $oldValues[$field] ??
+                null;
+
+            $new =
+                $newValues[$field] ??
+                null;
+
+            if (
+                $old !== $new
+            ) {
+                $oldChanges[$field] =
+                    $old;
+
+                $newChanges[$field] =
+                    $new;
+            }
+        }
+
+        return [
+            'old' =>
+                $oldChanges,
+
+            'new' =>
+                $newChanges,
+        ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TRANSFORM HISTORY
+    |--------------------------------------------------------------------------
+    */
+
+    private function transformHistory(
+        EventScheduleHistory $history
+    ): array {
+        return [
+            'id' =>
+                $history->id,
+
+            'action' =>
+                $history->action,
+
+            'event_title' =>
+                $history->event_title,
+
+            'old_values' =>
+                $history->old_values,
+
+            'new_values' =>
+                $history->new_values,
+
+            'description' =>
+                $history->description,
+
+            'user' =>
+                $history->relationLoaded(
+                    'user'
+                )
+                    ? $history->user
+                    : null,
+
+            'user_name' =>
+                $history->user
+                    ? $history
+                        ->user
+                        ->name
+                    : 'User tidak tersedia',
+
+            'created_at' =>
+                optional(
+                    $history->created_at
+                )->toISOString(),
+        ];
     }
 
     /*
@@ -816,7 +1170,7 @@ class EventScheduleController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | TRANSFORM
+    | TRANSFORM EVENT
     |--------------------------------------------------------------------------
     */
 
@@ -902,9 +1256,6 @@ class EventScheduleController extends Controller
             'is_public' =>
                 (bool) $event->is_public,
 
-            /*
-             * FullCalendar format.
-             */
             'start' =>
                 $start,
 
