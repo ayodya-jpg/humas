@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EventSchedule extends Model
 {
@@ -23,20 +24,9 @@ class EventSchedule extends Model
     ];
 
     protected $casts = [
-        'event_date' =>
-            'date:Y-m-d',
-
-        'all_day' =>
-            'boolean',
-
-        'is_public' =>
-            'boolean',
-
-        'created_by' =>
-            'integer',
-
-        'updated_by' =>
-            'integer',
+        'event_date' => 'date:Y-m-d',
+        'all_day' => 'boolean',
+        'is_public' => 'boolean',
     ];
 
     /*
@@ -65,5 +55,21 @@ class EventSchedule extends Model
             User::class,
             'updated_by'
         );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HISTORIES
+    |--------------------------------------------------------------------------
+    */
+
+    public function histories(): HasMany
+    {
+        return $this
+            ->hasMany(
+                EventScheduleHistory::class,
+                'event_schedule_id'
+            )
+            ->latest();
     }
 }
