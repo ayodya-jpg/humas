@@ -28,7 +28,7 @@ Route::post(
 
 /*
 |--------------------------------------------------------------------------
-| Public Jadwal Direktur
+| Public Jadwal Direktorat
 |--------------------------------------------------------------------------
 |
 | Digunakan pada halaman login.
@@ -105,7 +105,7 @@ Route::middleware(
 
     /*
     |--------------------------------------------------------------------------
-    | Jadwal Direktur
+    | Jadwal Direktorat
     |--------------------------------------------------------------------------
     |
     | READ:
@@ -126,6 +126,24 @@ Route::middleware(
         [
             EventScheduleController::class,
             'index',
+        ]
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Activity Log Jadwal Direktorat
+    |--------------------------------------------------------------------------
+    |
+    | Hanya dapat diakses role admin yang diizinkan controller.
+    | History tetap dapat dibaca meskipun agenda asal sudah dihapus.
+    |
+    */
+
+    Route::get(
+        '/event-schedules/activity',
+        [
+            EventScheduleController::class,
+            'activity',
         ]
     );
 

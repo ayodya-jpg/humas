@@ -29,11 +29,60 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| AGENDA CONFIG
+| KONFIGURASI DIREKTORAT
 |--------------------------------------------------------------------------
 */
 
-const AGENDA_TYPES = [
+const DIRECTORATES = [
+    {
+        value: 'direktorat',
+        label: 'Direktorat',
+        short: 'DIREKTORAT',
+        icon: 'bi-people-fill',
+        description:
+            'Direktur + Wakil Direktur I + Wakil Direktur II',
+    },
+    {
+        value: 'direktur',
+        label: 'Direktur',
+        short: 'DIREKTUR',
+        icon: 'bi-person-badge-fill',
+        description: 'Agenda khusus Direktur',
+    },
+    {
+        value: 'wakil_direktur_1',
+        label: 'Wakil Direktur I',
+        short: 'WADIR I',
+        icon: 'bi-person-workspace',
+        description: 'Agenda khusus Wakil Direktur I',
+    },
+    {
+        value: 'wakil_direktur_2',
+        label: 'Wakil Direktur II',
+        short: 'WADIR II',
+        icon: 'bi-person-workspace',
+        description: 'Agenda khusus Wakil Direktur II',
+    },
+];
+
+const FILTERS = [
+    {
+        value: 'semua',
+        label: 'Semua Jadwal',
+        short: 'SEMUA',
+        icon: 'bi-grid-fill',
+        description: 'Seluruh agenda Direktorat',
+    },
+    ...DIRECTORATES,
+];
+
+/*
+|--------------------------------------------------------------------------
+| KONFIGURASI KATEGORI AGENDA
+|--------------------------------------------------------------------------
+*/
+
+const TYPES = [
     'Rapat',
     'Kunjungan',
     'Internal',
@@ -43,7 +92,7 @@ const AGENDA_TYPES = [
     'Lainnya',
 ];
 
-const AGENDA_COLORS = {
+const COLORS = {
     Rapat: '#7F1D1D',
     Kunjungan: '#1D4ED8',
     Internal: '#4338CA',
@@ -53,7 +102,7 @@ const AGENDA_COLORS = {
     Lainnya: '#475569',
 };
 
-const AGENDA_ICONS = {
+const ICONS = {
     Rapat: 'bi-people-fill',
     Kunjungan: 'bi-building-fill-check',
     Internal: 'bi-building-fill',
@@ -63,54 +112,144 @@ const AGENDA_ICONS = {
     Lainnya: 'bi-calendar-event-fill',
 };
 
-const WORKING_START_MINUTES = 6 * 60;
-const WORKING_END_MINUTES = 22 * 60;
-const SLOT_INTERVAL_MINUTES = 30;
+const AUDIT_FIELDS = {
+    directorate: 'Agenda Untuk',
+    title: 'Judul Agenda',
+    description: 'Deskripsi',
+    event_date: 'Tanggal',
+    start_time: 'Jam Mulai',
+    end_time: 'Jam Selesai',
+    all_day: 'Sepanjang Hari',
+    location: 'Lokasi',
+    agenda_type: 'Kategori',
+    color: 'Warna',
+    is_public: 'Visibilitas',
+};
 
 /*
 |--------------------------------------------------------------------------
-| HELPERS
+| HELPER DIREKTORAT
 |--------------------------------------------------------------------------
 */
 
-const getAgendaColor = (
-    agendaType
-) => {
-    return (
-        AGENDA_COLORS[
-            agendaType
-        ] ||
-        AGENDA_COLORS.Lainnya
+const owner = (value) =>
+    DIRECTORATES.find((item) => item.value === value);
+
+const ownerLabel = (value) =>
+    owner(value)?.label || 'Direktorat';
+
+const ownerShort = (value) =>
+    owner(value)?.short || 'DIREKTORAT';
+
+const colorOf = (type) =>
+    COLORS[type] || COLORS.Lainnya;
+
+/*
+|--------------------------------------------------------------------------
+| HELPER WAKTU DAN TANGGAL
+|--------------------------------------------------------------------------
+*/
+
+const time = (value) =>
+    value ? String(value).slice(0, 5) : '';
+
+const toMinutes = (value) => {
+    const [h, m] = time(value).split(':').map(Number);
+
+    return Number.isFinite(h) && Number.isFinite(m)
+        ? h * 60 + m
+        : null;
+};
+
+const fromMinutes = (value) =>
+    `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(
+        value % 60
+    ).padStart(2, '0')}`;
+
+const dateKey = (value) =>
+    `${value.getFullYear()}-${String(
+        value.getMonth() + 1
+    ).padStart(2, '0')}-${String(value.getDate()).padStart(
+        2,
+        '0'
+    )}`;
+
+const localDate = (value, clock = '00:00') => {
+    if (!value) return null;
+
+    const [y, m, d] = String(value)
+        .slice(0, 10)
+        .split('-')
+        .map(Number);
+
+    const [h, min] = time(clock).split(':').map(Number);
+
+    const result = new Date(
+        y,
+        m - 1,
+        d,
+        h || 0,
+        min || 0
     );
+
+    return Number.isNaN(result.getTime()) ? null : result;
 };
 
-const getAgendaIcon = (
-    agendaType
-) => {
-    return (
-        AGENDA_ICONS[
-            agendaType
-        ] ||
-        AGENDA_ICONS.Lainnya
-    );
+const dateText = (value, short = false) => {
+    const parsed = localDate(value);
+
+    return parsed
+        ? parsed.toLocaleDateString(
+              'id-ID',
+              short
+                  ? {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                    }
+                  : {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                    }
+          )
+        : '-';
 };
 
-const getStoredUser = () => {
-    try {
-        return JSON.parse(
-            localStorage.getItem(
-                'admin_user'
-            ) || '{}'
-        );
-    } catch {
-        return {};
-    }
+const dateTimeText = (value) => {
+    const parsed = value ? new Date(value) : null;
+
+    return parsed && !Number.isNaN(parsed.getTime())
+        ? parsed.toLocaleString('id-ID', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+          })
+        : '-';
 };
 
-const getEmptyForm = (
-    date = ''
+const timeText = (event) =>
+    event?.all_day || event?.allDay
+        ? 'Sepanjang Hari'
+        : `${time(event?.start_time) || '-'} - ${
+              time(event?.end_time) || '-'
+          }`;
+
+/*
+|--------------------------------------------------------------------------
+| FORM DEFAULT
+|--------------------------------------------------------------------------
+*/
+
+const blankForm = (
+    date = '',
+    directorate = ''
 ) => ({
     id: null,
+    directorate,
     title: '',
     description: '',
     event_date: date,
@@ -119,707 +258,295 @@ const getEmptyForm = (
     all_day: false,
     location: '',
     agenda_type: 'Rapat',
-    color:
-        getAgendaColor(
-            'Rapat'
-        ),
+    color: COLORS.Rapat,
     is_public: true,
 });
 
-const normalizeTime = (
-    value
-) => {
-    if (!value) {
-        return null;
-    }
+/*
+|--------------------------------------------------------------------------
+| HELPER BENTROK JADWAL
+|--------------------------------------------------------------------------
+*/
 
-    return String(
-        value
-    ).slice(
-        0,
-        5
-    );
-};
+const conflictOwners = (directorate) =>
+    directorate === 'direktorat'
+        ? DIRECTORATES.map((item) => item.value)
+        : ['direktorat', directorate];
 
-const timeToMinutes = (
-    value
-) => {
-    const normalized =
-        normalizeTime(
-            value
-        );
-
-    if (!normalized) {
-        return null;
-    }
-
-    const [
-        hours,
-        minutes,
-    ] = normalized
-        .split(':')
-        .map(Number);
-
-    if (
-        Number.isNaN(
-            hours
-        ) ||
-        Number.isNaN(
-            minutes
-        )
-    ) {
-        return null;
-    }
-
-    return (
-        hours * 60 +
-        minutes
-    );
-};
-
-const minutesToTime = (
-    value
-) => {
-    const safeMinutes =
-        Math.max(
-            0,
-            Math.min(
-                value,
-                23 * 60 + 59
-            )
-        );
-
-    const hours =
-        Math.floor(
-            safeMinutes / 60
-        );
-
-    const minutes =
-        safeMinutes % 60;
-
-    return `${String(
-        hours
-    ).padStart(
-        2,
-        '0'
-    )}:${String(
-        minutes
-    ).padStart(
-        2,
-        '0'
-    )}`;
-};
-
-const getLocalDateKey = (
-    date
-) => {
-    const year =
-        date.getFullYear();
-
-    const month =
-        String(
-            date.getMonth() + 1
-        ).padStart(
-            2,
-            '0'
-        );
-
-    const day =
-        String(
-            date.getDate()
-        ).padStart(
-            2,
-            '0'
-        );
-
-    return `${year}-${month}-${day}`;
-};
-
-const buildLocalDate = (
-    dateString,
-    timeString = '00:00'
-) => {
-    if (
-        !dateString
-    ) {
-        return null;
-    }
-
-    const [
-        year,
-        month,
-        day,
-    ] =
-        dateString
-            .split('-')
-            .map(
-                Number
-            );
-
-    const [
-        hours,
-        minutes,
-    ] =
-        String(
-            timeString ||
-                '00:00'
-        )
-            .slice(
-                0,
-                5
-            )
-            .split(':')
-            .map(
-                Number
-            );
-
-    const date =
-        new Date(
-            year,
-            month - 1,
-            day,
-            hours || 0,
-            minutes || 0,
-            0,
-            0
-        );
-
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-        return null;
-    }
-
-    return date;
-};
-
-const extractErrorMessage = (
-    error
-) => {
-    const data =
-        error
-            ?.response
-            ?.data;
-
-    if (
-        data?.errors
-    ) {
-        const firstError =
-            Object.values(
-                data.errors
-            )
-                .flat()
-                .find(
-                    Boolean
-                );
-
-        if (
-            firstError
-        ) {
-            return firstError;
-        }
-    }
-
-    return (
-        data?.message ||
-        'Terjadi kesalahan pada server.'
-    );
-};
-
-const formatDate = (
-    value
-) => {
-    if (!value) {
-        return '-';
-    }
-
-    if (
-        typeof value ===
-            'string' &&
-        /^\d{4}-\d{2}-\d{2}$/.test(
-            value
-        )
-    ) {
-        const [
-            year,
-            month,
-            day,
-        ] =
-            value
-                .split('-')
-                .map(
-                    Number
-                );
-
-        return new Date(
-            year,
-            month - 1,
-            day
-        ).toLocaleDateString(
-            'id-ID',
-            {
-                weekday:
-                    'long',
-
-                day:
-                    '2-digit',
-
-                month:
-                    'long',
-
-                year:
-                    'numeric',
-            }
-        );
-    }
-
-    return '-';
-};
-
-const formatShortDate = (
-    value
-) => {
-    if (!value) {
-        return '-';
-    }
-
-    const [
-        year,
-        month,
-        day,
-    ] =
-        String(
-            value
-        )
-            .split('-')
-            .map(
-                Number
-            );
-
-    const date =
-        new Date(
-            year,
-            month - 1,
-            day
-        );
-
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-        return value;
-    }
-
-    return date
-        .toLocaleDateString(
-            'id-ID',
-            {
-                day:
-                    '2-digit',
-
-                month:
-                    'short',
-
-                year:
-                    'numeric',
-            }
-        );
-};
-
-const formatConflictDate = (
-    value
-) => {
-    if (!value) {
-        return '-';
-    }
-
-    const parts =
-        String(
-            value
-        ).split('-');
-
-    if (
-        parts.length !==
-        3
-    ) {
-        return value;
-    }
-
-    const [
-        year,
-        month,
-        day,
-    ] =
-        parts.map(
-            Number
-        );
-
-    const date =
-        new Date(
-            year,
-            month - 1,
-            day
-        );
-
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-        return value;
-    }
-
-    return date
-        .toLocaleDateString(
-            'id-ID',
-            {
-                weekday:
-                    'long',
-
-                day:
-                    '2-digit',
-
-                month:
-                    'long',
-
-                year:
-                    'numeric',
-            }
-        );
-};
-
-const getConflictTimeText = (
-    event
-) => {
-    if (
-        event?.all_day ||
-        event?.allDay
-    ) {
-        return 'Sepanjang Hari';
-    }
-
-    const start =
-        normalizeTime(
-            event?.start_time
-        );
-
-    const end =
-        normalizeTime(
-            event?.end_time
-        );
-
-    if (
-        start &&
-        end
-    ) {
-        return `${start} - ${end}`;
-    }
-
-    return '-';
-};
-
-const getSameDateEvents = (
+const potentialConflicts = (
     events,
-    date,
+    form,
+    excludeId = null
+) =>
+    events.filter(
+        (item) =>
+            conflictOwners(form.directorate).includes(
+                item.directorate
+            ) &&
+            item.event_date === form.event_date &&
+            (excludeId === null ||
+                Number(item.id) !== Number(excludeId))
+    );
+
+const scheduleConflict = (
+    events,
+    form,
     excludeId = null
 ) => {
-    if (!date) {
-        return [];
-    }
-
-    return events.filter(
-        (
-            event
-        ) => {
-            if (
-                event
-                    .event_date !==
-                date
-            ) {
-                return false;
-            }
-
-            if (
-                excludeId !==
-                    null &&
-                Number(
-                    event.id
-                ) ===
-                    Number(
-                        excludeId
-                    )
-            ) {
-                return false;
-            }
-
-            return true;
-        }
-    );
-};
-
-const findTimeConflict = (
-    events,
-    date,
-    startTime,
-    endTime,
-    excludeId = null
-) => {
-    const newStart =
-        timeToMinutes(
-            startTime
-        );
-
-    const newEnd =
-        timeToMinutes(
-            endTime
-        );
-
-    if (
-        newStart ===
-            null ||
-        newEnd ===
-            null ||
-        newEnd <=
-            newStart
-    ) {
+    if (!form.directorate || !form.event_date) {
         return null;
     }
 
-    const sameDateEvents =
-        getSameDateEvents(
-            events,
-            date,
-            excludeId
-        );
+    const candidates = potentialConflicts(
+        events,
+        form,
+        excludeId
+    );
+
+    if (form.all_day) {
+        return candidates[0] || null;
+    }
+
+    const begin = toMinutes(form.start_time);
+    const finish = toMinutes(form.end_time);
+
+    if (
+        begin === null ||
+        finish === null ||
+        finish <= begin
+    ) {
+        return null;
+    }
 
     return (
-        sameDateEvents.find(
-            (
-                event
-            ) => {
-                if (
-                    event
-                        .all_day ||
-                    event
-                        .allDay
-                ) {
-                    return true;
-                }
-
-                const existingStart =
-                    timeToMinutes(
-                        event
-                            .start_time
-                    );
-
-                const existingEnd =
-                    timeToMinutes(
-                        event
-                            .end_time
-                    );
-
-                if (
-                    existingStart ===
-                        null ||
-                    existingEnd ===
-                        null
-                ) {
-                    return false;
-                }
-
-                return (
-                    newStart <
-                        existingEnd &&
-                    newEnd >
-                        existingStart
-                );
+        candidates.find((item) => {
+            if (item.all_day || item.allDay) {
+                return true;
             }
-        ) ||
-        null
-    );
-};
 
-const getEventStartDate = (
-    event
-) => {
-    if (
-        !event
-            ?.event_date
-    ) {
-        return null;
-    }
+            const a = toMinutes(item.start_time);
+            const b = toMinutes(item.end_time);
 
-    if (
-        event
-            .all_day ||
-        event
-            .allDay
-    ) {
-        return buildLocalDate(
-            event
-                .event_date,
-            '00:00'
-        );
-    }
-
-    return buildLocalDate(
-        event
-            .event_date,
-        normalizeTime(
-            event
-                .start_time
-        ) ||
-            '00:00'
-    );
-};
-
-const getEventEndDate = (
-    event
-) => {
-    if (
-        !event
-            ?.event_date
-    ) {
-        return null;
-    }
-
-    if (
-        event
-            .all_day ||
-        event
-            .allDay
-    ) {
-        return buildLocalDate(
-            event
-                .event_date,
-            '23:59'
-        );
-    }
-
-    return buildLocalDate(
-        event
-            .event_date,
-        normalizeTime(
-            event
-                .end_time
-        ) ||
-            normalizeTime(
-                event
-                    .start_time
-            ) ||
-            '23:59'
+            return (
+                a !== null &&
+                b !== null &&
+                begin < b &&
+                finish > a
+            );
+        }) || null
     );
 };
 
 /*
 |--------------------------------------------------------------------------
-| COMPONENT
+| HELPER ERROR
+|--------------------------------------------------------------------------
+*/
+
+const errorMessage = (error) => {
+    const data = error?.response?.data;
+
+    return (
+        Object.values(data?.errors || {})
+            .flat()
+            .find(Boolean) ||
+        data?.message ||
+        'Terjadi kesalahan pada server.'
+    );
+};
+
+/*
+|--------------------------------------------------------------------------
+| HELPER AUDIT TRAIL
+|--------------------------------------------------------------------------
+*/
+
+const auditValue = (field, value) => {
+    if (
+        value === null ||
+        value === undefined ||
+        value === ''
+    ) {
+        return '-';
+    }
+
+    if (field === 'directorate') {
+        return ownerLabel(value);
+    }
+
+    if (field === 'event_date') {
+        return dateText(value, true);
+    }
+
+    if (
+        field === 'start_time' ||
+        field === 'end_time'
+    ) {
+        return time(value);
+    }
+
+    if (field === 'all_day') {
+        return value ? 'Ya' : 'Tidak';
+    }
+
+    if (field === 'is_public') {
+        return value ? 'Publik' : 'Internal';
+    }
+
+    return String(value);
+};
+
+const auditChanges = (entry) =>
+    [
+        ...new Set([
+            ...Object.keys(entry.old_values || {}),
+            ...Object.keys(entry.new_values || {}),
+        ]),
+    ]
+        .map((field) => ({
+            field,
+            label: AUDIT_FIELDS[field] || field,
+            old: auditValue(
+                field,
+                entry.old_values?.[field]
+            ),
+            next: auditValue(
+                field,
+                entry.new_values?.[field]
+            ),
+        }))
+        .filter((item) => item.old !== item.next);
+
+/*
+|--------------------------------------------------------------------------
+| KOMPONEN FIELD
+|--------------------------------------------------------------------------
+*/
+
+function Field({
+    label,
+    children,
+    required = false,
+}) {
+    return (
+        <label className="d-block">
+            <span className="form-label fw-bold d-block mb-2">
+                {label}
+
+                {required && (
+                    <span className="text-danger ms-1">
+                        *
+                    </span>
+                )}
+            </span>
+
+            {children}
+        </label>
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| HALAMAN UTAMA
 |--------------------------------------------------------------------------
 */
 
 export default function DirectorSchedulePage() {
-    const calendarRef =
-        useRef(null);
-
-    const currentUser =
-        useMemo(
-            () =>
-                getStoredUser(),
-            []
-        );
-
-    const [
-        events,
-        setEvents,
-    ] =
-        useState([]);
-
-    const [
-        canManage,
-        setCanManage,
-    ] =
-        useState(false);
-
-    const [
-        loading,
-        setLoading,
-    ] =
-        useState(true);
-
-    const [
-        modalOpen,
-        setModalOpen,
-    ] =
-        useState(false);
-
-    const [
-        detailMode,
-        setDetailMode,
-    ] =
-        useState(false);
-
-    const [
-        selectedEvent,
-        setSelectedEvent,
-    ] =
-        useState(null);
-
-    const [
-        form,
-        setForm,
-    ] =
-        useState(
-            getEmptyForm()
-        );
-
-    const [
-        saving,
-        setSaving,
-    ] =
-        useState(false);
-
-    const [
-        activeFilter,
-        setActiveFilter,
-    ] =
-        useState(
-            'Semua'
-        );
+    const calendarRef = useRef(null);
 
     /*
     |--------------------------------------------------------------------------
-    | SEARCH
+    | STATE DATA
     |--------------------------------------------------------------------------
     */
 
-    const [
-        searchTerm,
-        setSearchTerm,
-    ] =
-        useState('');
+    const [events, setEvents] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    const [
-        now,
-        setNow,
-    ] =
-        useState(
-            () =>
-                new Date()
+    const [canManage, setCanManage] = useState(false);
+
+    const [activeOwner, setActiveOwner] =
+        useState('semua');
+
+    const [activeType, setActiveType] =
+        useState('Semua');
+
+    const [search, setSearch] = useState('');
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATE MODAL
+    |--------------------------------------------------------------------------
+    */
+
+    const [modalOpen, setModalOpen] =
+        useState(false);
+
+    const [detailMode, setDetailMode] =
+        useState(false);
+
+    const [selectedEvent, setSelectedEvent] =
+        useState(null);
+
+    const [form, setForm] = useState(blankForm());
+
+    const [saving, setSaving] = useState(false);
+
+    const [detailLoading, setDetailLoading] =
+        useState(false);
+
+    const [histories, setHistories] = useState([]);
+
+    const [historyError, setHistoryError] =
+        useState(false);
+
+    const [now, setNow] = useState(() => new Date());
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESPONSIVE CALENDAR
+    |--------------------------------------------------------------------------
+    |
+    | PERBAIKAN UTAMA:
+    |
+    | PC:
+    | - FullCalendar height = 100%
+    | - Parent memiliki tinggi tertentu.
+    |
+    | HP / TABLET:
+    | - FullCalendar height = auto
+    | - Parent mengikuti tinggi konten.
+    |
+    */
+
+    const [compact, setCompact] = useState(
+        () =>
+            typeof window !== 'undefined' &&
+            window
+                .matchMedia('(max-width: 1250px)')
+                .matches
+    );
+
+    useEffect(() => {
+        const media = window.matchMedia(
+            '(max-width: 1250px)'
         );
 
-    const userCanPotentiallyManage =
-        [
-            'admin',
-            'admin_humas',
-            'admin_sekpim',
-            'superadmin',
-        ].includes(
-            currentUser
-                ?.role
-        );
+        const change = () => {
+            setCompact(media.matches);
+        };
+
+        change();
+
+        media.addEventListener('change', change);
+
+        return () => {
+            media.removeEventListener(
+                'change',
+                change
+            );
+        };
+    }, []);
 
     /*
     |--------------------------------------------------------------------------
@@ -827,26 +554,36 @@ export default function DirectorSchedulePage() {
     |--------------------------------------------------------------------------
     */
 
-    useEffect(
-        () => {
-            const timer =
-                window.setInterval(
-                    () => {
-                        setNow(
-                            new Date()
-                        );
-                    },
-                    60000
-                );
+    useEffect(() => {
+        const timer = window.setInterval(
+            () => setNow(new Date()),
+            60000
+        );
 
-            return () => {
-                window.clearInterval(
-                    timer
-                );
-            };
-        },
-        []
-    );
+        return () => {
+            window.clearInterval(timer);
+        };
+    }, []);
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE CALENDAR SIZE
+    |--------------------------------------------------------------------------
+    */
+
+    useEffect(() => {
+        const frame = window.requestAnimationFrame(
+            () => {
+                calendarRef.current
+                    ?.getApi()
+                    ?.updateSize();
+            }
+        );
+
+        return () => {
+            window.cancelAnimationFrame(frame);
+        };
+    }, [compact]);
 
     /*
     |--------------------------------------------------------------------------
@@ -854,799 +591,384 @@ export default function DirectorSchedulePage() {
     |--------------------------------------------------------------------------
     */
 
-    const loadEvents =
-        useCallback(
-            async () => {
-                try {
-                    setLoading(
-                        true
-                    );
+    const loadEvents = useCallback(async () => {
+        try {
+            setLoading(true);
 
-                    const response =
-                        await api.get(
-                            '/event-schedules'
-                        );
+            const response = await api.get(
+                '/event-schedules'
+            );
 
-                    const data =
-                        response
-                            ?.data
-                            ?.data ||
-                        {};
+            const data =
+                response?.data?.data || {};
 
-                    setEvents(
-                        Array.isArray(
-                            data
-                                .events
-                        )
-                            ? data
-                                  .events
-                            : []
-                    );
+            setEvents(
+                Array.isArray(data.events)
+                    ? data.events
+                    : []
+            );
 
-                    setCanManage(
-                        Boolean(
-                            data
-                                .can_manage
-                        )
-                    );
-                } catch (
-                    error
+            setCanManage(Boolean(data.can_manage));
+        } catch (error) {
+            console.error(
+                'Load directorate schedules:',
+                error?.response?.data || error
+            );
+
+            await showErrorAlert(
+                'Gagal Memuat Jadwal',
+                errorMessage(error)
+            );
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadEvents();
+    }, [loadEvents]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | HITUNG TOTAL AGENDA
+    |--------------------------------------------------------------------------
+    */
+
+    const ownerCounts = useMemo(() => {
+        const counts = {
+            semua: events.length,
+        };
+
+        DIRECTORATES.forEach((item) => {
+            counts[item.value] = events.filter(
+                (event) =>
+                    event.directorate === item.value
+            ).length;
+        });
+
+        return counts;
+    }, [events]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | FILTER DIREKTORAT
+    |--------------------------------------------------------------------------
+    */
+
+    const ownerEvents = useMemo(
+        () =>
+            activeOwner === 'semua'
+                ? events
+                : events.filter(
+                      (event) =>
+                          event.directorate ===
+                          activeOwner
+                  ),
+        [events, activeOwner]
+    );
+
+    const activeOwnerInfo =
+        FILTERS.find(
+            (item) => item.value === activeOwner
+        ) || FILTERS[0];
+
+    /*
+    |--------------------------------------------------------------------------
+    | HITUNG KATEGORI
+    |--------------------------------------------------------------------------
+    */
+
+    const typeCounts = useMemo(() => {
+        const counts = {
+            Semua: ownerEvents.length,
+        };
+
+        TYPES.forEach((type) => {
+            counts[type] = ownerEvents.filter(
+                (event) =>
+                    event.agenda_type === type
+            ).length;
+        });
+
+        return counts;
+    }, [ownerEvents]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | FILTER AGENDA
+    |--------------------------------------------------------------------------
+    */
+
+    const filteredEvents = useMemo(
+        () =>
+            ownerEvents.filter((event) => {
+                if (
+                    activeType !== 'Semua' &&
+                    event.agenda_type !== activeType
                 ) {
-                    console.error(
-                        'Load director schedule error:',
-                        error
-                            ?.response
-                            ?.data ||
-                            error
-                    );
-
-                    await showErrorAlert(
-                        'Gagal Memuat Jadwal',
-                        extractErrorMessage(
-                            error
-                        )
-                    );
-                } finally {
-                    setLoading(
-                        false
-                    );
+                    return false;
                 }
-            },
-            []
-        );
 
-    useEffect(
-        () => {
-            loadEvents();
-        },
-        [
-            loadEvents,
-        ]
+                const term = search
+                    .trim()
+                    .toLowerCase();
+
+                return (
+                    !term ||
+                    [
+                        event.title,
+                        event.description,
+                        event.location,
+                        event.directorate_label,
+                        ownerLabel(event.directorate),
+                    ]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase()
+                        .includes(term)
+                );
+            }),
+        [ownerEvents, activeType, search]
     );
 
     /*
     |--------------------------------------------------------------------------
-    | GO TO TODAY
+    | AGENDA HARI INI
     |--------------------------------------------------------------------------
     */
 
-    const handleGoToday =
-        () => {
-            const calendarApi =
-                calendarRef
-                    .current
-                    ?.getApi();
+    const todayEvents = useMemo(
+        () =>
+            ownerEvents
+                .filter(
+                    (event) =>
+                        event.event_date ===
+                        dateKey(now)
+                )
+                .sort(
+                    (a, b) =>
+                        Number(Boolean(b.all_day)) -
+                            Number(
+                                Boolean(a.all_day)
+                            ) ||
+                        String(
+                            a.start_time || ''
+                        ).localeCompare(
+                            String(b.start_time || '')
+                        )
+                ),
+        [ownerEvents, now]
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | AGENDA TERDEKAT
+    |--------------------------------------------------------------------------
+    */
+
+    const nearest = useMemo(() => {
+        const candidates = ownerEvents
+            .map((event) => ({
+                event,
+
+                start: localDate(
+                    event.event_date,
+                    event.all_day
+                        ? '00:00'
+                        : event.start_time || '00:00'
+                ),
+
+                end: localDate(
+                    event.event_date,
+                    event.all_day
+                        ? '23:59'
+                        : event.end_time || '23:59'
+                ),
+            }))
+            .filter(
+                (item) =>
+                    item.start &&
+                    item.end &&
+                    item.end >= now
+            )
+            .sort(
+                (a, b) => a.start - b.start
+            );
+
+        const active = candidates.find(
+            (item) =>
+                item.start <= now &&
+                item.end >= now
+        );
+
+        const next = active || candidates[0];
+
+        return next
+            ? {
+                  ...next,
+                  status: active
+                      ? 'ongoing'
+                      : 'upcoming',
+              }
+            : null;
+    }, [ownerEvents, now]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | DETEKSI BENTROK
+    |--------------------------------------------------------------------------
+    */
+
+    const conflict = useMemo(
+        () =>
+            detailMode
+                ? null
+                : scheduleConflict(
+                      events,
+                      form,
+                      form.id
+                  ),
+        [events, form, detailMode]
+    );
+
+    const availability = useMemo(() => {
+        if (
+            detailMode ||
+            !form.directorate ||
+            !form.event_date
+        ) {
+            return null;
+        }
+
+        if (
+            !form.all_day &&
+            (!form.start_time ||
+                !form.end_time ||
+                form.end_time <= form.start_time)
+        ) {
+            return 'invalid';
+        }
+
+        return conflict
+            ? 'conflict'
+            : 'available';
+    }, [form, detailMode, conflict]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | SARAN WAKTU
+    |--------------------------------------------------------------------------
+    */
+
+    const suggestions = useMemo(() => {
+        if (
+            !conflict ||
+            form.all_day ||
+            detailMode
+        ) {
+            return [];
+        }
+
+        const begin = toMinutes(
+            form.start_time
+        );
+
+        const finish = toMinutes(
+            form.end_time
+        );
+
+        if (
+            begin === null ||
+            finish === null ||
+            finish <= begin
+        ) {
+            return [];
+        }
+
+        const candidates = potentialConflicts(
+            events,
+            form,
+            form.id
+        );
+
+        if (
+            candidates.some(
+                (item) =>
+                    item.all_day || item.allDay
+            )
+        ) {
+            return [];
+        }
+
+        const duration = finish - begin;
+        const slots = [];
+
+        for (
+            let minute = 360;
+            minute + duration <= 1320;
+            minute += 30
+        ) {
+            const start = fromMinutes(minute);
+
+            const end = fromMinutes(
+                minute + duration
+            );
+
+            const checking = {
+                ...form,
+                start_time: start,
+                end_time: end,
+            };
 
             if (
-                calendarApi
-            ) {
-                calendarApi.today();
-            }
-        };
-
-    /*
-    |--------------------------------------------------------------------------
-    | TODAY EVENTS
-    |--------------------------------------------------------------------------
-    */
-
-    const todayDateKey =
-        useMemo(
-            () =>
-                getLocalDateKey(
-                    now
-                ),
-            [
-                now,
-            ]
-        );
-
-    const todayEvents =
-        useMemo(
-            () => {
-                return events
-                    .filter(
-                        (
-                            event
-                        ) =>
-                            event
-                                .event_date ===
-                            todayDateKey
-                    )
-                    .sort(
-                        (
-                            a,
-                            b
-                        ) => {
-                            if (
-                                Boolean(
-                                    a
-                                        .all_day
-                                ) !==
-                                Boolean(
-                                    b
-                                        .all_day
-                                )
-                            ) {
-                                return a
-                                    .all_day
-                                    ? -1
-                                    : 1;
-                            }
-
-                            return String(
-                                a
-                                    .start_time ||
-                                    ''
-                            ).localeCompare(
-                                String(
-                                    b
-                                        .start_time ||
-                                        ''
-                                )
-                            );
-                        }
-                    );
-            },
-            [
-                events,
-                todayDateKey,
-            ]
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | NEAREST AGENDA
-    |--------------------------------------------------------------------------
-    */
-
-    const nearestAgenda =
-        useMemo(
-            () => {
-                const candidates =
-                    events
-                        .map(
-                            (
-                                event
-                            ) => {
-                                const start =
-                                    getEventStartDate(
-                                        event
-                                    );
-
-                                const end =
-                                    getEventEndDate(
-                                        event
-                                    );
-
-                                return {
-                                    event,
-                                    start,
-                                    end,
-                                };
-                            }
-                        )
-                        .filter(
-                            (
-                                item
-                            ) => {
-                                if (
-                                    !item
-                                        .start ||
-                                    !item
-                                        .end
-                                ) {
-                                    return false;
-                                }
-
-                                return (
-                                    item.end
-                                        .getTime() >=
-                                    now.getTime()
-                                );
-                            }
-                        )
-                        .sort(
-                            (
-                                a,
-                                b
-                            ) =>
-                                a.start
-                                    .getTime() -
-                                b.start
-                                    .getTime()
-                        );
-
-                if (
-                    candidates.length ===
-                    0
-                ) {
-                    return null;
-                }
-
-                const active =
-                    candidates.find(
-                        (
-                            item
-                        ) =>
-                            item.start
-                                .getTime() <=
-                                now.getTime() &&
-                            item.end
-                                .getTime() >=
-                                now.getTime()
-                    );
-
-                if (
-                    active
-                ) {
-                    return {
-                        ...active,
-
-                        status:
-                            'ongoing',
-                    };
-                }
-
-                return {
-                    ...candidates[0],
-
-                    status:
-                        'upcoming',
-                };
-            },
-            [
-                events,
-                now,
-            ]
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | CATEGORY COUNTS
-    |--------------------------------------------------------------------------
-    */
-
-    const agendaCounts =
-        useMemo(
-            () => {
-                const counts = {
-                    Semua:
-                        events.length,
-                };
-
-                AGENDA_TYPES.forEach(
-                    (
-                        type
-                    ) => {
-                        counts[type] =
-                            events.filter(
-                                (
-                                    event
-                                ) =>
-                                    event
-                                        .agenda_type ===
-                                    type
-                            ).length;
-                    }
-                );
-
-                return counts;
-            },
-            [
-                events,
-            ]
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | FILTER + SEARCH
-    |--------------------------------------------------------------------------
-    |
-    | Search hanya memengaruhi event yang terlihat.
-    |
-    | Validasi bentrok tetap memakai array `events`,
-    | bukan `filteredEvents`.
-    |
-    */
-
-    const filteredEvents =
-        useMemo(
-            () => {
-                const keyword =
-                    searchTerm
-                        .trim()
-                        .toLowerCase();
-
-                return events.filter(
-                    (
-                        event
-                    ) => {
-                        const matchesCategory =
-                            activeFilter ===
-                                'Semua' ||
-                            event
-                                .agenda_type ===
-                                activeFilter;
-
-                        if (
-                            !matchesCategory
-                        ) {
-                            return false;
-                        }
-
-                        if (
-                            !keyword
-                        ) {
-                            return true;
-                        }
-
-                        const title =
-                            String(
-                                event
-                                    .title ||
-                                    ''
-                            ).toLowerCase();
-
-                        const location =
-                            String(
-                                event
-                                    .location ||
-                                    ''
-                            ).toLowerCase();
-
-                        return (
-                            title.includes(
-                                keyword
-                            ) ||
-                            location.includes(
-                                keyword
-                            )
-                        );
-                    }
-                );
-            },
-            [
-                events,
-                activeFilter,
-                searchTerm,
-            ]
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | REALTIME CONFLICT
-    |--------------------------------------------------------------------------
-    */
-
-    const realtimeConflict =
-        useMemo(
-            () => {
-                if (
-                    detailMode ||
-                    !form
-                        .event_date
-                ) {
-                    return null;
-                }
-
-                const sameDateEvents =
-                    getSameDateEvents(
-                        events,
-                        form
-                            .event_date,
-                        form.id
-                    );
-
-                if (
-                    form
-                        .all_day
-                ) {
-                    return (
-                        sameDateEvents[0] ||
-                        null
-                    );
-                }
-
-                return findTimeConflict(
+                !scheduleConflict(
                     events,
-                    form
-                        .event_date,
-                    form
-                        .start_time,
-                    form
-                        .end_time,
+                    checking,
                     form.id
-                );
-            },
-            [
-                events,
-                form.id,
-                form.event_date,
-                form.start_time,
-                form.end_time,
-                form.all_day,
-                detailMode,
-            ]
-        );
+                )
+            ) {
+                slots.push({
+                    start,
+                    end,
+                    distance: Math.abs(
+                        minute - begin
+                    ),
+                    minute,
+                });
+            }
+        }
 
-    /*
-    |--------------------------------------------------------------------------
-    | AVAILABILITY
-    |--------------------------------------------------------------------------
-    */
-
-    const availabilityState =
-        useMemo(
-            () => {
-                if (
-                    detailMode ||
-                    !form
-                        .event_date
-                ) {
-                    return null;
-                }
-
-                if (
-                    form
-                        .all_day
-                ) {
-                    return realtimeConflict
-                        ? 'conflict'
-                        : 'available';
-                }
-
-                if (
-                    !form
-                        .start_time ||
-                    !form
-                        .end_time
-                ) {
-                    return null;
-                }
-
-                if (
-                    form
-                        .end_time <=
-                    form
-                        .start_time
-                ) {
-                    return 'invalid';
-                }
-
-                return realtimeConflict
-                    ? 'conflict'
-                    : 'available';
-            },
-            [
-                detailMode,
-                form.event_date,
-                form.start_time,
-                form.end_time,
-                form.all_day,
-                realtimeConflict,
-            ]
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | SUGGESTED AVAILABLE TIMES
-    |--------------------------------------------------------------------------
-    */
-
-    const suggestedTimeSlots =
-        useMemo(
-            () => {
-                if (
-                    detailMode ||
-                    !realtimeConflict ||
-                    form
-                        .all_day ||
-                    !form
-                        .event_date
-                ) {
-                    return [];
-                }
-
-                const requestedStart =
-                    timeToMinutes(
-                        form
-                            .start_time
-                    );
-
-                const requestedEnd =
-                    timeToMinutes(
-                        form
-                            .end_time
-                    );
-
-                if (
-                    requestedStart ===
-                        null ||
-                    requestedEnd ===
-                        null ||
-                    requestedEnd <=
-                        requestedStart
-                ) {
-                    return [];
-                }
-
-                const duration =
-                    requestedEnd -
-                    requestedStart;
-
-                const sameDateEvents =
-                    getSameDateEvents(
-                        events,
-                        form
-                            .event_date,
-                        form.id
-                    );
-
-                const hasAllDayEvent =
-                    sameDateEvents.some(
-                        (
-                            event
-                        ) =>
-                            event
-                                .all_day ||
-                            event
-                                .allDay
-                    );
-
-                if (
-                    hasAllDayEvent
-                ) {
-                    return [];
-                }
-
-                const candidates =
-                    [];
-
-                for (
-                    let start =
-                        WORKING_START_MINUTES;
-                    start +
-                        duration <=
-                    WORKING_END_MINUTES;
-                    start +=
-                        SLOT_INTERVAL_MINUTES
-                ) {
-                    const end =
-                        start +
-                        duration;
-
-                    const startText =
-                        minutesToTime(
-                            start
-                        );
-
-                    const endText =
-                        minutesToTime(
-                            end
-                        );
-
-                    const conflict =
-                        findTimeConflict(
-                            events,
-                            form
-                                .event_date,
-                            startText,
-                            endText,
-                            form.id
-                        );
-
-                    if (
-                        !conflict
-                    ) {
-                        candidates.push({
-                            start:
-                                startText,
-
-                            end:
-                                endText,
-
-                            startMinutes:
-                                start,
-
-                            distance:
-                                Math.abs(
-                                    start -
-                                        requestedStart
-                                ),
-                        });
-                    }
-                }
-
-                return candidates
-                    .sort(
-                        (
-                            a,
-                            b
-                        ) => {
-                            if (
-                                a.distance !==
-                                b.distance
-                            ) {
-                                return (
-                                    a.distance -
-                                    b.distance
-                                );
-                            }
-
-                            return (
-                                a.startMinutes -
-                                b.startMinutes
-                            );
-                        }
-                    )
-                    .slice(
-                        0,
-                        3
-                    );
-            },
-            [
-                detailMode,
-                realtimeConflict,
-                form.all_day,
-                form.event_date,
-                form.start_time,
-                form.end_time,
-                form.id,
-                events,
-            ]
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | APPLY SUGGESTION
-    |--------------------------------------------------------------------------
-    */
-
-    const applySuggestedTime = (
-        slot
-    ) => {
-        setForm(
-            (
-                previous
-            ) => ({
-                ...previous,
-
-                all_day:
-                    false,
-
-                start_time:
-                    slot.start,
-
-                end_time:
-                    slot.end,
-            })
-        );
-    };
-
-    /*
-    |--------------------------------------------------------------------------
-    | OPEN CREATE
-    |--------------------------------------------------------------------------
-    */
-
-    const openCreateModal = (
-        date = ''
-    ) => {
-        setSelectedEvent(
-            null
-        );
-
-        setDetailMode(
-            false
-        );
-
-        setForm(
-            getEmptyForm(
-                date
+        return slots
+            .sort(
+                (a, b) =>
+                    a.distance - b.distance ||
+                    a.minute - b.minute
             )
-        );
-
-        setModalOpen(
-            true
-        );
-    };
+            .slice(0, 3);
+    }, [
+        events,
+        form,
+        detailMode,
+        conflict,
+    ]);
 
     /*
     |--------------------------------------------------------------------------
-    | OPEN DETAIL
+    | FORM CHANGE
     |--------------------------------------------------------------------------
     */
 
-    const openDetailModal = (
-        event
-    ) => {
-        const agendaType =
-            event
-                .agenda_type ||
-            'Rapat';
+    const setField = (field, value) => {
+        setForm((old) => ({
+            ...old,
+            [field]: value,
 
-        setSelectedEvent(
-            event
-        );
-
-        setForm({
-            id:
-                event.id,
-
-            title:
-                event.title ||
-                '',
-
-            description:
-                event.description ||
-                '',
-
-            event_date:
-                event.event_date ||
-                '',
-
-            start_time:
-                event.start_time ||
-                '09:00',
-
-            end_time:
-                event.end_time ||
-                '10:00',
-
-            all_day:
-                Boolean(
-                    event
-                        .all_day
-                ),
-
-            location:
-                event.location ||
-                '',
-
-            agenda_type:
-                agendaType,
-
-            color:
-                event.color ||
-                getAgendaColor(
-                    agendaType
-                ),
-
-            is_public:
-                Boolean(
-                    event
-                        .is_public
-                ),
-        });
-
-        setDetailMode(
-            true
-        );
-
-        setModalOpen(
-            true
-        );
+            ...(field === 'agenda_type'
+                ? {
+                      color: colorOf(value),
+                  }
+                : {}),
+        }));
     };
 
     /*
@@ -1655,619 +977,496 @@ export default function DirectorSchedulePage() {
     |--------------------------------------------------------------------------
     */
 
-    const closeModal =
-        () => {
-            if (
-                saving
-            ) {
-                return;
-            }
+    const closeModal = () => {
+        if (saving) return;
 
-            setModalOpen(
-                false
-            );
-
-            setSelectedEvent(
-                null
-            );
-
-            setDetailMode(
-                false
-            );
-        };
-
-    /*
-    |--------------------------------------------------------------------------
-    | FORM CHANGE
-    |--------------------------------------------------------------------------
-    */
-
-    const handleFormChange = (
-        field,
-        value
-    ) => {
-        setForm(
-            (
-                previous
-            ) => {
-                if (
-                    field ===
-                    'agenda_type'
-                ) {
-                    return {
-                        ...previous,
-
-                        agenda_type:
-                            value,
-
-                        color:
-                            getAgendaColor(
-                                value
-                            ),
-                    };
-                }
-
-                return {
-                    ...previous,
-
-                    [field]:
-                        value,
-                };
-            }
-        );
+        setModalOpen(false);
+        setDetailMode(false);
+        setSelectedEvent(null);
+        setHistories([]);
+        setHistoryError(false);
     };
 
     /*
     |--------------------------------------------------------------------------
-    | VALIDATE
+    | CREATE MODAL
     |--------------------------------------------------------------------------
     */
 
-    const validateForm =
-        async () => {
-            if (
-                !form
-                    .title
-                    .trim()
-            ) {
-                await showWarningAlert(
-                    'Judul Belum Diisi',
-                    'Judul agenda wajib diisi.'
-                );
+    const openCreateModal = (date = '') => {
+        setSelectedEvent(null);
+        setHistories([]);
+        setHistoryError(false);
+        setDetailMode(false);
 
-                return false;
-            }
+        setForm(
+            blankForm(
+                date,
+                activeOwner === 'semua'
+                    ? ''
+                    : activeOwner
+            )
+        );
 
-            if (
-                !form
-                    .event_date
-            ) {
-                await showWarningAlert(
-                    'Tanggal Belum Dipilih',
-                    'Tanggal agenda wajib dipilih.'
-                );
-
-                return false;
-            }
-
-            if (
-                !form
-                    .all_day
-            ) {
-                if (
-                    !form
-                        .start_time ||
-                    !form
-                        .end_time
-                ) {
-                    await showWarningAlert(
-                        'Jam Belum Lengkap',
-                        'Jam mulai dan jam selesai wajib diisi.'
-                    );
-
-                    return false;
-                }
-
-                if (
-                    form
-                        .end_time <=
-                    form
-                        .start_time
-                ) {
-                    await showWarningAlert(
-                        'Jam Tidak Valid',
-                        'Jam selesai harus setelah jam mulai.'
-                    );
-
-                    return false;
-                }
-            }
-
-            if (
-                realtimeConflict
-            ) {
-                await showWarningAlert(
-                    'Jadwal Bentrok',
-                    `Waktu yang dipilih bertabrakan dengan agenda "${realtimeConflict.title}".
-
-Tanggal: ${formatConflictDate(
-                        realtimeConflict.event_date
-                    )}
-Waktu: ${getConflictTimeText(
-                        realtimeConflict
-                    )}
-Lokasi: ${realtimeConflict.location || '-'}
-
-Silakan pilih waktu lain.`
-                );
-
-                return false;
-            }
-
-            return true;
-        };
+        setModalOpen(true);
+    };
 
     /*
     |--------------------------------------------------------------------------
-    | CALENDAR CLICK
+    | APPLY EVENT
     |--------------------------------------------------------------------------
     */
 
-    const handleDateClick = (
-        info
-    ) => {
+    const applyEvent = (event) => {
+        setForm({
+            id: event.id,
+            directorate:
+                event.directorate || 'direktur',
+            title: event.title || '',
+            description:
+                event.description || '',
+            event_date:
+                event.event_date || '',
+            start_time:
+                time(event.start_time) || '09:00',
+            end_time:
+                time(event.end_time) || '10:00',
+            all_day: Boolean(
+                event.all_day ?? event.allDay
+            ),
+            location:
+                event.location || '',
+            agenda_type:
+                event.agenda_type || 'Rapat',
+            color:
+                event.color ||
+                colorOf(event.agenda_type),
+            is_public: Boolean(
+                event.is_public
+            ),
+        });
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | DETAIL MODAL
+    |--------------------------------------------------------------------------
+    */
+
+    const openDetailModal = async (event) => {
+        if (!event?.id) return;
+
+        setSelectedEvent(event);
+
+        applyEvent(event);
+
+        setDetailMode(true);
+        setHistories([]);
+        setHistoryError(false);
+        setModalOpen(true);
+
+        try {
+            setDetailLoading(true);
+
+            const response = await api.get(
+                `/event-schedules/${event.id}`
+            );
+
+            const detail =
+                response?.data?.data;
+
+            if (detail) {
+                setSelectedEvent(detail);
+                applyEvent(detail);
+
+                setHistories(
+                    Array.isArray(
+                        detail.histories
+                    )
+                        ? detail.histories
+                        : []
+                );
+            }
+        } catch (error) {
+            console.error(
+                'Load schedule detail:',
+                error?.response?.data || error
+            );
+
+            setHistoryError(true);
+        } finally {
+            setDetailLoading(false);
+        }
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDASI FORM
+    |--------------------------------------------------------------------------
+    */
+
+    const validateForm = async () => {
+        if (!form.directorate) {
+            await showWarningAlert(
+                'Agenda Untuk Siapa?',
+                'Pilih Direktorat, Direktur, Wakil Direktur I, atau Wakil Direktur II.'
+            );
+
+            return false;
+        }
+
+        if (!form.title.trim()) {
+            await showWarningAlert(
+                'Judul Belum Diisi',
+                'Judul agenda wajib diisi.'
+            );
+
+            return false;
+        }
+
+        if (!form.event_date) {
+            await showWarningAlert(
+                'Tanggal Belum Dipilih',
+                'Tanggal agenda wajib dipilih.'
+            );
+
+            return false;
+        }
+
         if (
-            !canManage
+            !form.all_day &&
+            (!form.start_time ||
+                !form.end_time ||
+                form.end_time <= form.start_time)
+        ) {
+            await showWarningAlert(
+                'Jam Tidak Valid',
+                'Jam selesai harus setelah jam mulai.'
+            );
+
+            return false;
+        }
+
+        if (conflict) {
+            await showWarningAlert(
+                'Jadwal Bentrok',
+                `Agenda ${ownerLabel(
+                    form.directorate
+                )} bentrok dengan "${
+                    conflict.title
+                }" (${ownerLabel(
+                    conflict.directorate
+                )}), ${dateText(
+                    conflict.event_date
+                )} pukul ${timeText(conflict)}.`
+            );
+
+            return false;
+        }
+
+        return true;
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | SAVE AGENDA
+    |--------------------------------------------------------------------------
+    */
+
+    const handleSave = async () => {
+        if (!canManage) {
+            await showErrorAlert(
+                'Akses Ditolak',
+                'Akun tidak memiliki izin mengelola agenda.'
+            );
+
+            return;
+        }
+
+        if (!(await validateForm())) {
+            return;
+        }
+
+        const editing = Boolean(form.id);
+
+        const confirmed =
+            await showConfirmAlert({
+                title: editing
+                    ? 'Simpan Perubahan Agenda?'
+                    : 'Tambahkan Agenda?',
+
+                text: `Agenda untuk ${ownerLabel(
+                    form.directorate
+                )} akan ${
+                    editing
+                        ? 'diperbarui'
+                        : 'ditambahkan'
+                }.`,
+
+                confirmButtonText: editing
+                    ? 'Ya, simpan'
+                    : 'Ya, tambahkan',
+
+                confirmButtonColor:
+                    '#7f1d1d',
+            });
+
+        if (!confirmed?.isConfirmed) {
+            return;
+        }
+
+        const payload = {
+            directorate: form.directorate,
+            title: form.title.trim(),
+
+            description:
+                form.description.trim() || null,
+
+            event_date: form.event_date,
+
+            start_time: form.all_day
+                ? null
+                : time(form.start_time),
+
+            end_time: form.all_day
+                ? null
+                : time(form.end_time),
+
+            all_day: Boolean(
+                form.all_day
+            ),
+
+            location:
+                form.location.trim() || null,
+
+            agenda_type:
+                form.agenda_type,
+
+            color: colorOf(
+                form.agenda_type
+            ),
+
+            is_public: Boolean(
+                form.is_public
+            ),
+        };
+
+        try {
+            setSaving(true);
+
+            showLoadingAlert(
+                editing
+                    ? 'Menyimpan Agenda'
+                    : 'Menambahkan Agenda',
+                'Sistem sedang memeriksa bentrok jadwal.'
+            );
+
+            const response = editing
+                ? await api.put(
+                      `/event-schedules/${form.id}`,
+                      payload
+                  )
+                : await api.post(
+                      '/event-schedules',
+                      payload
+                  );
+
+            closeAlert();
+
+            await showSuccessAlert(
+                editing
+                    ? 'Agenda Diperbarui'
+                    : 'Agenda Ditambahkan',
+                response?.data?.message ||
+                    'Agenda berhasil disimpan.'
+            );
+
+            if (
+                activeOwner !== 'semua'
+            ) {
+                setActiveOwner(
+                    form.directorate
+                );
+            }
+
+            setModalOpen(false);
+            setSelectedEvent(null);
+            setDetailMode(false);
+            setHistories([]);
+
+            await loadEvents();
+        } catch (error) {
+            closeAlert();
+
+            const info =
+                error?.response?.data;
+
+            if (
+                error?.response?.status === 409 &&
+                info?.code ===
+                    'SCHEDULE_CONFLICT'
+            ) {
+                const item =
+                    info?.data?.conflict;
+
+                await showWarningAlert(
+                    'Jadwal Bentrok',
+                    `${info.message ||
+                        'Agenda tidak dapat disimpan.'}
+
+${item?.directorate_label || ''}
+${item?.title || ''}
+${dateText(item?.event_date)}
+${item?.time_text || ''}`
+                );
+            } else {
+                await showErrorAlert(
+                    'Gagal Menyimpan Agenda',
+                    errorMessage(error)
+                );
+            }
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE AGENDA
+    |--------------------------------------------------------------------------
+    */
+
+    const handleDelete = async () => {
+        if (
+            !canManage ||
+            !selectedEvent
         ) {
             return;
         }
 
-        openCreateModal(
-            info.dateStr
-        );
-    };
+        const confirmed =
+            await showConfirmAlert({
+                title: 'Hapus Agenda?',
 
-    const handleEventClick = (
-        info
-    ) => {
-        const id =
-            Number(
-                info
-                    .event
-                    .id
+                text: `Agenda "${selectedEvent.title}" akan dihapus.`,
+
+                icon: 'warning',
+
+                confirmButtonText:
+                    'Ya, hapus',
+
+                confirmButtonColor:
+                    '#dc2626',
+            });
+
+        if (!confirmed?.isConfirmed) {
+            return;
+        }
+
+        try {
+            setSaving(true);
+
+            showLoadingAlert(
+                'Menghapus Agenda',
+                'Mohon tunggu sebentar.'
             );
 
-        const event =
-            events.find(
-                (
-                    item
-                ) =>
-                    Number(
-                        item.id
-                    ) ===
-                    id
+            await api.delete(
+                `/event-schedules/${selectedEvent.id}`
             );
 
-        if (
-            event
-        ) {
-            openDetailModal(
-                event
+            closeAlert();
+
+            await showSuccessAlert(
+                'Agenda Dihapus',
+                'Agenda berhasil dihapus.'
             );
+
+            setModalOpen(false);
+            setSelectedEvent(null);
+            setDetailMode(false);
+            setHistories([]);
+
+            await loadEvents();
+        } catch (error) {
+            closeAlert();
+
+            await showErrorAlert(
+                'Gagal Menghapus Agenda',
+                errorMessage(error)
+            );
+        } finally {
+            setSaving(false);
         }
     };
 
     /*
     |--------------------------------------------------------------------------
-    | SAVE
+    | FULLCALENDAR EVENTS
     |--------------------------------------------------------------------------
     */
 
-    const handleSave =
-        async () => {
-            if (
-                !canManage ||
-                !userCanPotentiallyManage
-            ) {
-                await showErrorAlert(
-                    'Akses Ditolak',
-                    'Akun tidak memiliki izin mengelola Jadwal Direktur.'
-                );
+    const calendarEvents = useMemo(
+        () =>
+            filteredEvents.map((event) => ({
+                id: String(event.id),
 
-                return;
-            }
+                title: `[${ownerShort(
+                    event.directorate
+                )}] ${event.title}`,
 
-            if (
-                !(await validateForm())
-            ) {
-                return;
-            }
+                start:
+                    event.start ||
+                    `${event.event_date}${
+                        event.all_day
+                            ? ''
+                            : `T${time(
+                                  event.start_time
+                              )}:00`
+                    }`,
 
-            const isEdit =
-                Boolean(
-                    form.id
-                );
-
-            const confirmation =
-                await showConfirmAlert({
-                    title:
-                        isEdit
-                            ? 'Simpan Perubahan Agenda?'
-                            : 'Tambahkan Agenda?',
-
-                    text:
-                        isEdit
-                            ? 'Perubahan agenda akan langsung diterapkan pada kalender.'
-                            : 'Agenda akan langsung ditambahkan ke kalender Direktur.',
-
-                    confirmButtonText:
-                        isEdit
-                            ? 'Ya, simpan'
-                            : 'Ya, tambahkan',
-
-                    cancelButtonText:
-                        'Batal',
-
-                    icon:
-                        'question',
-
-                    confirmButtonColor:
-                        '#7f1d1d',
-                });
-
-            if (
-                !confirmation
-                    .isConfirmed
-            ) {
-                return;
-            }
-
-            const payload = {
-                title:
-                    form
-                        .title
-                        .trim(),
-
-                description:
-                    form
-                        .description
-                        .trim() ||
-                    null,
-
-                event_date:
-                    form
-                        .event_date,
-
-                all_day:
-                    Boolean(
-                        form
-                            .all_day
-                    ),
-
-                start_time:
-                    form
-                        .all_day
+                end:
+                    event.end ||
+                    (event.all_day
                         ? null
-                        : form
-                              .start_time,
+                        : `${event.event_date}T${time(
+                              event.end_time
+                          )}:00`),
 
-                end_time:
-                    form
-                        .all_day
-                        ? null
-                        : form
-                              .end_time,
-
-                location:
-                    form
-                        .location
-                        .trim() ||
-                    null,
-
-                agenda_type:
-                    form
-                        .agenda_type,
-
-                color:
-                    getAgendaColor(
-                        form
-                            .agenda_type
-                    ),
-
-                is_public:
-                    Boolean(
-                        form
-                            .is_public
-                    ),
-            };
-
-            try {
-                setSaving(
-                    true
-                );
-
-                showLoadingAlert(
-                    isEdit
-                        ? 'Menyimpan Agenda'
-                        : 'Menambahkan Agenda',
-
-                    'Sistem sedang memeriksa ketersediaan jadwal.'
-                );
-
-                const response =
-                    isEdit
-                        ? await api.put(
-                              `/event-schedules/${form.id}`,
-                              payload
-                          )
-                        : await api.post(
-                              '/event-schedules',
-                              payload
-                          );
-
-                closeAlert();
-
-                await showSuccessAlert(
-                    isEdit
-                        ? 'Agenda Diperbarui'
-                        : 'Agenda Ditambahkan',
-
-                    response
-                        ?.data
-                        ?.message ||
-                        'Data agenda berhasil disimpan.'
-                );
-
-                setModalOpen(
-                    false
-                );
-
-                setSelectedEvent(
-                    null
-                );
-
-                setDetailMode(
-                    false
-                );
-
-                await loadEvents();
-            } catch (
-                error
-            ) {
-                console.error(
-                    'Save director schedule error:',
-                    error
-                        ?.response
-                        ?.data ||
-                        error
-                );
-
-                closeAlert();
-
-                const responseData =
-                    error
-                        ?.response
-                        ?.data;
-
-                if (
-                    error
-                        ?.response
-                        ?.status ===
-                        409 &&
-                    responseData
-                        ?.code ===
-                        'SCHEDULE_CONFLICT'
-                ) {
-                    const conflict =
-                        responseData
-                            ?.data
-                            ?.conflict;
-
-                    const conflictDate =
-                        formatConflictDate(
-                            conflict
-                                ?.event_date
-                        );
-
-                    const conflictTime =
-                        conflict
-                            ?.all_day
-                            ? 'Sepanjang Hari'
-                            : conflict
-                                  ?.time_text ||
-                              `${conflict?.start_time || '-'} - ${conflict?.end_time || '-'}`;
-
-                    await showWarningAlert(
-                        'Jadwal Bentrok',
-                        `Agenda tidak dapat disimpan karena terdapat agenda lain pada waktu tersebut.
-
-Agenda: ${conflict?.title || '-'}
-Kategori: ${conflict?.agenda_type || '-'}
-Tanggal: ${conflictDate}
-Waktu: ${conflictTime}
-Lokasi: ${conflict?.location || '-'}
-
-Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
-                    );
-
-                    return;
-                }
-
-                await showErrorAlert(
-                    'Gagal Menyimpan Agenda',
-                    extractErrorMessage(
-                        error
-                    )
-                );
-            } finally {
-                setSaving(
-                    false
-                );
-            }
-        };
-
-    /*
-    |--------------------------------------------------------------------------
-    | DELETE
-    |--------------------------------------------------------------------------
-    */
-
-    const handleDelete =
-        async () => {
-            if (
-                !selectedEvent ||
-                !canManage
-            ) {
-                return;
-            }
-
-            const confirmation =
-                await showConfirmAlert({
-                    title:
-                        'Hapus Agenda?',
-
-                    text:
-                        `Agenda "${selectedEvent.title}" akan dihapus permanen.`,
-
-                    confirmButtonText:
-                        'Ya, hapus',
-
-                    cancelButtonText:
-                        'Batal',
-
-                    icon:
-                        'warning',
-
-                    confirmButtonColor:
-                        '#dc2626',
-                });
-
-            if (
-                !confirmation
-                    .isConfirmed
-            ) {
-                return;
-            }
-
-            try {
-                setSaving(
-                    true
-                );
-
-                showLoadingAlert(
-                    'Menghapus Agenda',
-                    'Mohon tunggu sebentar.'
-                );
-
-                await api.delete(
-                    `/event-schedules/${selectedEvent.id}`
-                );
-
-                closeAlert();
-
-                await showSuccessAlert(
-                    'Agenda Dihapus',
-                    'Agenda berhasil dihapus.'
-                );
-
-                setModalOpen(
-                    false
-                );
-
-                setSelectedEvent(
-                    null
-                );
-
-                setDetailMode(
-                    false
-                );
-
-                await loadEvents();
-            } catch (
-                error
-            ) {
-                console.error(
-                    'Delete director schedule error:',
-                    error
-                        ?.response
-                        ?.data ||
-                        error
-                );
-
-                closeAlert();
-
-                await showErrorAlert(
-                    'Gagal Menghapus Agenda',
-                    extractErrorMessage(
-                        error
-                    )
-                );
-            } finally {
-                setSaving(
-                    false
-                );
-            }
-        };
-
-    /*
-    |--------------------------------------------------------------------------
-    | CALENDAR EVENTS
-    |--------------------------------------------------------------------------
-    */
-
-    const calendarEvents =
-        useMemo(
-            () =>
-                filteredEvents.map(
-                    (
-                        item
-                    ) => {
-                        const color =
-                            item
-                                .color ||
-                            getAgendaColor(
-                                item
-                                    .agenda_type
-                            );
-
-                        return {
-                            id:
-                                String(
-                                    item.id
-                                ),
-
-                            title:
-                                item.title,
-
-                            start:
-                                item.start,
-
-                            end:
-                                item.end,
-
-                            allDay:
-                                Boolean(
-                                    item
-                                        .allDay ??
-                                        item
-                                            .all_day
-                                ),
-
-                            backgroundColor:
-                                color,
-
-                            borderColor:
-                                color,
-
-                            textColor:
-                                '#ffffff',
-                        };
-                    }
+                allDay: Boolean(
+                    event.allDay ??
+                        event.all_day
                 ),
-            [
-                filteredEvents,
-            ]
+
+                backgroundColor:
+                    event.color ||
+                    colorOf(
+                        event.agenda_type
+                    ),
+
+                borderColor:
+                    event.color ||
+                    colorOf(
+                        event.agenda_type
+                    ),
+
+                textColor:
+                    '#ffffff',
+            })),
+        [filteredEvents]
+    );
+
+    const onCalendarEvent = (info) => {
+        const found = events.find(
+            (item) =>
+                Number(item.id) ===
+                Number(info.event.id)
         );
+
+        if (found) {
+            openDetailModal(found);
+        }
+    };
 
     /*
     |--------------------------------------------------------------------------
@@ -2275,16 +1474,14 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
     |--------------------------------------------------------------------------
     */
 
-    if (
-        loading
-    ) {
+    if (loading) {
         return (
             <div className="card border-0 shadow-sm rounded-4">
-                <div className="card-body py-5 text-center">
-                    <div className="spinner-border text-danger mb-3" />
+                <div className="card-body text-center py-5">
+                    <span className="spinner-border text-danger mb-3" />
 
-                    <h5 className="fw-black mb-0">
-                        Memuat Jadwal Direktur
+                    <h5 className="fw-bold mb-0">
+                        Memuat Jadwal Direktorat
                     </h5>
                 </div>
             </div>
@@ -2293,7 +1490,7 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
 
     /*
     |--------------------------------------------------------------------------
-    | VIEW
+    | RENDER PAGE
     |--------------------------------------------------------------------------
     */
 
@@ -2301,275 +1498,258 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
         <div className="director-schedule-page">
             {/* HEADER */}
 
-            <section className="director-schedule-top">
+            <header className="director-schedule-header">
                 <div>
-                    <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
+                    <div className="d-flex flex-wrap gap-2 mb-2">
                         <span className="badge rounded-pill bg-danger-subtle text-danger px-3 py-2">
                             SEKRETARIAT PIMPINAN
                         </span>
 
-                        <span className="badge rounded-pill bg-white text-dark border px-3 py-2">
+                        <span className="badge rounded-pill border bg-white text-dark px-3 py-2">
                             <i className="bi bi-calendar-event me-2" />
-
                             {events.length} Agenda
                         </span>
                     </div>
 
                     <h2 className="fw-black mb-1">
-                        Jadwal Direktur
+                        Jadwal Direktorat
                     </h2>
 
                     <p className="text-muted mb-0">
-                        Kalender agenda dan kegiatan Direktur Telkom University Surabaya.
+                        Agenda Direktur, Wakil Direktur I,
+                        Wakil Direktur II, serta agenda
+                        bersama Direktorat.
                     </p>
                 </div>
 
                 {canManage && (
                     <button
                         type="button"
-                        className="btn btn-danger rounded-pill director-add-button"
+                        className="btn btn-danger rounded-pill fw-bold px-4"
                         onClick={() =>
                             openCreateModal()
                         }
                     >
                         <i className="bi bi-plus-lg me-2" />
-
                         Tambah Agenda
                     </button>
                 )}
+            </header>
+
+            {/* FILTER DIREKTORAT */}
+
+            <section className="directorate-filter-grid">
+                {FILTERS.map((item) => (
+                    <button
+                        key={item.value}
+                        type="button"
+                        className={`directorate-filter-card ${
+                            activeOwner === item.value
+                                ? 'active'
+                                : ''
+                        }`}
+                        onClick={() => {
+                            setActiveOwner(
+                                item.value
+                            );
+
+                            setActiveType(
+                                'Semua'
+                            );
+
+                            setSearch('');
+                        }}
+                    >
+                        <span className="directorate-filter-icon">
+                            <i
+                                className={`bi ${item.icon}`}
+                            />
+                        </span>
+
+                        <span className="directorate-filter-content">
+                            <strong>
+                                {item.label}
+                            </strong>
+
+                            <small>
+                                {item.description}
+                            </small>
+                        </span>
+
+                        <span className="directorate-filter-count">
+                            {ownerCounts[
+                                item.value
+                            ] || 0}
+                        </span>
+                    </button>
+                ))}
             </section>
 
-            {/* OVERVIEW */}
+            {/* FILTER AGENDA */}
 
-            <section className="schedule-overview-panel">
-                <div className="schedule-filter-area">
-                    <div className="schedule-filter-header">
+            <section className="schedule-control-panel">
+                <div className="schedule-control-main">
+                    <div className="schedule-control-heading">
                         <div>
-                            <div className="schedule-filter-title">
-                                <i className="bi bi-funnel-fill me-2" />
+                            <strong>
+                                <i className="bi bi-funnel-fill text-danger me-2" />
+                                Filter Agenda
+                            </strong>
 
-                                Filter & Pencarian
-                            </div>
-
-                            <div className="schedule-filter-subtitle">
+                            <div className="small text-muted">
                                 Menampilkan{' '}
-                                <strong>
-                                    {filteredEvents.length}
-                                </strong>{' '}
+                                {filteredEvents.length}{' '}
                                 dari{' '}
-                                <strong>
-                                    {events.length}
-                                </strong>{' '}
-                                agenda.
+                                {ownerEvents.length}{' '}
+                                agenda{' '}
+                                {activeOwnerInfo.label}.
                             </div>
                         </div>
 
-                        <div className="schedule-filter-tools">
-                            <div className="schedule-search-wrapper">
-                                <i className="bi bi-search schedule-search-icon" />
+                        <div className="schedule-control-tools">
+                            <div className="schedule-search">
+                                <i className="bi bi-search" />
 
                                 <input
-                                    type="text"
-                                    className="schedule-search-input"
-                                    placeholder="Cari judul / lokasi..."
-                                    value={
-                                        searchTerm
-                                    }
-                                    onChange={(
-                                        event
-                                    ) =>
-                                        setSearchTerm(
+                                    type="search"
+                                    aria-label="Cari agenda"
+                                    placeholder="Cari agenda, lokasi..."
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(
                                             event.target.value
                                         )
                                     }
                                 />
 
-                                {searchTerm && (
+                                {search && (
                                     <button
                                         type="button"
-                                        className="schedule-search-clear"
+                                        aria-label="Hapus pencarian"
                                         onClick={() =>
-                                            setSearchTerm(
-                                                ''
-                                            )
+                                            setSearch('')
                                         }
-                                        title="Hapus pencarian"
                                     >
-                                        <i className="bi bi-x-lg" />
+                                        <i className="bi bi-x" />
                                     </button>
                                 )}
                             </div>
 
                             <button
                                 type="button"
-                                className="schedule-today-button"
-                                onClick={
-                                    handleGoToday
+                                className="schedule-today"
+                                onClick={() =>
+                                    calendarRef.current
+                                        ?.getApi()
+                                        ?.today()
                                 }
                             >
                                 <i className="bi bi-calendar2-day-fill" />
-
-                                <span>
-                                    Ke Hari Ini
-                                </span>
+                                Hari Ini
                             </button>
                         </div>
                     </div>
 
-                    <div className="schedule-filter-list">
-                        <button
-                            type="button"
-                            className={`schedule-filter-button ${
-                                activeFilter ===
-                                'Semua'
-                                    ? 'active'
-                                    : ''
-                            }`}
-                            onClick={() =>
-                                setActiveFilter(
-                                    'Semua'
-                                )
-                            }
-                        >
-                            <span className="schedule-filter-icon schedule-filter-icon-all">
-                                <i className="bi bi-grid-fill" />
-                            </span>
+                    {/* KATEGORI */}
 
-                            <span>
-                                Semua
-                            </span>
-
-                            <span className="schedule-filter-count">
-                                {
-                                    agendaCounts
-                                        .Semua
+                    <div className="schedule-category-list">
+                        {[
+                            'Semua',
+                            ...TYPES,
+                        ].map((type) => (
+                            <button
+                                key={type}
+                                type="button"
+                                className={`schedule-category-button ${
+                                    activeType === type
+                                        ? 'active'
+                                        : ''
+                                }`}
+                                style={
+                                    activeType ===
+                                        type &&
+                                    type !== 'Semua'
+                                        ? {
+                                              color:
+                                                  colorOf(
+                                                      type
+                                                  ),
+                                              borderColor:
+                                                  colorOf(
+                                                      type
+                                                  ),
+                                          }
+                                        : undefined
                                 }
-                            </span>
-                        </button>
-
-                        {AGENDA_TYPES.map(
-                            (
-                                type
-                            ) => {
-                                const color =
-                                    getAgendaColor(
+                                onClick={() =>
+                                    setActiveType(
                                         type
-                                    );
-
-                                const isActive =
-                                    activeFilter ===
-                                    type;
-
-                                return (
-                                    <button
-                                        key={
-                                            type
-                                        }
-                                        type="button"
-                                        className={`schedule-filter-button ${
-                                            isActive
-                                                ? 'active'
-                                                : ''
+                                    )
+                                }
+                            >
+                                <span
+                                    className="agenda-dot"
+                                    style={{
+                                        background:
+                                            type ===
+                                            'Semua'
+                                                ? '#334155'
+                                                : colorOf(
+                                                      type
+                                                  ),
+                                    }}
+                                >
+                                    <i
+                                        className={`bi ${
+                                            type ===
+                                            'Semua'
+                                                ? 'bi-grid-fill'
+                                                : ICONS[
+                                                      type
+                                                  ]
                                         }`}
-                                        style={
-                                            isActive
-                                                ? {
-                                                      '--agenda-filter-color':
-                                                          color,
+                                    />
+                                </span>
 
-                                                      borderColor:
-                                                          color,
+                                {type}
 
-                                                      color:
-                                                          color,
-
-                                                      background:
-                                                          `${color}10`,
-                                                  }
-                                                : {
-                                                      '--agenda-filter-color':
-                                                          color,
-                                                  }
-                                        }
-                                        onClick={() =>
-                                            setActiveFilter(
-                                                type
-                                            )
-                                        }
-                                    >
-                                        <span
-                                            className="schedule-filter-icon"
-                                            style={{
-                                                background:
-                                                    color,
-                                            }}
-                                        >
-                                            <i
-                                                className={`bi ${getAgendaIcon(
-                                                    type
-                                                )}`}
-                                            />
-                                        </span>
-
-                                        <span>
-                                            {type}
-                                        </span>
-
-                                        <span
-                                            className="schedule-filter-count"
-                                            style={
-                                                isActive
-                                                    ? {
-                                                          background:
-                                                              color,
-
-                                                          color:
-                                                              '#ffffff',
-                                                      }
-                                                    : undefined
-                                            }
-                                        >
-                                            {
-                                                agendaCounts[
-                                                    type
-                                                ]
-                                            }
-                                        </span>
-                                    </button>
-                                );
-                            }
-                        )}
+                                <span className="agenda-count">
+                                    {typeCounts[
+                                        type
+                                    ] || 0}
+                                </span>
+                            </button>
+                        ))}
                     </div>
                 </div>
 
-                <div className="schedule-summary-area">
-                    <div className="schedule-mini-card schedule-mini-today">
-                        <div className="schedule-mini-icon">
-                            <i className="bi bi-calendar2-check-fill" />
-                        </div>
+                {/* RINGKASAN */}
 
-                        <div className="schedule-mini-content">
-                            <div className="schedule-mini-label">
+                <div className="schedule-summary-grid">
+                    <div className="schedule-summary-card">
+                        <span className="schedule-summary-icon today">
+                            <i className="bi bi-calendar2-check-fill" />
+                        </span>
+
+                        <div className="min-w-0">
+                            <div className="schedule-summary-label">
                                 Agenda Hari Ini
                             </div>
 
-                            <div className="schedule-mini-main">
-                                <span className="schedule-mini-number">
-                                    {
-                                        todayEvents.length
-                                    }
-                                </span>
+                            <strong>
+                                {todayEvents.length}{' '}
+                                Agenda
+                            </strong>
 
-                                <span>
-                                    agenda
-                                </span>
-                            </div>
-
-                            <div className="schedule-mini-description">
-                                {todayEvents.length >
-                                0
-                                    ? todayEvents[0]
-                                          .title
+                            <div className="schedule-summary-description">
+                                {todayEvents[0]
+                                    ? `${ownerShort(
+                                          todayEvents[0]
+                                              .directorate
+                                      )} • ${
+                                          todayEvents[0]
+                                              .title
+                                      }`
                                     : 'Tidak ada agenda hari ini'}
                             </div>
                         </div>
@@ -2577,97 +1757,95 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
 
                     <button
                         type="button"
-                        className={`schedule-mini-card schedule-mini-next ${
-                            nearestAgenda
-                                ? 'schedule-mini-clickable'
-                                : ''
-                        }`}
-                        onClick={() => {
-                            if (
-                                nearestAgenda
-                                    ?.event
-                            ) {
-                                openDetailModal(
-                                    nearestAgenda
-                                        .event
-                                );
-                            }
-                        }}
-                        disabled={
-                            !nearestAgenda
+                        className="schedule-summary-card"
+                        disabled={!nearest}
+                        onClick={() =>
+                            nearest &&
+                            openDetailModal(
+                                nearest.event
+                            )
                         }
                     >
-                        <div className="schedule-mini-icon">
+                        <span className="schedule-summary-icon next">
                             <i
                                 className={`bi ${
-                                    nearestAgenda
-                                        ?.status ===
+                                    nearest?.status ===
                                     'ongoing'
                                         ? 'bi-broadcast-pin'
                                         : 'bi-clock-history'
                                 }`}
                             />
-                        </div>
+                        </span>
 
-                        <div className="schedule-mini-content">
-                            <div className="schedule-mini-label">
-                                {nearestAgenda
-                                    ?.status ===
+                        <div className="min-w-0">
+                            <div className="schedule-summary-label">
+                                {nearest?.status ===
                                 'ongoing'
                                     ? 'Sedang Berlangsung'
                                     : 'Agenda Terdekat'}
                             </div>
 
-                            {nearestAgenda ? (
-                                <>
-                                    <div className="schedule-next-title">
-                                        {
-                                            nearestAgenda
-                                                .event
-                                                .title
-                                        }
-                                    </div>
+                            <strong className="schedule-summary-title">
+                                {nearest?.event.title ||
+                                    'Belum ada agenda'}
+                            </strong>
 
-                                    <div className="schedule-mini-description">
-                                        {formatShortDate(
-                                            nearestAgenda
-                                                .event
-                                                .event_date
-                                        )}
-
-                                        {' • '}
-
-                                        {getConflictTimeText(
-                                            nearestAgenda
-                                                .event
-                                        )}
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="schedule-mini-description">
-                                    Belum ada agenda mendatang.
+                            {nearest && (
+                                <div className="schedule-summary-description">
+                                    {ownerShort(
+                                        nearest.event
+                                            .directorate
+                                    )}{' '}
+                                    •{' '}
+                                    {dateText(
+                                        nearest.event
+                                            .event_date,
+                                        true
+                                    )}{' '}
+                                    •{' '}
+                                    {timeText(
+                                        nearest.event
+                                    )}
                                 </div>
                             )}
                         </div>
-
-                        {nearestAgenda && (
-                            <div className="schedule-mini-arrow">
-                                <i className="bi bi-chevron-right" />
-                            </div>
-                        )}
                     </button>
                 </div>
             </section>
 
-            {/* CALENDAR */}
+            {/* KALENDER */}
 
             <section className="card border-0 shadow-sm director-calendar-card">
+                <div className="calendar-active-banner">
+                    <span className="calendar-active-icon">
+                        <i
+                            className={`bi ${activeOwnerInfo.icon}`}
+                        />
+                    </span>
+
+                    <div>
+                        <div className="calendar-active-label">
+                            Kalender Aktif
+                        </div>
+
+                        <strong>
+                            {activeOwnerInfo.label}
+                        </strong>
+                    </div>
+
+                    {activeOwner === 'semua' && (
+                        <div className="ms-auto calendar-all-info">
+                            Agenda bersamaan tetap
+                            ditampilkan bila pemiliknya
+                            berbeda.
+                        </div>
+                    )}
+                </div>
+
                 <div className="card-body director-calendar-body">
                     <div className="director-calendar-viewport">
                         <FullCalendar
-                            ref={
-                                calendarRef
-                            }
+                            ref={calendarRef}
                             plugins={[
                                 themePlugin,
                                 dayGridPlugin,
@@ -2677,62 +1855,57 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                             initialView="dayGridMonth"
                             locale="id"
                             firstDay={1}
-                            height="100%"
-                            expandRows
+                            height={
+                                compact
+                                    ? 'auto'
+                                    : '100%'
+                            }
+                            expandRows={
+                                !compact
+                            }
                             events={
                                 calendarEvents
                             }
-                            dateClick={
-                                handleDateClick
+                            dateClick={(info) =>
+                                canManage &&
+                                openCreateModal(
+                                    info.dateStr.slice(
+                                        0,
+                                        10
+                                    )
+                                )
                             }
                             eventClick={
-                                handleEventClick
+                                onCalendarEvent
                             }
                             headerToolbar={{
                                 start:
                                     'prev,next',
-
                                 center:
                                     'title',
-
                                 end:
                                     'dayGridMonth,timeGridWeek,timeGridDay',
                             }}
                             buttons={{
                                 dayGridMonth: {
-                                    text:
-                                        'Bulan',
+                                    text: 'Bulan',
                                 },
-
                                 timeGridWeek: {
-                                    text:
-                                        'Minggu',
+                                    text: 'Minggu',
                                 },
-
                                 timeGridDay: {
-                                    text:
-                                        'Hari',
+                                    text: 'Hari',
                                 },
                             }}
                             eventTimeFormat={{
-                                hour:
-                                    '2-digit',
-
-                                minute:
-                                    '2-digit',
-
-                                hour12:
-                                    false,
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false,
                             }}
                             slotLabelFormat={{
-                                hour:
-                                    '2-digit',
-
-                                minute:
-                                    '2-digit',
-
-                                hour12:
-                                    false,
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false,
                             }}
                             slotMinTime="06:00:00"
                             slotMaxTime="22:00:00"
@@ -2742,7 +1915,11 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                             selectable={
                                 canManage
                             }
-                            dayMaxEvents={3}
+                            dayMaxEvents={
+                                compact
+                                    ? 2
+                                    : 6
+                            }
                             fixedWeekCount={
                                 false
                             }
@@ -2751,35 +1928,32 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                 </div>
             </section>
 
-            {/* MODAL */}
+            {/* MODAL AGENDA */}
 
             {modalOpen && (
                 <div
-                    className="modal fade show d-block"
-                    tabIndex="-1"
-                    style={{
-                        background:
-                            'rgba(15, 23, 42, .58)',
-                    }}
+                    className="modal fade show d-block director-modal-backdrop"
+                    role="dialog"
+                    aria-modal="true"
+                    tabIndex={-1}
                 >
-                    <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-                        <div className="modal-content border-0 rounded-5 shadow-lg overflow-hidden">
+                    <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+                        <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
                             <div
+                                className="director-modal-accent"
                                 style={{
-                                    height:
-                                        7,
-
                                     background:
-                                        getAgendaColor(
-                                            form
-                                                .agenda_type
+                                        colorOf(
+                                            form.agenda_type
                                         ),
                                 }}
                             />
 
-                            <div className="modal-header border-0 p-4 pb-2">
+                            {/* MODAL HEADER */}
+
+                            <div className="modal-header border-0 pb-1 px-4 pt-4">
                                 <div>
-                                    <span className="badge rounded-pill bg-danger-subtle text-danger px-3 py-2 mb-2">
+                                    <span className="badge bg-danger-subtle text-danger rounded-pill mb-2">
                                         {form.id
                                             ? 'DETAIL AGENDA'
                                             : 'AGENDA BARU'}
@@ -2788,7 +1962,7 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                                     <h4 className="fw-black mb-0">
                                         {form.id
                                             ? form.title
-                                            : 'Tambah Agenda Direktur'}
+                                            : 'Tambah Agenda Direktorat'}
                                     </h4>
                                 </div>
 
@@ -2801,17 +1975,68 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                                     disabled={
                                         saving
                                     }
+                                    aria-label="Tutup"
                                 />
                             </div>
 
-                            <div className="modal-body p-4">
+                            {/* MODAL BODY */}
+
+                            <div className="modal-body px-4 py-3">
                                 {detailMode ? (
                                     <div className="row g-3">
+                                        {detailLoading && (
+                                            <div className="col-12 small text-danger">
+                                                <span className="spinner-border spinner-border-sm me-2" />
+                                                Memuat detail
+                                                terbaru...
+                                            </div>
+                                        )}
+
+                                        {/* PEMILIK AGENDA */}
+
                                         <div className="col-12">
-                                            <div className="p-4 rounded-4 bg-light">
-                                                <div className="text-muted mb-1">
-                                                    Judul Agenda
+                                            <div className="agenda-owner-detail">
+                                                <span className="director-owner-icon">
+                                                    <i
+                                                        className={`bi ${
+                                                            owner(
+                                                                form.directorate
+                                                            )
+                                                                ?.icon ||
+                                                            'bi-people-fill'
+                                                        }`}
+                                                    />
+                                                </span>
+
+                                                <div>
+                                                    <small className="text-muted fw-bold">
+                                                        AGENDA UNTUK
+                                                    </small>
+
+                                                    <div className="fs-5 fw-black text-danger">
+                                                        {ownerLabel(
+                                                            form.directorate
+                                                        )}
+                                                    </div>
+
+                                                    <div className="small text-muted">
+                                                        {owner(
+                                                            form.directorate
+                                                        )
+                                                            ?.description ||
+                                                            ''}
+                                                    </div>
                                                 </div>
+                                            </div>
+                                        </div>
+
+                                        {/* JUDUL */}
+
+                                        <div className="col-12">
+                                            <div className="agenda-detail-box">
+                                                <small>
+                                                    Judul Agenda
+                                                </small>
 
                                                 <div className="fs-4 fw-black">
                                                     {
@@ -2821,110 +2046,70 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                                             </div>
                                         </div>
 
-                                        <div className="col-md-6">
-                                            <div className="p-3 rounded-4 bg-light h-100">
-                                                <div className="text-muted mb-1">
-                                                    Tanggal
-                                                </div>
+                                        {/* DETAIL AGENDA */}
 
-                                                <div className="fw-black fs-5">
-                                                    {formatDate(
-                                                        form.event_date
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="col-md-6">
-                                            <div className="p-3 rounded-4 bg-light h-100">
-                                                <div className="text-muted mb-1">
-                                                    Waktu
-                                                </div>
-
-                                                <div className="fw-black fs-5">
-                                                    {form.all_day
-                                                        ? 'Sepanjang Hari'
-                                                        : `${form.start_time} - ${form.end_time}`}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="col-md-6">
-                                            <div className="p-3 rounded-4 bg-light h-100">
-                                                <div className="text-muted mb-2">
-                                                    Kategori
-                                                </div>
-
+                                        {[
+                                            [
+                                                'Tanggal',
+                                                dateText(
+                                                    form.event_date
+                                                ),
+                                            ],
+                                            [
+                                                'Waktu',
+                                                timeText(
+                                                    form
+                                                ),
+                                            ],
+                                            [
+                                                'Kategori',
+                                                form.agenda_type,
+                                            ],
+                                            [
+                                                'Lokasi',
+                                                form.location ||
+                                                    '-',
+                                            ],
+                                        ].map(
+                                            ([
+                                                label,
+                                                value,
+                                            ]) => (
                                                 <div
-                                                    className="agenda-category-preview"
-                                                    style={{
-                                                        background:
-                                                            `${getAgendaColor(
-                                                                form.agenda_type
-                                                            )}14`,
-
-                                                        borderColor:
-                                                            `${getAgendaColor(
-                                                                form.agenda_type
-                                                            )}45`,
-
-                                                        color:
-                                                            getAgendaColor(
-                                                                form.agenda_type
-                                                            ),
-                                                    }}
+                                                    className="col-md-6"
+                                                    key={
+                                                        label
+                                                    }
                                                 >
-                                                    <span
-                                                        className="agenda-category-icon"
-                                                        style={{
-                                                            background:
-                                                                getAgendaColor(
-                                                                    form.agenda_type
-                                                                ),
-                                                        }}
-                                                    >
-                                                        <i
-                                                            className={`bi ${getAgendaIcon(
-                                                                form.agenda_type
-                                                            )}`}
-                                                        />
-                                                    </span>
+                                                    <div className="agenda-detail-box h-100">
+                                                        <small>
+                                                            {
+                                                                label
+                                                            }
+                                                        </small>
 
-                                                    <strong>
-                                                        {
-                                                            form.agenda_type
-                                                        }
-                                                    </strong>
+                                                        <strong>
+                                                            {
+                                                                value
+                                                            }
+                                                        </strong>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </div>
+                                            )
+                                        )}
 
-                                        <div className="col-md-6">
-                                            <div className="p-3 rounded-4 bg-light h-100">
-                                                <div className="text-muted mb-1">
-                                                    Lokasi
-                                                </div>
-
-                                                <div className="fw-black fs-5">
-                                                    {form.location ||
-                                                        '-'}
-                                                </div>
-                                            </div>
-                                        </div>
+                                        {/* DESKRIPSI */}
 
                                         <div className="col-12">
-                                            <div className="p-3 rounded-4 bg-light">
-                                                <div className="text-muted mb-1">
+                                            <div className="agenda-detail-box">
+                                                <small>
                                                     Deskripsi
-                                                </div>
+                                                </small>
 
                                                 <div
                                                     style={{
                                                         whiteSpace:
                                                             'pre-line',
-
-                                                        lineHeight:
-                                                            1.8,
                                                     }}
                                                 >
                                                     {form.description ||
@@ -2933,9 +2118,11 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                                             </div>
                                         </div>
 
+                                        {/* VISIBILITAS */}
+
                                         <div className="col-12">
                                             <span
-                                                className={`badge rounded-pill px-3 py-2 fs-6 ${
+                                                className={`badge rounded-pill px-3 py-2 ${
                                                     form.is_public
                                                         ? 'bg-success-subtle text-success'
                                                         : 'bg-secondary-subtle text-secondary'
@@ -2950,454 +2137,680 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                                                 />
 
                                                 {form.is_public
-                                                    ? 'Tampil di Login'
-                                                    : 'Hanya Internal'}
+                                                    ? 'Tampil di Kalender Publik'
+                                                    : 'Internal'}
                                             </span>
                                         </div>
+
+                                        {/* AUDIT TRAIL */}
+
+                                        {canManage && (
+                                            <div className="col-12">
+                                                <div className="audit-section">
+                                                    <div className="d-flex justify-content-between align-items-center gap-3 mb-3">
+                                                        <div>
+                                                            <small className="text-muted fw-bold">
+                                                                ACTIVITY
+                                                                LOG
+                                                            </small>
+
+                                                            <h5 className="fw-black mb-1">
+                                                                <i className="bi bi-clock-history me-2 text-danger" />
+                                                                Riwayat
+                                                                Perubahan
+                                                            </h5>
+
+                                                            <div className="small text-muted">
+                                                                Perubahan
+                                                                agenda yang
+                                                                dilakukan
+                                                                oleh admin.
+                                                            </div>
+                                                        </div>
+
+                                                        <span className="badge bg-danger-subtle text-danger">
+                                                            {
+                                                                histories.length
+                                                            }
+                                                        </span>
+                                                    </div>
+
+                                                    {historyError && (
+                                                        <div className="alert alert-warning">
+                                                            Riwayat perubahan
+                                                            belum dapat dimuat.
+                                                        </div>
+                                                    )}
+
+                                                    {!detailLoading &&
+                                                        !historyError &&
+                                                        histories.length ===
+                                                            0 && (
+                                                            <p className="text-muted small mb-0">
+                                                                Belum ada
+                                                                riwayat
+                                                                perubahan.
+                                                            </p>
+                                                        )}
+
+                                                    <div className="audit-timeline">
+                                                        {histories.map(
+                                                            (item) => (
+                                                                <div
+                                                                    key={
+                                                                        item.id
+                                                                    }
+                                                                    className="audit-item"
+                                                                >
+                                                                    <span
+                                                                        className={`audit-marker audit-${item.action}`}
+                                                                    >
+                                                                        <i
+                                                                            className={`bi ${
+                                                                                item.action ===
+                                                                                'created'
+                                                                                    ? 'bi-plus-lg'
+                                                                                    : item.action ===
+                                                                                      'deleted'
+                                                                                    ? 'bi-trash-fill'
+                                                                                    : 'bi-pencil-fill'
+                                                                            }`}
+                                                                        />
+                                                                    </span>
+
+                                                                    <div className="audit-content">
+                                                                        <div className="d-flex justify-content-between flex-wrap gap-2">
+                                                                            <div>
+                                                                                <strong>
+                                                                                    {item.action ===
+                                                                                    'created'
+                                                                                        ? 'Agenda Dibuat'
+                                                                                        : item.action ===
+                                                                                          'deleted'
+                                                                                        ? 'Agenda Dihapus'
+                                                                                        : 'Agenda Diperbarui'}
+                                                                                </strong>
+
+                                                                                <div className="small text-muted">
+                                                                                    {item.user_name ||
+                                                                                        'User tidak tersedia'}
+                                                                                </div>
+                                                                            </div>
+
+                                                                            <small className="text-muted">
+                                                                                {dateTimeText(
+                                                                                    item.created_at
+                                                                                )}
+                                                                            </small>
+                                                                        </div>
+
+                                                                        {item.action ===
+                                                                            'updated' &&
+                                                                            auditChanges(
+                                                                                item
+                                                                            ).map(
+                                                                                (
+                                                                                    change
+                                                                                ) => (
+                                                                                    <div
+                                                                                        className="audit-change"
+                                                                                        key={
+                                                                                            change.field
+                                                                                        }
+                                                                                    >
+                                                                                        <small className="fw-bold d-block text-muted mb-1">
+                                                                                            {
+                                                                                                change.label
+                                                                                            }
+                                                                                        </small>
+
+                                                                                        <div className="audit-change-values">
+                                                                                            <span className="audit-old">
+                                                                                                {
+                                                                                                    change.old
+                                                                                                }
+                                                                                            </span>
+
+                                                                                            <i className="bi bi-arrow-right" />
+
+                                                                                            <span className="audit-new">
+                                                                                                {
+                                                                                                    change.next
+                                                                                                }
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )
+                                                                            )}
+
+                                                                        {item.action ===
+                                                                            'created' && (
+                                                                            <div className="small mt-2 text-success">
+                                                                                Agenda
+                                                                                ini
+                                                                                dibuat.
+                                                                            </div>
+                                                                        )}
+
+                                                                        {item.action ===
+                                                                            'deleted' && (
+                                                                            <div className="small mt-2 text-danger">
+                                                                                Agenda
+                                                                                ini
+                                                                                dihapus.
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
+                                    /* FORM TAMBAH / EDIT */
+
                                     <div className="row g-3">
+                                        {/* AGENDA UNTUK */}
+
                                         <div className="col-12">
-                                            <label className="form-label fw-bold">
-                                                Judul Agenda
-                                            </label>
-
-                                            <input
-                                                type="text"
-                                                className="form-control form-control-lg"
-                                                value={
-                                                    form.title
-                                                }
-                                                maxLength="255"
-                                                placeholder="Contoh: Rapat Koordinasi Pimpinan"
-                                                onChange={(
-                                                    event
-                                                ) =>
-                                                    handleFormChange(
-                                                        'title',
-                                                        event.target.value
-                                                    )
-                                                }
+                                            <Field
+                                                label="Agenda Untuk"
+                                                required
                                             />
-                                        </div>
 
-                                        <div className="col-md-6">
-                                            <label className="form-label fw-bold">
-                                                Tanggal
-                                            </label>
-
-                                            <input
-                                                type="date"
-                                                className="form-control form-control-lg"
-                                                value={
-                                                    form.event_date
-                                                }
-                                                onChange={(
-                                                    event
-                                                ) =>
-                                                    handleFormChange(
-                                                        'event_date',
-                                                        event.target.value
-                                                    )
-                                                }
-                                            />
-                                        </div>
-
-                                        <div className="col-md-6">
-                                            <label className="form-label fw-bold">
-                                                Kategori
-                                            </label>
-
-                                            <select
-                                                className="form-select form-select-lg"
-                                                value={
-                                                    form.agenda_type
-                                                }
-                                                onChange={(
-                                                    event
-                                                ) =>
-                                                    handleFormChange(
-                                                        'agenda_type',
-                                                        event.target.value
-                                                    )
-                                                }
-                                            >
-                                                {AGENDA_TYPES.map(
-                                                    (
-                                                        agendaType
-                                                    ) => (
-                                                        <option
+                                            <div className="agenda-owner-options">
+                                                {DIRECTORATES.map(
+                                                    (item) => (
+                                                        <button
+                                                            type="button"
                                                             key={
-                                                                agendaType
+                                                                item.value
                                                             }
-                                                            value={
-                                                                agendaType
+                                                            className={`agenda-owner-option ${
+                                                                form.directorate ===
+                                                                item.value
+                                                                    ? 'active'
+                                                                    : ''
+                                                            }`}
+                                                            onClick={() =>
+                                                                setField(
+                                                                    'directorate',
+                                                                    item.value
+                                                                )
                                                             }
                                                         >
-                                                            {
-                                                                agendaType
-                                                            }
-                                                        </option>
+                                                            <span className="director-owner-icon">
+                                                                <i
+                                                                    className={`bi ${item.icon}`}
+                                                                />
+                                                            </span>
+
+                                                            <span className="flex-grow-1">
+                                                                <strong className="d-block">
+                                                                    {
+                                                                        item.label
+                                                                    }
+                                                                </strong>
+
+                                                                <small>
+                                                                    {
+                                                                        item.description
+                                                                    }
+                                                                </small>
+                                                            </span>
+
+                                                            {form.directorate ===
+                                                                item.value && (
+                                                                <i className="bi bi-check-circle-fill" />
+                                                            )}
+                                                        </button>
                                                     )
                                                 )}
-                                            </select>
+                                            </div>
                                         </div>
+
+                                        {/* JUDUL */}
+
+                                        <div className="col-12">
+                                            <Field
+                                                label="Judul Agenda"
+                                                required
+                                            >
+                                                <input
+                                                    type="text"
+                                                    className="form-control form-control-lg"
+                                                    maxLength={
+                                                        255
+                                                    }
+                                                    placeholder="Contoh: Rapat Koordinasi Pimpinan"
+                                                    value={
+                                                        form.title
+                                                    }
+                                                    onChange={(
+                                                        event
+                                                    ) =>
+                                                        setField(
+                                                            'title',
+                                                            event
+                                                                .target
+                                                                .value
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+                                        </div>
+
+                                        {/* TANGGAL */}
+
+                                        <div className="col-md-6">
+                                            <Field
+                                                label="Tanggal"
+                                                required
+                                            >
+                                                <input
+                                                    type="date"
+                                                    className="form-control form-control-lg"
+                                                    value={
+                                                        form.event_date
+                                                    }
+                                                    onChange={(
+                                                        event
+                                                    ) =>
+                                                        setField(
+                                                            'event_date',
+                                                            event
+                                                                .target
+                                                                .value
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+                                        </div>
+
+                                        {/* KATEGORI */}
+
+                                        <div className="col-md-6">
+                                            <Field label="Kategori">
+                                                <select
+                                                    className="form-select form-select-lg"
+                                                    value={
+                                                        form.agenda_type
+                                                    }
+                                                    onChange={(
+                                                        event
+                                                    ) =>
+                                                        setField(
+                                                            'agenda_type',
+                                                            event
+                                                                .target
+                                                                .value
+                                                        )
+                                                    }
+                                                >
+                                                    {TYPES.map(
+                                                        (
+                                                            type
+                                                        ) => (
+                                                            <option
+                                                                key={
+                                                                    type
+                                                                }
+                                                                value={
+                                                                    type
+                                                                }
+                                                            >
+                                                                {
+                                                                    type
+                                                                }
+                                                            </option>
+                                                        )
+                                                    )}
+                                                </select>
+                                            </Field>
+                                        </div>
+
+                                        {/* PREVIEW KATEGORI */}
 
                                         <div className="col-12">
                                             <div
                                                 className="agenda-category-preview"
                                                 style={{
-                                                    background:
-                                                        `${getAgendaColor(
-                                                            form.agenda_type
-                                                        )}12`,
-
-                                                    borderColor:
-                                                        `${getAgendaColor(
-                                                            form.agenda_type
-                                                        )}42`,
-
-                                                    color:
-                                                        getAgendaColor(
-                                                            form.agenda_type
-                                                        ),
+                                                    background: `${colorOf(
+                                                        form.agenda_type
+                                                    )}10`,
+                                                    color: colorOf(
+                                                        form.agenda_type
+                                                    ),
+                                                    borderColor: `${colorOf(
+                                                        form.agenda_type
+                                                    )}40`,
                                                 }}
                                             >
                                                 <span
-                                                    className="agenda-category-icon"
+                                                    className="agenda-preview-icon"
                                                     style={{
                                                         background:
-                                                            getAgendaColor(
+                                                            colorOf(
                                                                 form.agenda_type
                                                             ),
                                                     }}
                                                 >
                                                     <i
-                                                        className={`bi ${getAgendaIcon(
-                                                            form.agenda_type
-                                                        )}`}
+                                                        className={`bi ${
+                                                            ICONS[
+                                                                form.agenda_type
+                                                            ]
+                                                        }`}
                                                     />
                                                 </span>
 
                                                 <div>
-                                                    <div className="fw-black">
+                                                    <strong>
                                                         {
                                                             form.agenda_type
                                                         }
-                                                    </div>
+                                                    </strong>
 
-                                                    <div className="small opacity-75">
-                                                        Warna agenda ditentukan otomatis berdasarkan kategori.
+                                                    <div className="small">
+                                                        Warna agenda ditentukan
+                                                        otomatis berdasarkan
+                                                        kategori.
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* SEPANJANG HARI */}
 
                                         <div className="col-12">
                                             <div className="form-check form-switch">
                                                 <input
                                                     className="form-check-input"
                                                     type="checkbox"
-                                                    id="agendaAllDay"
+                                                    id="directorAllDay"
                                                     checked={
                                                         form.all_day
                                                     }
                                                     onChange={(
                                                         event
                                                     ) =>
-                                                        handleFormChange(
+                                                        setField(
                                                             'all_day',
-                                                            event.target.checked
+                                                            event
+                                                                .target
+                                                                .checked
                                                         )
                                                     }
                                                 />
 
                                                 <label
                                                     className="form-check-label fw-bold"
-                                                    htmlFor="agendaAllDay"
+                                                    htmlFor="directorAllDay"
                                                 >
                                                     Sepanjang Hari
                                                 </label>
                                             </div>
                                         </div>
 
+                                        {/* JAM */}
+
                                         {!form.all_day && (
                                             <>
                                                 <div className="col-md-6">
-                                                    <label className="form-label fw-bold">
-                                                        Jam Mulai
-                                                    </label>
-
-                                                    <input
-                                                        type="time"
-                                                        className="form-control form-control-lg"
-                                                        value={
-                                                            form.start_time
-                                                        }
-                                                        onChange={(
-                                                            event
-                                                        ) =>
-                                                            handleFormChange(
-                                                                'start_time',
-                                                                event.target.value
-                                                            )
-                                                        }
-                                                    />
+                                                    <Field
+                                                        label="Jam Mulai"
+                                                        required
+                                                    >
+                                                        <input
+                                                            type="time"
+                                                            className="form-control form-control-lg"
+                                                            value={
+                                                                form.start_time
+                                                            }
+                                                            onChange={(
+                                                                event
+                                                            ) =>
+                                                                setField(
+                                                                    'start_time',
+                                                                    event
+                                                                        .target
+                                                                        .value
+                                                                )
+                                                            }
+                                                        />
+                                                    </Field>
                                                 </div>
 
                                                 <div className="col-md-6">
-                                                    <label className="form-label fw-bold">
-                                                        Jam Selesai
-                                                    </label>
-
-                                                    <input
-                                                        type="time"
-                                                        className="form-control form-control-lg"
-                                                        value={
-                                                            form.end_time
-                                                        }
-                                                        onChange={(
-                                                            event
-                                                        ) =>
-                                                            handleFormChange(
-                                                                'end_time',
-                                                                event.target.value
-                                                            )
-                                                        }
-                                                    />
+                                                    <Field
+                                                        label="Jam Selesai"
+                                                        required
+                                                    >
+                                                        <input
+                                                            type="time"
+                                                            className="form-control form-control-lg"
+                                                            value={
+                                                                form.end_time
+                                                            }
+                                                            onChange={(
+                                                                event
+                                                            ) =>
+                                                                setField(
+                                                                    'end_time',
+                                                                    event
+                                                                        .target
+                                                                        .value
+                                                                )
+                                                            }
+                                                        />
+                                                    </Field>
                                                 </div>
                                             </>
                                         )}
 
-                                        {availabilityState && (
+                                        {/* INFORMASI KETERSEDIAAN */}
+
+                                        {availability && (
                                             <div className="col-12">
-                                                {availabilityState ===
-                                                    'available' && (
-                                                    <div className="schedule-availability schedule-availability-success">
-                                                        <div className="schedule-availability-icon">
-                                                            <i className="bi bi-check-lg" />
+                                                <div
+                                                    className={`availability-box ${availability}`}
+                                                >
+                                                    <span className="availability-icon">
+                                                        <i
+                                                            className={`bi ${
+                                                                availability ===
+                                                                'available'
+                                                                    ? 'bi-check-lg'
+                                                                    : availability ===
+                                                                      'invalid'
+                                                                    ? 'bi-exclamation-lg'
+                                                                    : 'bi-calendar-x-fill'
+                                                            }`}
+                                                        />
+                                                    </span>
+
+                                                    <div className="flex-grow-1">
+                                                        <strong>
+                                                            {availability ===
+                                                            'available'
+                                                                ? 'Jadwal Tersedia'
+                                                                : availability ===
+                                                                  'invalid'
+                                                                ? 'Jam Tidak Valid'
+                                                                : 'Jadwal Bentrok'}
+                                                        </strong>
+
+                                                        <div className="small">
+                                                            {availability ===
+                                                            'available'
+                                                                ? `Agenda dapat digunakan untuk ${ownerLabel(
+                                                                      form.directorate
+                                                                  )}.`
+                                                                : availability ===
+                                                                  'invalid'
+                                                                ? 'Jam selesai harus setelah jam mulai.'
+                                                                : `Bertabrakan dengan agenda "${conflict?.title}" milik ${ownerLabel(
+                                                                      conflict?.directorate
+                                                                  )} (${timeText(
+                                                                      conflict
+                                                                  )}).`}
                                                         </div>
 
-                                                        <div>
-                                                            <div className="fw-black">
-                                                                Jadwal Tersedia
-                                                            </div>
+                                                        {availability ===
+                                                            'conflict' &&
+                                                            suggestions.length >
+                                                                0 && (
+                                                                <div className="mt-2">
+                                                                    <strong className="small">
+                                                                        Saran
+                                                                        waktu
+                                                                        tersedia:
+                                                                    </strong>
 
-                                                            <div className="small">
-                                                                Belum terdapat agenda lain yang bertabrakan dengan waktu ini.
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {availabilityState ===
-                                                    'invalid' && (
-                                                    <div className="schedule-availability schedule-availability-warning">
-                                                        <div className="schedule-availability-icon">
-                                                            <i className="bi bi-exclamation-lg" />
-                                                        </div>
-
-                                                        <div>
-                                                            <div className="fw-black">
-                                                                Jam Tidak Valid
-                                                            </div>
-
-                                                            <div className="small">
-                                                                Jam selesai harus setelah jam mulai.
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {availabilityState ===
-                                                    'conflict' &&
-                                                    realtimeConflict && (
-                                                        <div className="schedule-availability schedule-availability-danger">
-                                                            <div className="schedule-availability-icon">
-                                                                <i className="bi bi-calendar-x-fill" />
-                                                            </div>
-
-                                                            <div className="flex-grow-1">
-                                                                <div className="fw-black mb-1">
-                                                                    Jadwal Bentrok
-                                                                </div>
-
-                                                                <div className="small mb-2">
-                                                                    Waktu yang dipilih sudah digunakan oleh agenda lain.
-                                                                </div>
-
-                                                                <div className="schedule-conflict-detail">
-                                                                    <div>
-                                                                        <strong>
-                                                                            Agenda:
-                                                                        </strong>{' '}
-                                                                        {
-                                                                            realtimeConflict.title
-                                                                        }
-                                                                    </div>
-
-                                                                    <div>
-                                                                        <strong>
-                                                                            Kategori:
-                                                                        </strong>{' '}
-                                                                        {
-                                                                            realtimeConflict.agenda_type
-                                                                        }
-                                                                    </div>
-
-                                                                    <div>
-                                                                        <strong>
-                                                                            Waktu:
-                                                                        </strong>{' '}
-                                                                        {getConflictTimeText(
-                                                                            realtimeConflict
+                                                                    <div className="d-flex flex-wrap gap-2 mt-2">
+                                                                        {suggestions.map(
+                                                                            (
+                                                                                slot
+                                                                            ) => (
+                                                                                <button
+                                                                                    key={
+                                                                                        slot.start
+                                                                                    }
+                                                                                    type="button"
+                                                                                    className="btn btn-sm btn-light border rounded-pill"
+                                                                                    onClick={() =>
+                                                                                        setForm(
+                                                                                            (
+                                                                                                old
+                                                                                            ) => ({
+                                                                                                ...old,
+                                                                                                start_time:
+                                                                                                    slot.start,
+                                                                                                end_time:
+                                                                                                    slot.end,
+                                                                                                all_day:
+                                                                                                    false,
+                                                                                            })
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    {
+                                                                                        slot.start
+                                                                                    }{' '}
+                                                                                    -{' '}
+                                                                                    {
+                                                                                        slot.end
+                                                                                    }
+                                                                                </button>
+                                                                            )
                                                                         )}
                                                                     </div>
-
-                                                                    <div>
-                                                                        <strong>
-                                                                            Lokasi:
-                                                                        </strong>{' '}
-                                                                        {realtimeConflict.location ||
-                                                                            '-'}
-                                                                    </div>
                                                                 </div>
-
-                                                                {suggestedTimeSlots.length >
-                                                                    0 && (
-                                                                    <div className="schedule-suggestions mt-3">
-                                                                        <div className="small fw-black mb-2">
-                                                                            <i className="bi bi-lightbulb-fill me-1" />
-
-                                                                            Saran waktu tersedia
-                                                                        </div>
-
-                                                                        <div className="d-flex flex-wrap gap-2">
-                                                                            {suggestedTimeSlots.map(
-                                                                                (
-                                                                                    slot
-                                                                                ) => (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        key={`${slot.start}-${slot.end}`}
-                                                                                        className="btn btn-sm btn-light border rounded-pill schedule-suggestion-button"
-                                                                                        onClick={() =>
-                                                                                            applySuggestedTime(
-                                                                                                slot
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        <i className="bi bi-clock me-1" />
-
-                                                                                        {
-                                                                                            slot.start
-                                                                                        }{' '}
-                                                                                        -{' '}
-                                                                                        {
-                                                                                            slot.end
-                                                                                        }
-                                                                                    </button>
-                                                                                )
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-
-                                                                {suggestedTimeSlots.length ===
-                                                                    0 &&
-                                                                    !form.all_day && (
-                                                                        <div className="small fw-bold mt-3">
-                                                                            Tidak ditemukan slot kosong dengan durasi yang sama pada pukul 06:00–22:00. Silakan pilih tanggal lain.
-                                                                        </div>
-                                                                    )}
-                                                            </div>
-                                                        </div>
-                                                    )}
+                                                            )}
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
 
-                                        <div className="col-12">
-                                            <label className="form-label fw-bold">
-                                                Lokasi
-                                            </label>
-
-                                            <input
-                                                type="text"
-                                                className="form-control form-control-lg"
-                                                value={
-                                                    form.location
-                                                }
-                                                placeholder="Contoh: Ruang Direktur"
-                                                onChange={(
-                                                    event
-                                                ) =>
-                                                    handleFormChange(
-                                                        'location',
-                                                        event.target.value
-                                                    )
-                                                }
-                                            />
-                                        </div>
+                                        {/* LOKASI */}
 
                                         <div className="col-12">
-                                            <label className="form-label fw-bold">
-                                                Deskripsi
-                                            </label>
-
-                                            <textarea
-                                                className="form-control"
-                                                rows="5"
-                                                value={
-                                                    form.description
-                                                }
-                                                placeholder="Tambahkan informasi agenda jika diperlukan..."
-                                                onChange={(
-                                                    event
-                                                ) =>
-                                                    handleFormChange(
-                                                        'description',
-                                                        event.target.value
-                                                    )
-                                                }
-                                            />
+                                            <Field label="Lokasi">
+                                                <input
+                                                    type="text"
+                                                    className="form-control form-control-lg"
+                                                    value={
+                                                        form.location
+                                                    }
+                                                    placeholder="Contoh: Ruang Rapat Pimpinan"
+                                                    onChange={(
+                                                        event
+                                                    ) =>
+                                                        setField(
+                                                            'location',
+                                                            event
+                                                                .target
+                                                                .value
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
                                         </div>
+
+                                        {/* DESKRIPSI */}
+
+                                        <div className="col-12">
+                                            <Field label="Deskripsi">
+                                                <textarea
+                                                    className="form-control"
+                                                    rows={
+                                                        4
+                                                    }
+                                                    value={
+                                                        form.description
+                                                    }
+                                                    placeholder="Informasi tambahan agenda..."
+                                                    onChange={(
+                                                        event
+                                                    ) =>
+                                                        setField(
+                                                            'description',
+                                                            event
+                                                                .target
+                                                                .value
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+                                        </div>
+
+                                        {/* VISIBILITAS PUBLIK */}
 
                                         <div className="col-12">
                                             <div className="form-check form-switch">
                                                 <input
                                                     className="form-check-input"
                                                     type="checkbox"
-                                                    id="agendaPublic"
+                                                    id="directorPublic"
                                                     checked={
                                                         form.is_public
                                                     }
                                                     onChange={(
                                                         event
                                                     ) =>
-                                                        handleFormChange(
+                                                        setField(
                                                             'is_public',
-                                                            event.target.checked
+                                                            event
+                                                                .target
+                                                                .checked
                                                         )
                                                     }
                                                 />
 
                                                 <label
                                                     className="form-check-label fw-bold"
-                                                    htmlFor="agendaPublic"
+                                                    htmlFor="directorPublic"
                                                 >
-                                                    Tampilkan di halaman Login
+                                                    Tampilkan di halaman
+                                                    Login
                                                 </label>
                                             </div>
 
                                             <div className="form-text">
-                                                Jika diaktifkan, agenda dapat dilihat pada kalender publik di halaman login.
+                                                Agenda publik dapat dilihat
+                                                sebelum pengguna login.
                                             </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="modal-footer border-0 p-4 pt-2">
+                            {/* MODAL FOOTER */}
+
+                            <div className="modal-footer border-0 px-4 pb-4 pt-2">
                                 {detailMode ? (
                                     <>
                                         {canManage && (
@@ -3405,32 +2818,30 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                                                 <button
                                                     type="button"
                                                     className="btn btn-outline-danger rounded-pill"
-                                                    onClick={
-                                                        handleDelete
-                                                    }
                                                     disabled={
                                                         saving
                                                     }
+                                                    onClick={
+                                                        handleDelete
+                                                    }
                                                 >
                                                     <i className="bi bi-trash-fill me-2" />
-
                                                     Hapus
                                                 </button>
 
                                                 <button
                                                     type="button"
                                                     className="btn btn-danger rounded-pill"
+                                                    disabled={
+                                                        saving
+                                                    }
                                                     onClick={() =>
                                                         setDetailMode(
                                                             false
                                                         )
                                                     }
-                                                    disabled={
-                                                        saving
-                                                    }
                                                 >
                                                     <i className="bi bi-pencil-fill me-2" />
-
                                                     Edit Agenda
                                                 </button>
                                             </>
@@ -3451,11 +2862,11 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                                         <button
                                             type="button"
                                             className="btn btn-light border rounded-pill"
-                                            onClick={
-                                                closeModal
-                                            }
                                             disabled={
                                                 saving
+                                            }
+                                            onClick={
+                                                closeModal
                                             }
                                         >
                                             Batal
@@ -3464,34 +2875,31 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                                         <button
                                             type="button"
                                             className="btn btn-danger rounded-pill px-4"
-                                            onClick={
-                                                handleSave
-                                            }
                                             disabled={
                                                 saving ||
                                                 Boolean(
-                                                    realtimeConflict
+                                                    conflict
                                                 ) ||
-                                                availabilityState ===
+                                                availability ===
                                                     'invalid'
+                                            }
+                                            onClick={
+                                                handleSave
                                             }
                                         >
                                             {saving ? (
                                                 <>
                                                     <span className="spinner-border spinner-border-sm me-2" />
-
-                                                    Memeriksa Jadwal...
+                                                    Memeriksa...
                                                 </>
-                                            ) : realtimeConflict ? (
+                                            ) : conflict ? (
                                                 <>
                                                     <i className="bi bi-calendar-x-fill me-2" />
-
                                                     Jadwal Bentrok
                                                 </>
                                             ) : (
                                                 <>
                                                     <i className="bi bi-floppy-fill me-2" />
-
                                                     Simpan Agenda
                                                 </>
                                             )}
@@ -3504,1050 +2912,858 @@ Silakan ubah tanggal atau jam agenda untuk melakukan reschedule.`
                 </div>
             )}
 
+            {/* STYLING */}
+
             <style>
                 {`
-                    .director-schedule-page {
-                        display: flex;
-                        flex-direction: column;
-                        gap: 12px;
-                        min-height: 0;
-                    }
+                .director-schedule-page {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 14px;
+                    min-width: 0;
+                }
 
-                    .director-schedule-top {
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        flex-wrap: wrap;
-                        gap: 16px;
-                        margin-bottom: 0;
-                        flex-shrink: 0;
-                    }
+                .director-schedule-page .fw-black {
+                    font-weight: 900 !important;
+                }
 
-                    .director-schedule-top h2 {
-                        font-size: 2rem;
-                        line-height: 1.1;
-                    }
+                .director-schedule-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    flex-wrap: wrap;
+                    gap: 16px;
+                }
 
-                    .director-schedule-top p {
-                        font-size: 1rem;
-                    }
+                .director-schedule-header h2 {
+                    font-size: 2rem;
+                }
 
-                    .director-add-button {
-                        min-height: 46px;
-                        padding-left: 24px;
-                        padding-right: 24px;
-                        font-size: 1rem;
-                        font-weight: 800;
-                    }
+                .directorate-filter-grid {
+                    display: grid;
+                    grid-template-columns: repeat(5, minmax(0, 1fr));
+                    gap: 9px;
+                }
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | OVERVIEW
-                    |--------------------------------------------------------------------------
-                    */
+                .directorate-filter-card {
+                    display: flex;
+                    align-items: center;
+                    gap: 9px;
+                    min-width: 0;
+                    padding: 11px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 17px;
+                    background: #fff;
+                    text-align: left;
+                    color: #475569;
+                    box-shadow: 0 4px 15px #0f172a0a;
+                }
 
-                    .schedule-overview-panel {
-                        display: grid;
+                .directorate-filter-card:hover {
+                    border-color: #cbd5e1;
+                    transform: translateY(-1px);
+                }
+
+                .directorate-filter-card.active {
+                    border-color: #7f1d1d;
+                    color: #7f1d1d;
+                    background: #fff7f7;
+                }
+
+                .directorate-filter-icon {
+                    display: grid;
+                    place-items: center;
+                    flex: 0 0 38px;
+                    width: 38px;
+                    height: 38px;
+                    border-radius: 12px;
+                    background: #f1f5f9;
+                    color: #64748b;
+                }
+
+                .directorate-filter-card.active
+                .directorate-filter-icon {
+                    background: #7f1d1d;
+                    color: #fff;
+                }
+
+                .directorate-filter-content {
+                    display: flex;
+                    flex: 1;
+                    min-width: 0;
+                    flex-direction: column;
+                }
+
+                .directorate-filter-content strong {
+                    font-size: .81rem;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .directorate-filter-content small {
+                    font-size: .62rem;
+                    color: #94a3b8;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .directorate-filter-count {
+                    display: grid;
+                    place-items: center;
+                    min-width: 27px;
+                    height: 27px;
+                    padding: 0 6px;
+                    border-radius: 999px;
+                    background: #f1f5f9;
+                    color: #64748b;
+                    font-size: .68rem;
+                    font-weight: 900;
+                }
+
+                .directorate-filter-card.active
+                .directorate-filter-count {
+                    background: #7f1d1d;
+                    color: #fff;
+                }
+
+                .schedule-control-panel {
+                    display: grid;
+                    grid-template-columns:
+                        minmax(0, 1.7fr)
+                        minmax(330px, .8fr);
+                    gap: 10px;
+                }
+
+                .schedule-control-main,
+                .schedule-summary-card {
+                    border: 1px solid #e5e7eb;
+                    border-radius: 18px;
+                    background: #fff;
+                    box-shadow: 0 4px 18px #0f172a0a;
+                }
+
+                .schedule-control-main {
+                    padding: 12px 14px;
+                    min-width: 0;
+                }
+
+                .schedule-control-heading,
+                .schedule-control-tools {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 10px;
+                }
+
+                .schedule-control-heading {
+                    margin-bottom: 10px;
+                }
+
+                .schedule-control-tools {
+                    gap: 7px;
+                }
+
+                .schedule-search {
+                    position: relative;
+                    display: flex;
+                    align-items: center;
+                    width: 215px;
+                    min-width: 0;
+                }
+
+                .schedule-search > i {
+                    position: absolute;
+                    left: 11px;
+                    color: #94a3b8;
+                    font-size: .76rem;
+                }
+
+                .schedule-search input {
+                    width: 100%;
+                    height: 35px;
+                    padding: 0 32px 0 31px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 99px;
+                    background: #f8fafc;
+                    outline: none;
+                    font-size: .75rem;
+                }
+
+                .schedule-search input:focus {
+                    border-color: #7f1d1d;
+                    background: #fff;
+                }
+
+                .schedule-search button {
+                    position: absolute;
+                    right: 8px;
+                    border: 0;
+                    background: none;
+                    color: #64748b;
+                }
+
+                .schedule-today {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 6px;
+                    min-height: 35px;
+                    padding: 0 12px;
+                    border: 1px solid #fecaca;
+                    border-radius: 99px;
+                    background: #fff7f7;
+                    color: #7f1d1d;
+                    font-size: .74rem;
+                    font-weight: 900;
+                    white-space: nowrap;
+                }
+
+                .schedule-category-list {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 6px;
+                }
+
+                .schedule-category-button {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    min-height: 31px;
+                    padding: 3px 8px 3px 4px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 99px;
+                    background: #fff;
+                    color: #475569;
+                    font-size: .7rem;
+                    font-weight: 800;
+                    white-space: nowrap;
+                }
+
+                .schedule-category-button.active {
+                    background: #fff7f7;
+                    border-color: #7f1d1d;
+                }
+
+                .agenda-dot {
+                    display: grid;
+                    place-items: center;
+                    width: 23px;
+                    height: 23px;
+                    border-radius: 50%;
+                    color: #fff;
+                    font-size: .6rem;
+                }
+
+                .agenda-count {
+                    display: grid;
+                    place-items: center;
+                    min-width: 19px;
+                    height: 19px;
+                    border-radius: 99px;
+                    background: #f1f5f9;
+                    color: #64748b;
+                    font-size: .61rem;
+                }
+
+                .schedule-summary-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1.3fr;
+                    gap: 8px;
+                    min-width: 0;
+                }
+
+                .schedule-summary-card {
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 12px;
+                    color: inherit;
+                    text-align: left;
+                    min-width: 0;
+                }
+
+                button.schedule-summary-card:disabled {
+                    opacity: 1;
+                }
+
+                .schedule-summary-icon {
+                    flex: 0 0 40px;
+                    display: grid;
+                    place-items: center;
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 12px;
+                    color: #fff;
+                }
+
+                .schedule-summary-icon.today {
+                    background: #7f1d1d;
+                }
+
+                .schedule-summary-icon.next {
+                    background: #334155;
+                }
+
+                .schedule-summary-label {
+                    font-size: .63rem;
+                    font-weight: 800;
+                    color: #94a3b8;
+                    text-transform: uppercase;
+                }
+
+                .schedule-summary-title {
+                    display: block;
+                    max-width: 210px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+                .schedule-summary-description {
+                    max-width: 215px;
+                    margin-top: 2px;
+                    color: #64748b;
+                    font-size: .65rem;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | KALENDER PC
+                |--------------------------------------------------------------------------
+                */
+
+                .director-calendar-card {
+                    border-radius: 24px !important;
+                    overflow: hidden;
+                    min-width: 0;
+                    min-height: 0;
+                }
+
+                .calendar-active-banner {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    min-height: 55px;
+                    padding: 9px 15px;
+                    background: linear-gradient(
+                        90deg,
+                        #7f1d1d,
+                        #991b1b
+                    );
+                    color: #fff;
+                }
+
+                .calendar-active-icon {
+                    display: grid;
+                    place-items: center;
+                    flex: 0 0 37px;
+                    width: 37px;
+                    height: 37px;
+                    border-radius: 11px;
+                    background: #ffffff2a;
+                }
+
+                .calendar-active-label {
+                    font-size: .62rem;
+                    font-weight: 800;
+                    opacity: .8;
+                    text-transform: uppercase;
+                }
+
+                .calendar-all-info {
+                    font-size: .69rem;
+                    font-weight: 700;
+                    opacity: .86;
+                }
+
+                .director-calendar-body {
+                    padding: 14px !important;
+                    min-width: 0;
+                }
+
+                .director-calendar-viewport {
+                    height: calc(100vh - 475px);
+                    min-height: 440px;
+                    max-height: 720px;
+                    min-width: 0;
+                }
+
+                .director-calendar-viewport > div,
+                .director-calendar-viewport .fc {
+                    height: 100%;
+                }
+
+                .director-calendar-card .fc {
+                    font-size: 1rem;
+                    min-width: 0;
+                }
+
+                .director-calendar-card .fc-toolbar {
+                    margin-bottom: 10px !important;
+                }
+
+                .director-calendar-card .fc-toolbar-title {
+                    font-size: 1.7rem !important;
+                    font-weight: 900 !important;
+                    text-transform: capitalize;
+                }
+
+                .director-calendar-card .fc-button {
+                    min-height: 37px;
+                    border-radius: 99px !important;
+                    font-size: .82rem !important;
+                    font-weight: 800 !important;
+                }
+
+                .director-calendar-card .fc-col-header-cell {
+                    background: #f8fafc;
+                }
+
+                .director-calendar-card
+                .fc-col-header-cell-cushion,
+                .director-calendar-card
+                .fc-daygrid-day-number {
+                    font-weight: 900;
+                    text-decoration: none;
+                }
+
+                .director-calendar-card .fc-day-today {
+                    background: #fff7f7 !important;
+                }
+
+                .director-calendar-card .fc-event {
+                    margin: 2px 3px !important;
+                    padding: 3px 5px !important;
+                    border-radius: 7px !important;
+                    font-weight: 800;
+                    cursor: pointer;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | MODAL
+                |--------------------------------------------------------------------------
+                */
+
+                .director-modal-backdrop {
+                    background: #0f172a9e;
+                    z-index: 1050;
+                }
+
+                .director-modal-accent {
+                    height: 7px;
+                }
+
+                .agenda-owner-options {
+                    display: grid;
+                    grid-template-columns:
+                        repeat(2, minmax(0, 1fr));
+                    gap: 8px;
+                }
+
+                .agenda-owner-option {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    min-width: 0;
+                    min-height: 65px;
+                    padding: 9px 11px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 15px;
+                    background: #fff;
+                    text-align: left;
+                    color: #475569;
+                }
+
+                .agenda-owner-option.active {
+                    border-color: #7f1d1d;
+                    background: #fff7f7;
+                    color: #7f1d1d;
+                }
+
+                .agenda-owner-option small {
+                    display: block;
+                    color: #94a3b8;
+                    font-size: .65rem;
+                }
+
+                .director-owner-icon {
+                    display: grid;
+                    place-items: center;
+                    flex: 0 0 39px;
+                    width: 39px;
+                    height: 39px;
+                    border-radius: 12px;
+                    background: #7f1d1d;
+                    color: #fff;
+                }
+
+                .agenda-owner-detail {
+                    display: flex;
+                    align-items: center;
+                    gap: 13px;
+                    padding: 13px 15px;
+                    border: 1px solid #fecaca;
+                    border-radius: 16px;
+                    background: #fff7f7;
+                }
+
+                .agenda-detail-box {
+                    height: 100%;
+                    padding: 14px 16px;
+                    border-radius: 15px;
+                    background: #f8fafc;
+                }
+
+                .agenda-detail-box small {
+                    display: block;
+                    margin-bottom: 5px;
+                    color: #64748b;
+                }
+
+                .agenda-detail-box strong {
+                    display: block;
+                    word-break: break-word;
+                }
+
+                .agenda-category-preview {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 10px 12px;
+                    border: 1px solid;
+                    border-radius: 15px;
+                }
+
+                .agenda-preview-icon {
+                    display: grid;
+                    place-items: center;
+                    flex: 0 0 38px;
+                    width: 38px;
+                    height: 38px;
+                    border-radius: 11px;
+                    color: #fff;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | KETERSEDIAAN JADWAL
+                |--------------------------------------------------------------------------
+                */
+
+                .availability-box {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 12px;
+                    padding: 13px 15px;
+                    border: 1px solid;
+                    border-radius: 15px;
+                }
+
+                .availability-box.available {
+                    background: #ecfdf5;
+                    border-color: #a7f3d0;
+                    color: #065f46;
+                }
+
+                .availability-box.invalid {
+                    background: #fffbeb;
+                    border-color: #fde68a;
+                    color: #92400e;
+                }
+
+                .availability-box.conflict {
+                    background: #fef2f2;
+                    border-color: #fecaca;
+                    color: #991b1b;
+                }
+
+                .availability-icon {
+                    display: grid;
+                    place-items: center;
+                    flex: 0 0 38px;
+                    width: 38px;
+                    height: 38px;
+                    border-radius: 11px;
+                    background: #ffffffbf;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | AUDIT TRAIL
+                |--------------------------------------------------------------------------
+                */
+
+                .audit-section {
+                    padding: 18px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 20px;
+                    background: #fff;
+                }
+
+                .audit-timeline {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 11px;
+                }
+
+                .audit-item {
+                    display: grid;
+                    grid-template-columns:
+                        38px minmax(0, 1fr);
+                    gap: 10px;
+                }
+
+                .audit-marker {
+                    display: grid;
+                    place-items: center;
+                    width: 37px;
+                    height: 37px;
+                    border: 3px solid #fff;
+                    border-radius: 12px;
+                    background: #f1f5f9;
+                }
+
+                .audit-marker.audit-created {
+                    background: #ecfdf5;
+                    color: #047857;
+                }
+
+                .audit-marker.audit-updated {
+                    background: #eff6ff;
+                    color: #1d4ed8;
+                }
+
+                .audit-marker.audit-deleted {
+                    background: #fef2f2;
+                    color: #dc2626;
+                }
+
+                .audit-content {
+                    min-width: 0;
+                    padding: 11px 13px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 15px;
+                    background: #f8fafc;
+                }
+
+                .audit-change {
+                    margin-top: 10px;
+                    padding: 9px 10px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 11px;
+                    background: #fff;
+                }
+
+                .audit-change-values {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: .73rem;
+                    font-weight: 800;
+                }
+
+                .audit-old,
+                .audit-new {
+                    flex: 1;
+                    min-width: 0;
+                    padding: 6px 8px;
+                    border-radius: 8px;
+                    word-break: break-word;
+                }
+
+                .audit-old {
+                    background: #fef2f2;
+                    color: #991b1b;
+                    text-decoration: line-through;
+                }
+
+                .audit-new {
+                    background: #ecfdf5;
+                    color: #047857;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | RESPONSIVE TABLET
+                |--------------------------------------------------------------------------
+                */
+
+                @media (max-width: 1400px) {
+                    .directorate-filter-grid {
                         grid-template-columns:
-                            minmax(0, 1.65fr)
-                            minmax(330px, .75fr);
-                        gap: 10px;
+                            repeat(3, minmax(0, 1fr));
+                    }
+                }
+
+                @media (max-width: 1250px) {
+                    .schedule-control-panel {
+                        grid-template-columns: 1fr;
                     }
 
                     /*
-                    |--------------------------------------------------------------------------
-                    | FILTER
-                    |--------------------------------------------------------------------------
-                    */
-
-                    .schedule-filter-area {
-                        min-width: 0;
-                        background: #ffffff;
-                        border: 1px solid #e5e7eb;
-                        border-radius: 18px;
-                        padding: 11px 13px;
-                        box-shadow:
-                            0 4px 20px
-                            rgba(15, 23, 42, .04);
-                    }
-
-                    .schedule-filter-header {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        gap: 12px;
-                        margin-bottom: 8px;
-                    }
-
-                    .schedule-filter-title {
-                        font-size: .92rem;
-                        font-weight: 900;
-                        color: #1f2937;
-                    }
-
-                    .schedule-filter-subtitle {
-                        font-size: .72rem;
-                        color: #94a3b8;
-                        margin-top: 1px;
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | SEARCH
-                    |--------------------------------------------------------------------------
-                    */
-
-                    .schedule-filter-tools {
-                        display: flex;
-                        align-items: center;
-                        gap: 7px;
-                        flex-shrink: 0;
-                    }
-
-                    .schedule-search-wrapper {
-                        width: 215px;
-                        height: 34px;
-                        position: relative;
-                        display: flex;
-                        align-items: center;
-                    }
-
-                    .schedule-search-icon {
-                        position: absolute;
-                        left: 11px;
-                        color: #94a3b8;
-                        font-size: .78rem;
-                        pointer-events: none;
-                    }
-
-                    .schedule-search-input {
-                        width: 100%;
-                        height: 34px;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 999px;
-                        background: #f8fafc;
-                        outline: none;
-                        padding: 0 34px 0 31px;
-                        font-size: .75rem;
-                        font-weight: 600;
-                        color: #334155;
-                        transition:
-                            border-color .15s ease,
-                            box-shadow .15s ease,
-                            background .15s ease;
-                    }
-
-                    .schedule-search-input:focus {
-                        background: #ffffff;
-                        border-color: #7f1d1d;
-                        box-shadow:
-                            0 0 0 3px
-                            rgba(127, 29, 29, .08);
-                    }
-
-                    .schedule-search-input::placeholder {
-                        color: #94a3b8;
-                    }
-
-                    .schedule-search-clear {
-                        position: absolute;
-                        right: 5px;
-                        width: 25px;
-                        height: 25px;
-                        border: 0;
-                        border-radius: 50%;
-                        background: transparent;
-                        color: #94a3b8;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: .65rem;
-                    }
-
-                    .schedule-search-clear:hover {
-                        background: #e2e8f0;
-                        color: #334155;
-                    }
-
-                    .schedule-today-button {
-                        height: 34px;
-                        flex-shrink: 0;
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                        gap: 6px;
-                        border: 1px solid #fecaca;
-                        background: #fff7f7;
-                        color: #7f1d1d;
-                        border-radius: 999px;
-                        padding: 0 12px;
-                        font-size: .73rem;
-                        font-weight: 900;
-                        transition:
-                            transform .15s ease,
-                            background .15s ease,
-                            box-shadow .15s ease;
-                    }
-
-                    .schedule-today-button:hover {
-                        transform: translateY(-1px);
-                        background: #fee2e2;
-                        box-shadow:
-                            0 5px 12px
-                            rgba(127, 29, 29, .09);
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | FILTER BUTTONS
-                    |--------------------------------------------------------------------------
-                    */
-
-                    .schedule-filter-list {
-                        display: flex;
-                        gap: 6px;
-                        flex-wrap: wrap;
-                    }
-
-                    .schedule-filter-button {
-                        display: inline-flex;
-                        align-items: center;
-                        gap: 6px;
-                        min-height: 31px;
-                        border: 1px solid #e2e8f0;
-                        background: #ffffff;
-                        color: #475569;
-                        border-radius: 999px;
-                        padding: 3px 7px 3px 4px;
-                        font-size: .7rem;
-                        font-weight: 800;
-                        transition:
-                            transform .15s ease,
-                            box-shadow .15s ease,
-                            border-color .15s ease,
-                            background .15s ease;
-                    }
-
-                    .schedule-filter-button:hover {
-                        transform: translateY(-1px);
-                        box-shadow:
-                            0 5px 12px
-                            rgba(15, 23, 42, .08);
-                        border-color:
-                            var(
-                                --agenda-filter-color,
-                                #7f1d1d
-                            );
-                    }
-
-                    .schedule-filter-button.active {
-                        border-color: #7f1d1d;
-                        background: #fff7f7;
-                        color: #7f1d1d;
-                    }
-
-                    .schedule-filter-icon {
-                        width: 23px;
-                        height: 23px;
-                        flex: 0 0 23px;
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                        border-radius: 50%;
-                        color: #ffffff;
-                        font-size: .61rem;
-                    }
-
-                    .schedule-filter-icon-all {
-                        background: #7f1d1d;
-                    }
-
-                    .schedule-filter-count {
-                        min-width: 19px;
-                        height: 19px;
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                        padding: 0 5px;
-                        border-radius: 999px;
-                        background: #f1f5f9;
-                        color: #64748b;
-                        font-size: .61rem;
-                        font-weight: 900;
-                    }
-
-                    .schedule-filter-button.active
-                    .schedule-filter-count {
-                        background: #7f1d1d;
-                        color: #ffffff;
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | SUMMARY
-                    |--------------------------------------------------------------------------
-                    */
-
-                    .schedule-summary-area {
-                        display: grid;
-                        grid-template-columns:
-                            1fr 1.35fr;
-                        gap: 8px;
-                    }
-
-                    .schedule-mini-card {
-                        width: 100%;
-                        min-width: 0;
-                        border: 1px solid #e5e7eb;
-                        border-radius: 18px;
-                        background: #ffffff;
-                        padding: 12px;
-                        display: flex;
-                        align-items: center;
-                        gap: 10px;
-                        text-align: left;
-                        color: inherit;
-                        box-shadow:
-                            0 4px 20px
-                            rgba(15, 23, 42, .04);
-                    }
-
-                    button.schedule-mini-card {
-                        appearance: none;
-                        font-family: inherit;
-                    }
-
-                    button.schedule-mini-card:disabled {
-                        opacity: 1;
-                    }
-
-                    .schedule-mini-today {
-                        background:
-                            linear-gradient(
-                                145deg,
-                                #fff7f7,
-                                #ffffff
-                            );
-                        border-color: #fecaca;
-                    }
-
-                    .schedule-mini-next {
-                        background:
-                            linear-gradient(
-                                145deg,
-                                #f8fafc,
-                                #ffffff
-                            );
-                    }
-
-                    .schedule-mini-clickable {
-                        cursor: pointer;
-                        transition:
-                            transform .15s ease,
-                            box-shadow .15s ease,
-                            border-color .15s ease;
-                    }
-
-                    .schedule-mini-clickable:hover {
-                        transform: translateY(-2px);
-                        border-color: #d1d5db;
-                        box-shadow:
-                            0 8px 22px
-                            rgba(15, 23, 42, .09);
-                    }
-
-                    .schedule-mini-icon {
-                        width: 39px;
-                        height: 39px;
-                        flex: 0 0 39px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        border-radius: 12px;
-                        color: #ffffff;
-                        background: #7f1d1d;
-                        font-size: 1rem;
-                    }
-
-                    .schedule-mini-next
-                    .schedule-mini-icon {
-                        background: #334155;
-                    }
-
-                    .schedule-mini-content {
-                        min-width: 0;
-                        flex: 1;
-                    }
-
-                    .schedule-mini-label {
-                        color: #64748b;
-                        font-size: .67rem;
-                        line-height: 1;
-                        font-weight: 800;
-                        text-transform: uppercase;
-                        letter-spacing: .04em;
-                        margin-bottom: 5px;
-                    }
-
-                    .schedule-mini-main {
-                        display: flex;
-                        align-items: baseline;
-                        gap: 4px;
-                        font-size: .76rem;
-                        font-weight: 800;
-                        color: #475569;
-                    }
-
-                    .schedule-mini-number {
-                        font-size: 1.55rem;
-                        line-height: 1;
-                        font-weight: 900;
-                        color: #7f1d1d;
-                    }
-
-                    .schedule-mini-description {
-                        margin-top: 4px;
-                        color: #64748b;
-                        font-size: .69rem;
-                        line-height: 1.3;
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                    }
-
-                    .schedule-next-title {
-                        color: #1f2937;
-                        font-size: .82rem;
-                        line-height: 1.25;
-                        font-weight: 900;
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                    }
-
-                    .schedule-mini-arrow {
-                        flex-shrink: 0;
-                        color: #94a3b8;
-                        font-size: .9rem;
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | CALENDAR
-                    |--------------------------------------------------------------------------
-                    */
-
-                    .director-calendar-card {
-                        border-radius: 24px !important;
-                        overflow: hidden;
-                        min-height: 0;
-                    }
-
-                    .director-calendar-body {
-                        padding: 14px !important;
-                        min-height: 0;
-                    }
+                     * PERBAIKAN:
+                     * Tidak lagi memakai fixed height
+                     * ketika tampilan tablet / HP.
+                     */
 
                     .director-calendar-viewport {
-                        height: calc(100vh - 365px);
-                        min-height: 450px;
-                        max-height: 720px;
+                        height: auto;
+                        max-height: none;
+                        min-height: 0;
+                        overflow: visible;
                     }
 
                     .director-calendar-viewport > div,
                     .director-calendar-viewport .fc {
-                        height: 100%;
+                        height: auto !important;
+                        min-height: 0;
+                    }
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | RESPONSIVE TABLET KECIL
+                |--------------------------------------------------------------------------
+                */
+
+                @media (max-width: 992px) {
+                    .directorate-filter-grid {
+                        grid-template-columns:
+                            repeat(2, minmax(0, 1fr));
                     }
 
-                    .director-calendar-card .fc {
-                        font-size: 1.08rem;
+                    .schedule-control-heading {
+                        flex-direction: column;
+                        align-items: stretch;
+                    }
+
+                    .schedule-control-tools {
+                        width: 100%;
+                    }
+
+                    .schedule-search {
+                        width: auto;
+                        flex: 1;
+                    }
+
+                    .calendar-all-info {
+                        display: none;
                     }
 
                     .director-calendar-card .fc-toolbar {
-                        margin-bottom: 12px !important;
-                        gap: 12px;
+                        flex-direction: column;
+                        gap: 9px;
                     }
 
                     .director-calendar-card
-                    .fc-toolbar-title {
-                        font-size: 2rem !important;
-                        font-weight: 900 !important;
-                        line-height: 1 !important;
-                        text-transform: capitalize;
+                    .fc-toolbar-chunk {
+                        display: flex;
+                        justify-content: center;
+                    }
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | RESPONSIVE HP
+                |--------------------------------------------------------------------------
+                */
+
+                @media (max-width: 768px) {
+                    .director-schedule-header h2 {
+                        font-size: 1.5rem;
                     }
 
-                    .director-calendar-card
-                    .fc-button {
-                        min-height: 40px;
-                        border-radius: 999px !important;
-                        font-size: .92rem !important;
-                        font-weight: 800 !important;
-                        padding-left: 16px !important;
-                        padding-right: 16px !important;
+                    .directorate-filter-grid {
+                        grid-template-columns: 1fr;
                     }
 
-                    .director-calendar-card
-                    .fc-col-header-cell {
-                        background: #f8fafc;
-                        padding-top: 8px;
-                        padding-bottom: 8px;
+                    .schedule-control-tools {
+                        flex-direction: column;
+                        align-items: stretch;
                     }
 
-                    .director-calendar-card
-                    .fc-col-header-cell-cushion {
-                        font-size: 1rem;
-                        font-weight: 900;
-                        color: #475569;
-                        text-decoration: none;
-                        text-transform: uppercase;
+                    .schedule-search,
+                    .schedule-today {
+                        width: 100%;
                     }
+
+                    .schedule-category-list {
+                        flex-wrap: nowrap;
+                        overflow-x: auto;
+                        scrollbar-width: none;
+                    }
+
+                    .schedule-category-list::-webkit-scrollbar {
+                        display: none;
+                    }
+
+                    .schedule-category-button {
+                        flex-shrink: 0;
+                    }
+
+                    .schedule-summary-grid,
+                    .agenda-owner-options {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .director-calendar-body {
+                        padding: 8px !important;
+                    }
+
+                    .director-calendar-card .fc {
+                        width: 100%;
+                        font-size: .78rem;
+                        min-width: 0;
+                    }
+
+                    .director-calendar-card .fc-toolbar-title {
+                        font-size: 1.28rem !important;
+                    }
+
+                    /*
+                     * Memastikan setiap kotak tanggal
+                     * tetap memiliki tinggi minimum.
+                     */
 
                     .director-calendar-card
                     .fc-daygrid-day-frame {
-                        min-height: 0 !important;
+                        min-height: 54px;
                     }
 
                     .director-calendar-card
                     .fc-daygrid-day-number {
-                        padding: 8px 10px;
-                        font-size: 1.05rem;
-                        font-weight: 900;
-                        color: #1f2937;
-                        text-decoration: none;
+                        font-size: .73rem;
+                        padding: 4px;
                     }
 
-                    .director-calendar-card
-                    .fc-day-today {
-                        background: #fff7f7 !important;
-                    }
-
-                    .director-calendar-card
-                    .fc-day-today
-                    .fc-daygrid-day-number {
-                        min-width: 30px;
-                        min-height: 30px;
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                        border-radius: 999px;
-                        background: #7f1d1d;
-                        color: #ffffff !important;
-                        margin: 4px;
-                        padding: 4px 8px;
-                    }
-
-                    .director-calendar-card
-                    .fc-event {
-                        border-radius: 7px !important;
-                        padding: 3px 5px !important;
-                        margin: 2px 4px !important;
-                        font-size: .92rem !important;
-                        font-weight: 800;
-                        line-height: 1.3;
-                        cursor: pointer;
-                    }
-
-                    .director-calendar-card
-                    .fc-event-main {
-                        overflow: hidden;
-                    }
-
-                    .director-calendar-card
-                    .fc-event-time {
-                        font-size: .9rem !important;
-                        font-weight: 900;
-                    }
-
-                    .director-calendar-card
-                    .fc-event-title {
-                        font-size: .92rem !important;
-                        font-weight: 800;
-                        overflow: hidden;
-                        white-space: nowrap;
-                        text-overflow: ellipsis;
+                    .director-calendar-card .fc-event {
+                        margin: 1px !important;
+                        padding: 1px 2px !important;
+                        font-size: .62rem;
                     }
 
                     .director-calendar-card
                     .fc-daygrid-more-link {
-                        margin-left: 5px;
-                        color: #b91c1c;
-                        font-size: .85rem;
-                        font-weight: 900;
-                        text-decoration: none;
+                        font-size: .62rem;
                     }
 
-                    .director-calendar-card
-                    .fc-scrollgrid {
-                        border-radius: 14px;
-                        overflow: hidden;
+                    .audit-change-values {
+                        flex-direction: column;
+                        align-items: stretch;
                     }
 
-                    .director-calendar-card
-                    .fc-theme-standard td,
-                    .director-calendar-card
-                    .fc-theme-standard th {
-                        border-color: #e5e7eb;
+                    .audit-change-values > i {
+                        align-self: center;
+                        transform: rotate(90deg);
                     }
-
-                    .director-calendar-card
-                    .fc-timegrid-axis,
-                    .director-calendar-card
-                    .fc-timegrid-slot-label {
-                        font-size: .9rem;
-                        font-weight: 700;
-                    }
-
-                    .director-calendar-card
-                    .fc-timegrid-slot {
-                        height: 2.7rem;
-                    }
-
-                    .director-calendar-card
-                    .fc-timegrid-event {
-                        font-size: .9rem !important;
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | CATEGORY
-                    |--------------------------------------------------------------------------
-                    */
-
-                    .agenda-category-preview {
-                        display: flex;
-                        align-items: center;
-                        gap: 12px;
-                        border: 1px solid;
-                        border-radius: 16px;
-                        padding: 12px 14px;
-                    }
-
-                    .agenda-category-icon {
-                        width: 42px;
-                        height: 42px;
-                        flex: 0 0 42px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        border-radius: 12px;
-                        color: #ffffff;
-                        font-size: 1.15rem;
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | AVAILABILITY
-                    |--------------------------------------------------------------------------
-                    */
-
-                    .schedule-availability {
-                        display: flex;
-                        align-items: flex-start;
-                        gap: 14px;
-                        border-radius: 16px;
-                        padding: 14px 16px;
-                        border: 1px solid transparent;
-                    }
-
-                    .schedule-availability-icon {
-                        width: 40px;
-                        height: 40px;
-                        flex: 0 0 40px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        border-radius: 12px;
-                        font-size: 1.15rem;
-                    }
-
-                    .schedule-availability-success {
-                        background: #ecfdf5;
-                        border-color: #a7f3d0;
-                        color: #065f46;
-                    }
-
-                    .schedule-availability-success
-                    .schedule-availability-icon {
-                        background: #d1fae5;
-                    }
-
-                    .schedule-availability-warning {
-                        background: #fffbeb;
-                        border-color: #fde68a;
-                        color: #92400e;
-                    }
-
-                    .schedule-availability-warning
-                    .schedule-availability-icon {
-                        background: #fef3c7;
-                    }
-
-                    .schedule-availability-danger {
-                        background: #fef2f2;
-                        border-color: #fecaca;
-                        color: #991b1b;
-                    }
-
-                    .schedule-availability-danger
-                    .schedule-availability-icon {
-                        background: #fee2e2;
-                    }
-
-                    .schedule-conflict-detail {
-                        display: grid;
-                        gap: 3px;
-                        padding: 10px 12px;
-                        border-radius: 10px;
-                        background:
-                            rgba(
-                                255,
-                                255,
-                                255,
-                                .68
-                            );
-                    }
-
-                    .schedule-suggestion-button {
-                        color: #065f46 !important;
-                        background: #ffffff !important;
-                        border-color: #a7f3d0 !important;
-                        font-weight: 800 !important;
-                    }
-
-                    .schedule-suggestion-button:hover {
-                        background: #d1fae5 !important;
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | LARGE SCREEN
-                    |--------------------------------------------------------------------------
-                    */
-
-                    @media (min-width: 1500px) {
-                        .schedule-overview-panel {
-                            grid-template-columns:
-                                minmax(0, 1.75fr)
-                                minmax(380px, .7fr);
-                        }
-
-                        .director-calendar-viewport {
-                            height: calc(100vh - 355px);
-                            max-height: 790px;
-                        }
-
-                        .director-calendar-card
-                        .fc-toolbar-title {
-                            font-size: 2.15rem !important;
-                        }
-
-                        .director-calendar-card
-                        .fc-col-header-cell-cushion {
-                            font-size: 1.05rem;
-                        }
-
-                        .director-calendar-card
-                        .fc-daygrid-day-number {
-                            font-size: 1.08rem;
-                        }
-
-                        .director-calendar-card
-                        .fc-event,
-                        .director-calendar-card
-                        .fc-event-title {
-                            font-size: .95rem !important;
-                        }
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | SHORT SCREEN
-                    |--------------------------------------------------------------------------
-                    */
-
-                    @media (
-                        min-width: 992px
-                    ) and (
-                        max-height: 850px
-                    ) {
-                        .director-schedule-page {
-                            gap: 8px;
-                        }
-
-                        .director-schedule-top h2 {
-                            font-size: 1.6rem;
-                        }
-
-                        .director-schedule-top p {
-                            font-size: .84rem;
-                        }
-
-                        .schedule-filter-area,
-                        .schedule-mini-card {
-                            padding: 8px 10px;
-                        }
-
-                        .schedule-filter-header {
-                            margin-bottom: 5px;
-                        }
-
-                        .schedule-filter-subtitle {
-                            font-size: .65rem;
-                        }
-
-                        .schedule-search-wrapper {
-                            width: 185px;
-                            height: 30px;
-                        }
-
-                        .schedule-search-input,
-                        .schedule-today-button {
-                            height: 30px;
-                        }
-
-                        .schedule-search-input {
-                            font-size: .68rem;
-                        }
-
-                        .schedule-today-button {
-                            font-size: .66rem;
-                        }
-
-                        .schedule-filter-button {
-                            min-height: 28px;
-                            font-size: .66rem;
-                        }
-
-                        .schedule-filter-icon {
-                            width: 20px;
-                            height: 20px;
-                            flex-basis: 20px;
-                            font-size: .55rem;
-                        }
-
-                        .schedule-filter-count {
-                            min-width: 18px;
-                            height: 18px;
-                            font-size: .58rem;
-                        }
-
-                        .schedule-mini-icon {
-                            width: 34px;
-                            height: 34px;
-                            flex-basis: 34px;
-                        }
-
-                        .schedule-mini-number {
-                            font-size: 1.3rem;
-                        }
-
-                        .schedule-mini-label {
-                            font-size: .6rem;
-                        }
-
-                        .schedule-mini-description,
-                        .schedule-next-title {
-                            font-size: .65rem;
-                        }
-
-                        .director-calendar-viewport {
-                            height: calc(100vh - 310px);
-                            min-height: 420px;
-                        }
-
-                        .director-calendar-card
-                        .fc-toolbar {
-                            margin-bottom: 7px !important;
-                        }
-
-                        .director-calendar-card
-                        .fc-toolbar-title {
-                            font-size: 1.6rem !important;
-                        }
-
-                        .director-calendar-card
-                        .fc-button {
-                            min-height: 35px;
-                            font-size: .78rem !important;
-                        }
-
-                        .director-calendar-card
-                        .fc-col-header-cell {
-                            padding-top: 5px;
-                            padding-bottom: 5px;
-                        }
-
-                        .director-calendar-card
-                        .fc-event,
-                        .director-calendar-card
-                        .fc-event-title {
-                            font-size: .79rem !important;
-                        }
-
-                        .director-calendar-card
-                        .fc-event-time {
-                            font-size: .76rem !important;
-                        }
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | MEDIUM
-                    |--------------------------------------------------------------------------
-                    */
-
-                    @media (max-width: 1250px) {
-                        .schedule-overview-panel {
-                            grid-template-columns: 1fr;
-                        }
-
-                        .schedule-summary-area {
-                            grid-template-columns:
-                                1fr 1.5fr;
-                        }
-
-                        .director-calendar-viewport {
-                            height: auto;
-                            min-height: 650px;
-                            max-height: none;
-                        }
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | TABLET
-                    |--------------------------------------------------------------------------
-                    */
-
-                    @media (max-width: 991.98px) {
-                        .schedule-filter-header {
-                            align-items: stretch;
-                            flex-direction: column;
-                        }
-
-                        .schedule-filter-tools {
-                            width: 100%;
-                        }
-
-                        .schedule-search-wrapper {
-                            width: auto;
-                            flex: 1;
-                        }
-
-                        .director-calendar-viewport {
-                            min-height: 720px;
-                        }
-
-                        .director-calendar-card
-                        .fc-toolbar {
-                            flex-direction: column;
-                        }
-
-                        .director-calendar-card
-                        .fc-toolbar-chunk {
-                            display: flex;
-                            justify-content: center;
-                        }
-
-                        .director-calendar-card
-                        .fc-daygrid-day-frame {
-                            min-height: 90px !important;
-                        }
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | MOBILE
-                    |--------------------------------------------------------------------------
-                    */
-
-                    @media (max-width: 767.98px) {
-                        .director-schedule-top h2 {
-                            font-size: 1.6rem;
-                        }
-
-                        .schedule-filter-area {
-                            padding: 11px;
-                        }
-
-                        .schedule-filter-tools {
-                            flex-direction: column;
-                            align-items: stretch;
-                        }
-
-                        .schedule-search-wrapper {
-                            width: 100%;
-                        }
-
-                        .schedule-today-button {
-                            width: 100%;
-                        }
-
-                        .schedule-filter-list {
-                            flex-wrap: nowrap;
-                            overflow-x: auto;
-                            padding-bottom: 4px;
-                            scrollbar-width: none;
-                        }
-
-                        .schedule-filter-list::-webkit-scrollbar {
-                            display: none;
-                        }
-
-                        .schedule-filter-button {
-                            flex-shrink: 0;
-                        }
-
-                        .schedule-summary-area {
-                            grid-template-columns: 1fr;
-                        }
-
-                        .schedule-mini-card {
-                            min-height: 74px;
-                        }
-
-                        .director-calendar-body {
-                            padding: 10px !important;
-                        }
-
-                        .director-calendar-card
-                        .fc {
-                            font-size: .82rem;
-                        }
-
-                        .director-calendar-card
-                        .fc-toolbar-title {
-                            font-size: 1.35rem !important;
-                        }
-
-                        .director-calendar-card
-                        .fc-button {
-                            min-height: 36px;
-                            padding-left: 10px !important;
-                            padding-right: 10px !important;
-                            font-size: .72rem !important;
-                        }
-
-                        .director-calendar-card
-                        .fc-col-header-cell-cushion {
-                            font-size: .75rem;
-                        }
-
-                        .director-calendar-card
-                        .fc-daygrid-day-number {
-                            font-size: .8rem;
-                            padding: 5px;
-                        }
-
-                        .director-calendar-card
-                        .fc-event,
-                        .director-calendar-card
-                        .fc-event-title,
-                        .director-calendar-card
-                        .fc-event-time {
-                            font-size: .65rem !important;
-                        }
-                    }
+                }
                 `}
             </style>
         </div>
