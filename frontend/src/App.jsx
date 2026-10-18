@@ -45,6 +45,10 @@ import MyRequestDetailPage from './pages/requests/MyRequestDetailPage';
 import DirectorSchedulePage from './pages/schedule/DirectorSchedulePage';
 import EventScheduleActivityPage from './pages/schedule/EventScheduleActivityPage';
 
+// FITUR BARU: Request Jadwal Direktorat
+import DirectorateScheduleRequestPage from './pages/requests/DirectorateScheduleRequestPage';
+import DirectorateScheduleApprovalPage from './pages/schedule/DirectorateScheduleApprovalPage';
+
 import UnauthorizedPage from './pages/errors/UnauthorizedPage';
 import NotFoundPage from './pages/errors/NotFoundPage';
 
@@ -59,36 +63,26 @@ const ADMIN_ROLES = [
     'superadmin',
 ];
 
+const SCHEDULE_APPROVAL_ROLES = [
+    'admin',
+    'superadmin',
+];
+
 const SUPERADMIN_ROLES = [
     'superadmin',
 ];
 
 function RoleRedirect() {
-    const token =
-        localStorage.getItem(
-            'admin_token'
-        );
+    const token = localStorage.getItem('admin_token');
+    const currentUser = getStoredUser();
 
-    const currentUser =
-        getStoredUser();
-
-    if (
-        !token ||
-        !currentUser?.role
-    ) {
-        return (
-            <Navigate
-                to="/login"
-                replace
-            />
-        );
+    if (!token || !currentUser?.role) {
+        return <Navigate to="/login" replace />;
     }
 
     return (
         <Navigate
-            to={getDefaultPath(
-                currentUser
-            )}
+            to={getDefaultPath(currentUser)}
             replace
         />
     );
@@ -100,57 +94,47 @@ function App() {
             <ScrollToTop />
 
             <Routes>
-                {/* PUBLIC */}
+                {/* ======================================================
+                    PUBLIC
+                ====================================================== */}
 
                 <Route
                     path="/login"
-                    element={
-                        <LoginPage />
-                    }
+                    element={<LoginPage />}
                 />
 
                 <Route
                     path="/"
-                    element={
-                        <RoleRedirect />
-                    }
+                    element={<RoleRedirect />}
                 />
 
                 <Route
                     path="/dashboard"
-                    element={
-                        <RoleRedirect />
-                    }
+                    element={<RoleRedirect />}
                 />
 
-                {/* USER */}
+                {/* ======================================================
+                    USER LAYOUT
+                ====================================================== */}
 
                 <Route
                     path="/user"
                     element={
-                        <ProtectedRoute
-                            allowedRoles={
-                                USER_ROLES
-                            }
-                        >
+                        <ProtectedRoute allowedRoles={USER_ROLES}>
                             <DashboardLayout />
                         </ProtectedRoute>
                     }
                 >
                     <Route
                         index
-                        element={
-                            <RoleRedirect />
-                        }
+                        element={<RoleRedirect />}
                     />
 
                     <Route
                         path="dashboard"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    USER_ROLES
-                                }
+                                allowedRoles={USER_ROLES}
                                 requiredPermission="dashboard.view"
                             >
                                 <Dashboard />
@@ -158,33 +142,42 @@ function App() {
                         }
                     />
 
+                    {/* Kalender Direktorat */}
+
                     <Route
                         path="director-schedule"
                         element={
-                            <ProtectedRoute
-                                allowedRoles={
-                                    USER_ROLES
-                                }
-                            >
+                            <ProtectedRoute allowedRoles={USER_ROLES}>
                                 <DirectorSchedulePage />
                             </ProtectedRoute>
                         }
                     />
 
+                    {/* BARU: Pengajuan Jadwal Direktorat */}
+
                     <Route
-                        path="unauthorized"
+                        path="request/directorate-schedule"
                         element={
-                            <UnauthorizedPage />
+                            <ProtectedRoute allowedRoles={USER_ROLES}>
+                                <DirectorateScheduleRequestPage />
+                            </ProtectedRoute>
                         }
                     />
+
+                    {/* Halaman Error */}
+
+                    <Route
+                        path="unauthorized"
+                        element={<UnauthorizedPage />}
+                    />
+
+                    {/* Merchandise */}
 
                     <Route
                         path="request/merchandise"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    USER_ROLES
-                                }
+                                allowedRoles={USER_ROLES}
                                 requiredPermission="request.merchandise.create"
                             >
                                 <MerchandiseRequestPage />
@@ -192,13 +185,13 @@ function App() {
                         }
                     />
 
+                    {/* Layanan Humas */}
+
                     <Route
                         path="request/humas-service"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    USER_ROLES
-                                }
+                                allowedRoles={USER_ROLES}
                                 requiredPermission="request.humas.create"
                             >
                                 <HumasServiceRequestPage />
@@ -206,13 +199,13 @@ function App() {
                         }
                     />
 
+                    {/* Layanan SEKPiM */}
+
                     <Route
                         path="request/sekpim-borrowing"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    USER_ROLES
-                                }
+                                allowedRoles={USER_ROLES}
                                 requiredPermission="request.borrowing.create"
                             >
                                 <SekpimBorrowingRequestPage />
@@ -220,13 +213,13 @@ function App() {
                         }
                     />
 
+                    {/* Riwayat Pengajuan */}
+
                     <Route
                         path="my-requests"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    USER_ROLES
-                                }
+                                allowedRoles={USER_ROLES}
                                 requiredPermission="request.history.view"
                             >
                                 <MyRequestsPage />
@@ -238,9 +231,7 @@ function App() {
                         path="my-requests/:type/:id/detail"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    USER_ROLES
-                                }
+                                allowedRoles={USER_ROLES}
                                 requiredPermission="request.history.view"
                             >
                                 <MyRequestDetailPage />
@@ -250,40 +241,34 @@ function App() {
 
                     <Route
                         path="*"
-                        element={
-                            <NotFoundPage />
-                        }
+                        element={<NotFoundPage />}
                     />
                 </Route>
 
-                {/* ADMIN */}
+                {/* ======================================================
+                    ADMIN LAYOUT
+                ====================================================== */}
 
                 <Route
                     path="/admin"
                     element={
-                        <ProtectedRoute
-                            allowedRoles={
-                                ADMIN_ROLES
-                            }
-                        >
+                        <ProtectedRoute allowedRoles={ADMIN_ROLES}>
                             <DashboardLayout />
                         </ProtectedRoute>
                     }
                 >
                     <Route
                         index
-                        element={
-                            <RoleRedirect />
-                        }
+                        element={<RoleRedirect />}
                     />
+
+                    {/* Dashboard */}
 
                     <Route
                         path="dashboard"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="dashboard.view"
                             >
                                 <Dashboard />
@@ -291,46 +276,66 @@ function App() {
                         }
                     />
 
+                    {/* Kalender Direktorat */}
+
                     <Route
                         path="director-schedule"
                         element={
-                            <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
-                            >
+                            <ProtectedRoute allowedRoles={ADMIN_ROLES}>
                                 <DirectorSchedulePage />
                             </ProtectedRoute>
                         }
                     />
 
+                    {/* Riwayat Aktivitas Jadwal */}
+
                     <Route
                         path="director-schedule/activity"
                         element={
-                            <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
-                            >
+                            <ProtectedRoute allowedRoles={ADMIN_ROLES}>
                                 <EventScheduleActivityPage />
                             </ProtectedRoute>
                         }
                     />
 
+                    {/* BARU: Pengajuan Jadwal Direktorat oleh admin */}
+
                     <Route
-                        path="unauthorized"
+                        path="request/directorate-schedule"
                         element={
-                            <UnauthorizedPage />
+                            <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                                <DirectorateScheduleRequestPage />
+                            </ProtectedRoute>
                         }
                     />
+
+                    {/* BARU: Approval Jadwal Direktorat */}
+
+                    <Route
+                        path="director-schedule/requests"
+                        element={
+                            <ProtectedRoute
+                                allowedRoles={SCHEDULE_APPROVAL_ROLES}
+                            >
+                                <DirectorateScheduleApprovalPage />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Halaman Error */}
+
+                    <Route
+                        path="unauthorized"
+                        element={<UnauthorizedPage />}
+                    />
+
+                    {/* Pengajuan Merchandise */}
 
                     <Route
                         path="request/merchandise"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="request.merchandise.create"
                             >
                                 <MerchandiseRequestPage />
@@ -338,13 +343,13 @@ function App() {
                         }
                     />
 
+                    {/* Pengajuan Humas */}
+
                     <Route
                         path="request/humas-service"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="request.humas.create"
                             >
                                 <HumasServiceRequestPage />
@@ -352,13 +357,13 @@ function App() {
                         }
                     />
 
+                    {/* Pengajuan SEKPiM */}
+
                     <Route
                         path="request/sekpim-borrowing"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="request.borrowing.create"
                             >
                                 <SekpimBorrowingRequestPage />
@@ -366,13 +371,13 @@ function App() {
                         }
                     />
 
+                    {/* Riwayat Pengajuan Pribadi */}
+
                     <Route
                         path="my-requests"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="request.history.view"
                             >
                                 <MyRequestsPage />
@@ -384,9 +389,7 @@ function App() {
                         path="my-requests/:type/:id/detail"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="request.history.view"
                             >
                                 <MyRequestDetailPage />
@@ -394,13 +397,13 @@ function App() {
                         }
                     />
 
+                    {/* Approval Merchandise */}
+
                     <Route
                         path="orders"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="approval.merchandise.view"
                             >
                                 <MerchandiseApprovalPage />
@@ -412,9 +415,7 @@ function App() {
                         path="orders/:id"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="approval.merchandise.view"
                             >
                                 <MerchandiseApprovalDetailPage />
@@ -422,13 +423,13 @@ function App() {
                         }
                     />
 
+                    {/* Approval Humas */}
+
                     <Route
                         path="humas-services"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="approval.humas.view"
                             >
                                 <HumasServiceApprovalPage />
@@ -440,9 +441,7 @@ function App() {
                         path="humas-services/:id"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="approval.humas.view"
                             >
                                 <HumasServiceApprovalDetailPage />
@@ -450,26 +449,24 @@ function App() {
                         }
                     />
 
+                    {/* Pengaturan Layanan */}
+
                     <Route
                         path="humas-settings"
                         element={
-                            <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
-                            >
+                            <ProtectedRoute allowedRoles={ADMIN_ROLES}>
                                 <HumasSettingsPage />
                             </ProtectedRoute>
                         }
                     />
 
+                    {/* Approval SEKPiM */}
+
                     <Route
                         path="borrow-requests"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="approval.borrowing.view"
                             >
                                 <BorrowingApprovalPage />
@@ -481,9 +478,7 @@ function App() {
                         path="borrow-requests/:id"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="approval.borrowing.view"
                             >
                                 <BorrowingApprovalDetailPage />
@@ -491,13 +486,13 @@ function App() {
                         }
                     />
 
+                    {/* Kategori */}
+
                     <Route
                         path="categories"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="categories.view"
                             >
                                 <CategoryManagementPage />
@@ -509,9 +504,7 @@ function App() {
                         path="categories/create"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="categories.manage"
                             >
                                 <CategoryFormPage />
@@ -523,9 +516,7 @@ function App() {
                         path="categories/:id/edit"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="categories.manage"
                             >
                                 <CategoryFormPage />
@@ -533,13 +524,13 @@ function App() {
                         }
                     />
 
+                    {/* Produk */}
+
                     <Route
                         path="products"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="products.view"
                             >
                                 <ProductManagementPage />
@@ -551,9 +542,7 @@ function App() {
                         path="products/create"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="products.manage"
                             >
                                 <ProductFormPage />
@@ -565,9 +554,7 @@ function App() {
                         path="products/:id/edit"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission="products.manage"
                             >
                                 <ProductFormPage />
@@ -575,13 +562,13 @@ function App() {
                         }
                     />
 
+                    {/* Manajemen User */}
+
                     <Route
                         path="users"
                         element={
                             <ProtectedRoute
-                                allowedRoles={
-                                    ADMIN_ROLES
-                                }
+                                allowedRoles={ADMIN_ROLES}
                                 requiredPermission={[
                                     'users.view',
                                     'users.manage',
@@ -595,11 +582,7 @@ function App() {
                     <Route
                         path="users/create"
                         element={
-                            <ProtectedRoute
-                                allowedRoles={
-                                    SUPERADMIN_ROLES
-                                }
-                            >
+                            <ProtectedRoute allowedRoles={SUPERADMIN_ROLES}>
                                 <UserFormPage />
                             </ProtectedRoute>
                         }
@@ -608,11 +591,7 @@ function App() {
                     <Route
                         path="users/:id/edit"
                         element={
-                            <ProtectedRoute
-                                allowedRoles={
-                                    SUPERADMIN_ROLES
-                                }
-                            >
+                            <ProtectedRoute allowedRoles={SUPERADMIN_ROLES}>
                                 <UserFormPage />
                             </ProtectedRoute>
                         }
@@ -620,9 +599,7 @@ function App() {
 
                     <Route
                         path="*"
-                        element={
-                            <NotFoundPage />
-                        }
+                        element={<NotFoundPage />}
                     />
                 </Route>
 
@@ -630,9 +607,7 @@ function App() {
 
                 <Route
                     path="*"
-                    element={
-                        <RoleRedirect />
-                    }
+                    element={<RoleRedirect />}
                 />
             </Routes>
         </>

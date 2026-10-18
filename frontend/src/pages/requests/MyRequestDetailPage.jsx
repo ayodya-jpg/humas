@@ -12,761 +12,346 @@ import {
 } from 'react-router-dom';
 
 import api from '../../api/axios';
-
 import MerchandiseRevisionForm from '../../components/MerchandiseRevisionForm';
 
-const TYPE_BORROW =
-    'borrow';
-
-const TYPE_ASSET_REQUEST =
-    'asset_request';
+/*
+|--------------------------------------------------------------------------
+| KONFIGURASI LAYANAN
+|--------------------------------------------------------------------------
+*/
 
 const TYPE_CONFIG = {
     merchandise: {
-        label:
-            'Merchandise',
-
-        title:
-            'Detail Pengajuan Merchandise',
-
-        description:
-            'Informasi lengkap pengajuan paket merchandise.',
-
-        icon:
-            'bi-gift-fill',
-
-        color:
-            'primary',
-
-        endpoint:
-            (id) =>
-                `/orders/${id}`,
+        label: 'Merchandise',
+        title: 'Detail Pengajuan Merchandise',
+        description: 'Informasi pengajuan paket merchandise.',
+        icon: 'bi-gift-fill',
+        color: 'primary',
+        endpoint: (id) => `/orders/${id}`,
     },
-
     humas: {
-        label:
-            'Layanan Humas',
-
-        title:
-            'Detail Request Layanan Humas',
-
-        description:
-            'Informasi lengkap kebutuhan layanan Humas.',
-
-        icon:
-            'bi-camera-reels-fill',
-
-        color:
-            'danger',
-
-        endpoint:
-            (id) =>
-                `/humas-service-requests/${id}`,
+        label: 'Layanan Humas',
+        title: 'Detail Request Layanan Humas',
+        description: 'Informasi kebutuhan layanan Humas.',
+        icon: 'bi-camera-reels-fill',
+        color: 'danger',
+        endpoint: (id) => `/humas-service-requests/${id}`,
     },
-
     borrowing: {
-        label:
-            'Layanan SEKPiM',
-
-        title:
-            'Detail Pengajuan SEKPiM',
-
-        description:
-            'Informasi lengkap pengajuan barang SEKPiM.',
-
-        icon:
-            'bi-box-seam-fill',
-
-        color:
-            'success',
-
-        endpoint:
-            (id) =>
-                `/borrow-requests/${id}`,
+        label: 'Layanan SEKPiM',
+        title: 'Detail Pengajuan SEKPiM',
+        description: 'Informasi pengajuan barang SEKPiM.',
+        icon: 'bi-box-seam-fill',
+        color: 'success',
+        endpoint: (id) => `/borrow-requests/${id}`,
     },
+    directorate_schedule: {
+        label: 'Jadwal Direktorat',
+        title: 'Detail Pengajuan Jadwal Direktorat',
+        description: 'Informasi pengajuan agenda kepada pimpinan.',
+        icon: 'bi-calendar2-check-fill',
+        color: 'danger',
+        endpoint: (id) => `/event-schedule-requests/${id}`,
+    },
+};
+
+const DIRECTORATES = {
+    direktorat: 'Direktorat',
+    direktur: 'Direktur',
+    wakil_direktur_1: 'Wakil Direktur I',
+    wakil_direktur_2: 'Wakil Direktur II',
 };
 
 const STATUS_CONFIG = {
     pending: {
-        label:
-            'Menunggu Persetujuan',
-
-        shortLabel:
-            'Menunggu',
-
-        badgeClass:
-            'text-bg-warning',
-
-        icon:
-            'bi-hourglass-split',
-
-        description:
-            'Pengajuan sedang menunggu pemeriksaan admin.',
+        label: 'Menunggu Persetujuan',
+        shortLabel: 'Menunggu',
+        badgeClass: 'text-bg-warning',
+        icon: 'bi-hourglass-split',
+        description: 'Pengajuan sedang menunggu pemeriksaan admin.',
     },
-
     revision: {
-        label:
-            'Pengajuan Perlu Direvisi',
-
-        shortLabel:
-            'Perlu Revisi',
-
-        badgeClass:
-            'text-bg-info',
-
-        icon:
-            'bi-pencil-square',
-
-        description:
-            'Admin meminta data pengajuan diperbaiki sebelum dapat diproses kembali.',
+        label: 'Pengajuan Perlu Direvisi',
+        shortLabel: 'Perlu Revisi',
+        badgeClass: 'text-bg-info',
+        icon: 'bi-pencil-square',
+        description: 'Pengajuan perlu diperbaiki sesuai catatan admin.',
     },
-
     approved: {
-        label:
-            'Pengajuan Disetujui',
-
-        shortLabel:
-            'Disetujui',
-
-        badgeClass:
-            'text-bg-success',
-
-        icon:
-            'bi-check-circle-fill',
-
-        description:
-            'Pengajuan telah disetujui dan menunggu proses penyerahan barang.',
+        label: 'Pengajuan Disetujui',
+        shortLabel: 'Disetujui',
+        badgeClass: 'text-bg-success',
+        icon: 'bi-check-circle-fill',
+        description: 'Pengajuan telah disetujui oleh admin.',
     },
-
     rejected: {
-        label:
-            'Pengajuan Ditolak',
-
-        shortLabel:
-            'Ditolak',
-
-        badgeClass:
-            'text-bg-danger',
-
-        icon:
-            'bi-x-circle-fill',
-
-        description:
-            'Pengajuan tidak dapat diproses lebih lanjut.',
+        label: 'Pengajuan Ditolak',
+        shortLabel: 'Ditolak',
+        badgeClass: 'text-bg-danger',
+        icon: 'bi-x-circle-fill',
+        description: 'Pengajuan tidak dapat diproses lebih lanjut.',
     },
-
     completed: {
-        label:
-            'Layanan Selesai',
-
-        shortLabel:
-            'Selesai',
-
-        badgeClass:
-            'text-bg-primary',
-
-        icon:
-            'bi-check2-all',
-
-        description:
-            'Seluruh proses pelayanan telah selesai.',
+        label: 'Layanan Selesai',
+        shortLabel: 'Selesai',
+        badgeClass: 'text-bg-primary',
+        icon: 'bi-check2-all',
+        description: 'Proses pelayanan telah selesai.',
     },
-
     borrowed: {
-        label:
-            'Barang Sedang Dipinjam',
-
-        shortLabel:
-            'Sedang Dipinjam',
-
-        badgeClass:
-            'text-bg-info',
-
-        icon:
-            'bi-box-arrow-up-right',
-
-        description:
-            'Barang telah diserahkan dan sedang digunakan oleh pemohon.',
+        label: 'Barang Sedang Dipinjam',
+        shortLabel: 'Sedang Dipinjam',
+        badgeClass: 'text-bg-info',
+        icon: 'bi-box-arrow-up-right',
+        description: 'Barang telah diserahkan kepada pemohon.',
     },
-
     returned: {
-        label:
-            'Barang Dikembalikan',
-
-        shortLabel:
-            'Dikembalikan',
-
-        badgeClass:
-            'text-bg-secondary',
-
-        icon:
-            'bi-box-arrow-in-down-left',
-
-        description:
-            'Barang telah dikembalikan dan proses peminjaman selesai.',
+        label: 'Barang Dikembalikan',
+        shortLabel: 'Dikembalikan',
+        badgeClass: 'text-bg-secondary',
+        icon: 'bi-box-arrow-in-down-left',
+        description: 'Barang sudah dikembalikan dan peminjaman selesai.',
     },
 };
 
-const COVERAGE_TYPE_CONFIG = {
-    'REQUEST DESIGN INSTAGRAM': {
-        label:
-            'Request Design Instagram',
-
-        icon:
-            'bi-instagram',
-    },
-
-    DOKUMENTASI: {
-        label:
-            'Dokumentasi',
-
-        icon:
-            'bi-camera-fill',
-    },
-
-    'PUBLIKASI WEBSITE': {
-        label:
-            'Publikasi Website',
-
-        icon:
-            'bi-globe2',
-    },
-
-    'PUBLIKASI MEDIA MASSA': {
-        label:
-            'Publikasi Media Massa',
-
-        icon:
-            'bi-newspaper',
-    },
-
-    YOUTUBE: {
-        label:
-            'YouTube',
-
-        icon:
-            'bi-youtube',
-    },
-
-    'VIDEO REELS': {
-        label:
-            'Video Reels',
-
-        icon:
-            'bi-play-btn-fill',
-    },
-
-    /*
-     * Legacy.
-     */
-    'SOCIAL MEDIA': {
-        label:
-            'Social Media (Data Lama)',
-
-        icon:
-            'bi-instagram',
-    },
+const COVERAGE_LABELS = {
+    'REQUEST DESIGN INSTAGRAM': 'Request Design Instagram',
+    DOKUMENTASI: 'Dokumentasi',
+    'PUBLIKASI WEBSITE': 'Publikasi Website',
+    'PUBLIKASI MEDIA MASSA': 'Publikasi Media Massa',
+    YOUTUBE: 'YouTube',
+    'VIDEO REELS': 'Video Reels',
+    'SOCIAL MEDIA': 'Social Media (Data Lama)',
 };
 
-/*
-|--------------------------------------------------------------------------
-| USER
-|--------------------------------------------------------------------------
-*/
-
-const getCurrentUser =
-    () => {
-        try {
-            return JSON.parse(
-                localStorage.getItem(
-                    'admin_user'
-                ) ||
-                    '{}'
-            );
-        } catch {
-            return {};
-        }
-    };
+const TYPE_BORROW = 'borrow';
+const TYPE_ASSET_REQUEST = 'asset_request';
 
 /*
 |--------------------------------------------------------------------------
-| DATE
+| HELPERS
 |--------------------------------------------------------------------------
 */
 
-const formatDate =
-    (
-        date
-    ) => {
-        if (
-            !date
-        ) {
-            return '-';
-        }
+function getCurrentUser() {
+    try {
+        return JSON.parse(localStorage.getItem('admin_user') || '{}');
+    } catch {
+        return {};
+    }
+}
 
-        if (
-            typeof date ===
-                'string' &&
-            /^\d{4}-\d{2}-\d{2}$/.test(
-                date
-            )
-        ) {
-            const [
-                year,
-                month,
-                day,
-            ] =
-                date
-                    .split('-')
-                    .map(
-                        Number
-                    );
+function formatDate(value) {
+    if (!value) return '-';
 
-            return new Date(
-                year,
-                month - 1,
-                day
-            ).toLocaleDateString(
-                'id-ID',
-                {
-                    day:
-                        '2-digit',
+    let date;
 
-                    month:
-                        'long',
+    if (
+        typeof value === 'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ) {
+        const [year, month, day] = value.split('-').map(Number);
+        date = new Date(year, month - 1, day);
+    } else {
+        date = new Date(value);
+    }
 
-                    year:
-                        'numeric',
-                }
-            );
-        }
+    if (Number.isNaN(date.getTime())) return '-';
 
-        const parsedDate =
-            new Date(
-                date
-            );
+    return date.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+    });
+}
 
-        if (
-            Number.isNaN(
-                parsedDate.getTime()
-            )
-        ) {
-            return '-';
-        }
+function formatDateTime(value) {
+    if (!value) return '-';
 
-        return parsedDate
-            .toLocaleDateString(
-                'id-ID',
-                {
-                    day:
-                        '2-digit',
+    const date = new Date(value);
 
-                    month:
-                        'long',
+    if (Number.isNaN(date.getTime())) return '-';
 
-                    year:
-                        'numeric',
-                }
-            );
+    return date.toLocaleString('id-ID', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    });
+}
+
+function formatTime(value) {
+    return value ? String(value).slice(0, 5) : '-';
+}
+
+function formatNumber(value) {
+    return new Intl.NumberFormat('id-ID').format(Number(value || 0));
+}
+
+function normalizeExternalUrl(value) {
+    if (!value) return null;
+
+    const url = String(value).trim();
+
+    if (!url) return null;
+
+    if (/^https?:\/\//i.test(url)) return url;
+
+    return `https://${url}`;
+}
+
+function getFileUrl(value) {
+    if (!value) return null;
+
+    const path = String(value);
+
+    if (/^https?:\/\//i.test(path)) return path;
+
+    const apiBase =
+        import.meta.env.VITE_API_URL ||
+        'http://127.0.0.1:8000/api';
+
+    const backendBase = apiBase.replace(/\/api\/?$/, '');
+
+    if (path.startsWith('/storage/')) {
+        return `${backendBase}${path}`;
+    }
+
+    if (path.startsWith('storage/')) {
+        return `${backendBase}/${path}`;
+    }
+
+    return `${backendBase}/storage/${path}`;
+}
+
+function getCoverageLabels(value) {
+    if (!value) return 'Layanan Humas';
+
+    return String(value)
+        .split(/[;,]/)
+        .map((part) => part.trim().toUpperCase())
+        .filter(Boolean)
+        .map((part) => COVERAGE_LABELS[part] || part)
+        .join('; ');
+}
+
+function getCoverageIcon(value) {
+    const first = String(value || '')
+        .split(/[;,]/)[0]
+        .trim()
+        .toUpperCase();
+
+    const icons = {
+        'REQUEST DESIGN INSTAGRAM': 'bi-instagram',
+        DOKUMENTASI: 'bi-camera-fill',
+        'PUBLIKASI WEBSITE': 'bi-globe2',
+        'PUBLIKASI MEDIA MASSA': 'bi-newspaper',
+        YOUTUBE: 'bi-youtube',
+        'VIDEO REELS': 'bi-play-btn-fill',
     };
 
-const formatDateTime =
-    (
-        date
-    ) => {
-        if (
-            !date
-        ) {
-            return '-';
-        }
+    return icons[first] || 'bi-camera-reels-fill';
+}
 
-        const parsedDate =
-            new Date(
-                date
-            );
+function getResolvedUnitName(data) {
+    if (data?.resolved_unit_name) {
+        return data.resolved_unit_name;
+    }
 
-        if (
-            Number.isNaN(
-                parsedDate.getTime()
-            )
-        ) {
-            return '-';
-        }
-
-        return parsedDate
-            .toLocaleString(
-                'id-ID',
-                {
-                    day:
-                        '2-digit',
-
-                    month:
-                        'long',
-
-                    year:
-                        'numeric',
-
-                    hour:
-                        '2-digit',
-
-                    minute:
-                        '2-digit',
-
-                    hour12:
-                        false,
-                }
-            );
-    };
-
-const formatNumber =
-    (
-        value
-    ) => {
-        return new Intl.NumberFormat(
-            'id-ID'
-        ).format(
-            Number(
-                value ||
-                    0
-            )
-        );
-    };
-
-/*
-|--------------------------------------------------------------------------
-| URL
-|--------------------------------------------------------------------------
-*/
-
-const normalizeExternalUrl =
-    (
-        value
-    ) => {
-        if (
-            !value
-        ) {
-            return null;
-        }
-
-        const normalizedValue =
-            String(
-                value
-            ).trim();
-
-        if (
-            !normalizedValue
-        ) {
-            return null;
-        }
-
-        if (
-            /^https?:\/\//i.test(
-                normalizedValue
-            )
-        ) {
-            return normalizedValue;
-        }
-
-        return `https://${normalizedValue}`;
-    };
-
-const getFileUrl =
-    (
-        value
-    ) => {
-        if (
-            !value
-        ) {
-            return null;
-        }
-
-        if (
-            value.startsWith(
-                'http://'
-            ) ||
-            value.startsWith(
-                'https://'
-            )
-        ) {
-            return value;
-        }
-
-        const apiBaseUrl =
-            import.meta.env
-                .VITE_API_URL ||
-            'http://127.0.0.1:8000/api';
-
-        const backendBaseUrl =
-            apiBaseUrl.replace(
-                /\/api\/?$/,
-                ''
-            );
-
-        if (
-            value.startsWith(
-                '/storage/'
-            )
-        ) {
-            return `${backendBaseUrl}${value}`;
-        }
-
-        if (
-            value.startsWith(
-                'storage/'
-            )
-        ) {
-            return `${backendBaseUrl}/${value}`;
-        }
-
-        return `${backendBaseUrl}/storage/${value}`;
-    };
-
-/*
-|--------------------------------------------------------------------------
-| HUMAS
-|--------------------------------------------------------------------------
-*/
-
-const getResolvedUnitName =
-    (
-        requestData
-    ) => {
-        if (
-            requestData
-                ?.resolved_unit_name
-        ) {
-            return requestData
-                .resolved_unit_name;
-        }
-
-        if (
-            requestData
-                ?.unit_name ===
-            'Lainnya'
-        ) {
-            return (
-                requestData
-                    .other_unit_name ||
-                'Lainnya'
-            );
-        }
-
-        return (
-            requestData
-                ?.unit_name ||
-            requestData
-                ?.requester_unit ||
-            requestData
-                ?.user
-                ?.unit_name ||
-            '-'
-        );
-    };
-
-const getCoverageParts =
-    (
-        coverageType
-    ) => {
-        if (
-            !coverageType
-        ) {
-            return [];
-        }
-
-        return String(
-            coverageType
-        )
-            .split(
-                /[;,]/
-            )
-            .map(
-                (
-                    item
-                ) =>
-                    item
-                        .trim()
-                        .toUpperCase()
-            )
-            .filter(
-                Boolean
-            );
-    };
-
-const getCoverageLabels =
-    (
-        coverageType
-    ) => {
-        const parts =
-            getCoverageParts(
-                coverageType
-            );
-
-        if (
-            parts.length ===
-            0
-        ) {
-            return '-';
-        }
-
-        return parts
-            .map(
-                (
-                    item
-                ) =>
-                    COVERAGE_TYPE_CONFIG[
-                        item
-                    ]?.label ||
-                    item
-            )
-            .join(
-                '; '
-            );
-    };
-
-const getCoverageIcon =
-    (
-        coverageType
-    ) => {
-        const firstPart =
-            getCoverageParts(
-                coverageType
-            )[0];
-
-        return (
-            COVERAGE_TYPE_CONFIG[
-                firstPart
-            ]?.icon ||
-            'bi-camera-reels-fill'
-        );
-    };
-
-/*
-|--------------------------------------------------------------------------
-| SEKPiM
-|--------------------------------------------------------------------------
-*/
-
-const getSekpimRequestType =
-    (
-        requestData
-    ) => {
-        /*
-         * Data lama yang belum memiliki request_type
-         * dianggap Peminjaman Barang.
-         */
-        return (
-            requestData
-                ?.request_type ||
-            TYPE_BORROW
-        );
-    };
-
-const getSekpimTypeLabel =
-    (
-        requestData
-    ) => {
-        return getSekpimRequestType(
-            requestData
-        ) ===
-        TYPE_ASSET_REQUEST
-            ? 'Request Barang'
-            : 'Peminjaman Barang';
-    };
-
-const getSekpimTypeIcon =
-    (
-        requestData
-    ) => {
-        return getSekpimRequestType(
-            requestData
-        ) ===
-        TYPE_ASSET_REQUEST
-            ? 'bi-box2-heart-fill'
-            : 'bi-box-arrow-up-right';
-    };
-
-/*
-|--------------------------------------------------------------------------
-| INFO COMPONENT
-|--------------------------------------------------------------------------
-*/
-
-const InfoItem = ({
-    label,
-    value,
-    icon =
-        'bi-info-circle',
-    fullWidth =
-        false,
-    isLink =
-        false,
-}) => {
-    const linkUrl =
-        isLink
-            ? normalizeExternalUrl(
-                  value
-              )
-            : null;
+    if (data?.unit_name === 'Lainnya') {
+        return data.other_unit_name || 'Lainnya';
+    }
 
     return (
-        <div
-            className={
-                fullWidth
-                    ? 'col-12'
-                    : 'col-md-6'
-            }
-        >
+        data?.unit_name ||
+        data?.requester_unit ||
+        data?.user?.unit_name ||
+        '-'
+    );
+}
+
+function getRequestCode(type, data) {
+    const id = String(data?.id || 0).padStart(4, '0');
+
+    if (type === 'merchandise') {
+        return data.order_code || data.code || `MER-${id}`;
+    }
+
+    if (type === 'humas') {
+        return data.service_code || data.code || `HMS-${id}`;
+    }
+
+    if (type === 'directorate_schedule') {
+        return `JAD-${id}`;
+    }
+
+    return (
+        data.borrow_code ||
+        data.code ||
+        `${data.request_type === TYPE_ASSET_REQUEST ? 'REQ' : 'BRW'}-${id}`
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| KOMPONEN INFORMASI
+|--------------------------------------------------------------------------
+*/
+
+function InfoItem({
+    label,
+    value,
+    icon = 'bi-info-circle',
+    fullWidth = false,
+    isLink = false,
+}) {
+    const linkUrl = isLink ? normalizeExternalUrl(value) : null;
+
+    return (
+        <div className={fullWidth ? 'col-12' : 'col-md-6'}>
             <div className="p-3 rounded-4 bg-light h-100">
                 <div className="d-flex align-items-start gap-3">
                     <div
                         className="rounded-circle bg-white text-danger d-flex align-items-center justify-content-center flex-shrink-0"
                         style={{
-                            width:
-                                42,
-
-                            height:
-                                42,
+                            width: 42,
+                            height: 42,
                         }}
                     >
-                        <i
-                            className={`bi ${icon}`}
-                        />
+                        <i className={`bi ${icon}`} />
                     </div>
 
                     <div className="min-w-0 flex-grow-1">
                         <div className="small text-muted fw-bold mb-1">
-                            {
-                                label
-                            }
+                            {label}
                         </div>
 
                         {linkUrl ? (
                             <a
-                                href={
-                                    linkUrl
-                                }
+                                href={linkUrl}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="fw-bold text-danger text-break text-decoration-none"
                             >
-                                {
-                                    value
-                                }
-
+                                {value}
                                 <i className="bi bi-box-arrow-up-right ms-2" />
                             </a>
                         ) : (
                             <div
                                 className="fw-bold text-dark text-break"
                                 style={{
-                                    whiteSpace:
-                                        fullWidth
-                                            ? 'pre-line'
-                                            : 'normal',
+                                    whiteSpace: fullWidth
+                                        ? 'pre-line'
+                                        : 'normal',
                                 }}
                             >
-                                {value ||
-                                    '-'}
+                                {value === null ||
+                                    value === undefined ||
+                                    value === ''
+                                    ? '-'
+                                    : value}
                             </div>
                         )}
                     </div>
@@ -774,27 +359,22 @@ const InfoItem = ({
             </div>
         </div>
     );
-};
+}
 
 /*
 |--------------------------------------------------------------------------
-| FILE COMPONENT
+| KOMPONEN FILE
 |--------------------------------------------------------------------------
 */
 
-const FileCard = ({
+function FileCard({
     label,
     fileName,
     fileUrl,
-    icon =
-        'bi-file-earmark-text-fill',
-    color =
-        'danger',
-}) => {
-    const finalUrl =
-        getFileUrl(
-            fileUrl
-        );
+    icon = 'bi-file-earmark-text-fill',
+    color = 'danger',
+}) {
+    const finalUrl = getFileUrl(fileUrl);
 
     return (
         <div className="col-md-6">
@@ -803,35 +383,27 @@ const FileCard = ({
                     <div
                         className={`icon-box bg-${color}-subtle text-${color}`}
                     >
-                        <i
-                            className={`bi ${icon}`}
-                        />
+                        <i className={`bi ${icon}`} />
                     </div>
 
                     <div className="min-w-0 flex-grow-1">
                         <div className="small text-muted fw-bold mb-1">
-                            {
-                                label
-                            }
+                            {label}
                         </div>
 
                         <div className="fw-bold text-truncate">
-                            {fileName ||
-                                'Dokumen lampiran'}
+                            {fileName || 'Dokumen lampiran'}
                         </div>
                     </div>
 
                     {finalUrl ? (
                         <a
-                            href={
-                                finalUrl
-                            }
+                            href={finalUrl}
                             target="_blank"
                             rel="noreferrer"
                             className={`btn btn-sm btn-outline-${color} rounded-pill`}
                         >
                             <i className="bi bi-eye-fill me-1" />
-
                             Buka
                         </a>
                     ) : (
@@ -843,198 +415,163 @@ const FileCard = ({
             </div>
         </div>
     );
-};
+}
 
 /*
 |--------------------------------------------------------------------------
-| REVISION HISTORY
+| RIWAYAT REVISI MERCHANDISE
 |--------------------------------------------------------------------------
 */
 
-const RevisionHistoryCard = ({
-    histories,
-}) => {
-    if (
-        !Array.isArray(
-            histories
-        ) ||
-        histories.length ===
-            0
-    ) {
+function RevisionHistoryCard({ histories }) {
+    if (!Array.isArray(histories) || histories.length === 0) {
         return null;
     }
 
     return (
         <section className="card border-0 shadow-sm rounded-5 mb-4">
             <div className="card-body p-4">
-                <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
+                <div className="d-flex justify-content-between align-items-center gap-3 mb-4">
                     <div>
-                        <h4 className="fw-black mb-1">
-                            Riwayat Revisi
-                        </h4>
+                        <h4 className="fw-black mb-1">Riwayat Revisi</h4>
 
                         <p className="text-muted mb-0">
-                            Seluruh permintaan revisi yang pernah diberikan admin.
+                            Catatan permintaan revisi dari admin.
                         </p>
                     </div>
 
-                    <span className="badge rounded-pill text-bg-info px-3 py-2">
-                        {
-                            histories.length
-                        }{' '}
-                        revisi
+                    <span className="badge text-bg-info rounded-pill px-3 py-2">
+                        {histories.length} revisi
                     </span>
                 </div>
 
                 <div className="d-flex flex-column gap-3">
-                    {histories.map(
-                        (
-                            history,
-                            index
-                        ) => (
+                    {histories.map((history, index) => (
+                        <div
+                            key={history.id || index}
+                            className="p-4 rounded-4 border bg-light"
+                        >
+                            <div className="d-flex flex-wrap justify-content-between gap-3 mb-3">
+                                <strong className="text-info">
+                                    Revisi #{histories.length - index}
+                                </strong>
+
+                                <small className="text-muted">
+                                    {formatDateTime(history.requested_at)}
+                                </small>
+                            </div>
+
                             <div
-                                key={
-                                    history.id ||
-                                    index
-                                }
-                                className="p-4 rounded-4 border bg-light"
+                                className="mb-3"
+                                style={{ whiteSpace: 'pre-line' }}
                             >
-                                <div className="d-flex flex-wrap justify-content-between gap-3 mb-3">
-                                    <div className="fw-black text-info">
-                                        Revisi #
-                                        {histories.length -
-                                            index}
-                                    </div>
+                                {history.revision_note || '-'}
+                            </div>
 
-                                    <div className="small text-muted">
-                                        {formatDateTime(
-                                            history
-                                                .requested_at
-                                        )}
-                                    </div>
+                            <div className="row g-2">
+                                <div className="col-md-6">
+                                    <small className="text-muted d-block">
+                                        Diminta oleh
+                                    </small>
+
+                                    <strong>
+                                        {history.requested_by?.name ||
+                                            history.requestedBy?.name ||
+                                            'Admin'}
+                                    </strong>
                                 </div>
 
-                                <div
-                                    className="text-dark mb-3"
-                                    style={{
-                                        whiteSpace:
-                                            'pre-line',
+                                <div className="col-md-6">
+                                    <small className="text-muted d-block">
+                                        Dikirim ulang
+                                    </small>
 
-                                        lineHeight:
-                                            1.7,
-                                    }}
-                                >
-                                    {history
-                                        .revision_note ||
-                                        '-'}
-                                </div>
-
-                                <div className="row g-2">
-                                    <div className="col-md-6">
-                                        <div className="small text-muted">
-                                            Diminta oleh
-                                        </div>
-
-                                        <div className="fw-bold">
-                                            {history
-                                                .requested_by
-                                                ?.name ||
-                                                history
-                                                    .requestedBy
-                                                    ?.name ||
-                                                'Admin'}
-                                        </div>
-                                    </div>
-
-                                    <div className="col-md-6">
-                                        <div className="small text-muted">
-                                            Dikirim ulang
-                                        </div>
-
-                                        <div className="fw-bold">
-                                            {history
-                                                .resubmitted_at
-                                                ? formatDateTime(
-                                                      history
-                                                          .resubmitted_at
-                                                  )
-                                                : 'Belum dikirim ulang'}
-                                        </div>
-                                    </div>
+                                    <strong>
+                                        {history.resubmitted_at
+                                            ? formatDateTime(
+                                                history.resubmitted_at
+                                            )
+                                            : 'Belum dikirim ulang'}
+                                    </strong>
                                 </div>
                             </div>
-                        )
-                    )}
+                        </div>
+                    ))}
                 </div>
             </div>
         </section>
     );
-};
+}
 
 /*
 |--------------------------------------------------------------------------
-| PAGE
+| KOMPONEN TIMELINE
+|--------------------------------------------------------------------------
+*/
+
+function Timeline({ items }) {
+    return (
+        <div className="request-timeline">
+            {items.map((item, index) => (
+                <div
+                    key={`${item.label}-${index}`}
+                    className={`request-timeline-item ${item.status === 'active'
+                            ? 'active'
+                            : item.status === 'rejected'
+                                ? 'rejected'
+                                : 'done'
+                        }`}
+                >
+                    <div className="request-timeline-marker">
+                        <i className={`bi ${item.icon}`} />
+                    </div>
+
+                    <div className="request-timeline-content">
+                        <div className="fw-black mb-1">
+                            {item.label}
+                        </div>
+
+                        <div className="small text-muted mb-1">
+                            {item.description}
+                        </div>
+
+                        {item.date && (
+                            <div className="small fw-bold text-danger">
+                                {formatDateTime(item.date)}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| HALAMAN DETAIL PENGAJUAN
 |--------------------------------------------------------------------------
 */
 
 export default function MyRequestDetailPage() {
-    const {
-        type,
-        id,
-    } =
-        useParams();
+    const { type, id } = useParams();
+    const navigate = useNavigate();
 
-    const navigate =
-        useNavigate();
-
-    const currentUser =
-        useMemo(
-            () =>
-                getCurrentUser(),
-            []
-        );
+    const currentUser = useMemo(() => getCurrentUser(), []);
 
     const basePath =
-        currentUser
-            .role ===
-        'user'
+        currentUser.role === 'user'
             ? '/user'
             : '/admin';
 
-    const historyPath =
-        `${basePath}/my-requests`;
+    const historyPath = `${basePath}/my-requests`;
+    const dashboardPath = `${basePath}/dashboard`;
 
-    const dashboardPath =
-        `${basePath}/dashboard`;
+    const typeConfig = TYPE_CONFIG[type];
 
-    const [
-        requestData,
-        setRequestData,
-    ] =
-        useState(
-            null
-        );
-
-    const [
-        loading,
-        setLoading,
-    ] =
-        useState(
-            true
-        );
-
-    const [
-        errorMessage,
-        setErrorMessage,
-    ] =
-        useState(
-            ''
-        );
-
-    const typeConfig =
-        TYPE_CONFIG[
-            type
-        ];
+    const [requestData, setRequestData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState('');
 
     /*
     |--------------------------------------------------------------------------
@@ -1042,737 +579,394 @@ export default function MyRequestDetailPage() {
     |--------------------------------------------------------------------------
     */
 
-    const fetchDetail =
-        useCallback(
-            async () => {
-                if (
-                    !typeConfig ||
-                    !id
-                ) {
-                    setErrorMessage(
-                        'Jenis pengajuan tidak dikenali.'
-                    );
+    const fetchDetail = useCallback(async () => {
+        if (!typeConfig || !id) {
+            setErrorMessage('Jenis pengajuan tidak dikenali.');
+            setLoading(false);
+            return;
+        }
 
-                    setLoading(
-                        false
-                    );
+        try {
+            setLoading(true);
+            setErrorMessage('');
 
-                    return;
-                }
+            const response = await api.get(
+                typeConfig.endpoint(id)
+            );
 
-                try {
-                    setLoading(
-                        true
-                    );
+            setRequestData(
+                response?.data?.data ||
+                response?.data ||
+                null
+            );
+        } catch (error) {
+            console.error(
+                'Fetch request detail:',
+                error?.response?.data || error
+            );
 
-                    setErrorMessage(
-                        ''
-                    );
+            setErrorMessage(
+                error?.response?.data?.message ||
+                'Detail pengajuan tidak dapat dimuat.'
+            );
+        } finally {
+            setLoading(false);
+        }
+    }, [typeConfig, id]);
 
-                    const response =
-                        await api.get(
-                            typeConfig.endpoint(
-                                id
-                            )
-                        );
-
-                    setRequestData(
-                        response
-                            ?.data
-                            ?.data ||
-                            response
-                                ?.data ||
-                            null
-                    );
-                } catch (
-                    error
-                ) {
-                    console.error(
-                        'Fetch request detail error:',
-                        error
-                            ?.response
-                            ?.data ||
-                            error
-                    );
-
-                    setErrorMessage(
-                        error
-                            ?.response
-                            ?.data
-                            ?.message ||
-                            'Detail pengajuan tidak dapat dimuat.'
-                    );
-                } finally {
-                    setLoading(
-                        false
-                    );
-                }
-            },
-            [
-                id,
-                typeConfig,
-            ]
-        );
-
-    useEffect(
-        () => {
-            fetchDetail();
-        },
-        [
-            fetchDetail,
-        ]
-    );
+    useEffect(() => {
+        fetchDetail();
+    }, [fetchDetail]);
 
     /*
     |--------------------------------------------------------------------------
-    | SEKPiM DERIVED
+    | DATA TURUNAN
     |--------------------------------------------------------------------------
     */
 
+    const isDirectorateSchedule =
+        type === 'directorate_schedule';
+
     const sekpimRequestType =
-        type ===
-        'borrowing'
-            ? getSekpimRequestType(
-                  requestData
-              )
+        type === 'borrowing'
+            ? requestData?.request_type || TYPE_BORROW
             : null;
 
     const isSekpimBorrow =
-        type ===
-            'borrowing' &&
-        sekpimRequestType ===
-            TYPE_BORROW;
+        type === 'borrowing' &&
+        sekpimRequestType === TYPE_BORROW;
 
     const isSekpimAssetRequest =
-        type ===
-            'borrowing' &&
-        sekpimRequestType ===
-            TYPE_ASSET_REQUEST;
+        type === 'borrowing' &&
+        sekpimRequestType === TYPE_ASSET_REQUEST;
+
+    const sekpimTypeLabel = isSekpimAssetRequest
+        ? 'Request Barang'
+        : 'Peminjaman Barang';
+
+    const displayTypeConfig = useMemo(() => {
+        if (type !== 'borrowing') return typeConfig;
+
+        if (isSekpimAssetRequest) {
+            return {
+                ...typeConfig,
+                label: 'Request Barang',
+                title: 'Detail Request Barang SEKPiM',
+                description: 'Informasi Request Barang SEKPiM.',
+                icon: 'bi-box2-heart-fill',
+                color: 'info',
+            };
+        }
+
+        return {
+            ...typeConfig,
+            label: 'Peminjaman Barang',
+            title: 'Detail Peminjaman Barang SEKPiM',
+            description: 'Informasi peminjaman barang SEKPiM.',
+            icon: 'bi-box-arrow-up-right',
+            color: 'success',
+        };
+    }, [type, typeConfig, isSekpimAssetRequest]);
+
+    const statusConfig = useMemo(() => {
+        const base = STATUS_CONFIG[requestData?.status] || {
+            label: requestData?.status || 'Tidak diketahui',
+            shortLabel: requestData?.status || 'Tidak diketahui',
+            badgeClass: 'text-bg-secondary',
+            icon: 'bi-info-circle-fill',
+            description: 'Status pengajuan tidak diketahui.',
+        };
+
+        if (
+            type === 'borrowing' &&
+            isSekpimAssetRequest &&
+            requestData?.status === 'completed'
+        ) {
+            return {
+                ...base,
+                label: 'Barang Telah Diserahkan',
+                shortLabel: 'Selesai',
+                badgeClass: 'text-bg-success',
+                description:
+                    'Barang telah diserahkan kepada pemohon.',
+            };
+        }
+
+        if (
+            isDirectorateSchedule &&
+            requestData?.status === 'approved'
+        ) {
+            return {
+                ...base,
+                description:
+                    'Pengajuan disetujui dan agenda telah dimasukkan ke kalender Direktorat.',
+            };
+        }
+
+        if (
+            isDirectorateSchedule &&
+            requestData?.status === 'pending'
+        ) {
+            return {
+                ...base,
+                description:
+                    'Pengajuan masih menunggu approval admin atau superadmin.',
+            };
+        }
+
+        return base;
+    }, [
+        requestData?.status,
+        type,
+        isSekpimAssetRequest,
+        isDirectorateSchedule,
+    ]);
+
+    const requestCode = useMemo(
+        () => (requestData ? getRequestCode(type, requestData) : '-'),
+        [type, requestData]
+    );
+
+    const requestTitle = useMemo(() => {
+        if (!requestData) return '-';
+
+        if (type === 'humas') {
+            return getCoverageLabels(requestData.coverage_type);
+        }
+
+        if (type === 'borrowing') {
+            return requestData.purpose || sekpimTypeLabel;
+        }
+
+        if (isDirectorateSchedule) {
+            return requestData.title || 'Jadwal Direktorat';
+        }
 
-    const sekpimTypeLabel =
-        type ===
-        'borrowing'
-            ? getSekpimTypeLabel(
-                  requestData
-              )
-            : null;
-
-    /*
-    |--------------------------------------------------------------------------
-    | DISPLAY TYPE
-    |--------------------------------------------------------------------------
-    */
-
-    const displayTypeConfig =
-        useMemo(
-            () => {
-                if (
-                    type !==
-                    'borrowing'
-                ) {
-                    return typeConfig;
-                }
-
-                if (
-                    isSekpimAssetRequest
-                ) {
-                    return {
-                        ...typeConfig,
-
-                        label:
-                            'Request Barang',
-
-                        title:
-                            'Detail Request Barang SEKPiM',
-
-                        description:
-                            'Informasi lengkap Request Barang SEKPiM.',
-
-                        icon:
-                            'bi-box2-heart-fill',
-
-                        color:
-                            'info',
-                    };
-                }
-
-                return {
-                    ...typeConfig,
-
-                    label:
-                        'Peminjaman Barang',
-
-                    title:
-                        'Detail Peminjaman Barang SEKPiM',
-
-                    description:
-                        'Informasi lengkap Peminjaman Barang SEKPiM.',
-
-                    icon:
-                        'bi-box-arrow-up-right',
-
-                    color:
-                        'success',
-                };
-            },
-            [
-                type,
-                typeConfig,
-                isSekpimAssetRequest,
-            ]
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | STATUS
-    |--------------------------------------------------------------------------
-    */
-
-    const statusConfig =
-        useMemo(
-            () => {
-                const baseStatus =
-                    STATUS_CONFIG[
-                        requestData
-                            ?.status
-                    ] || {
-                        label:
-                            requestData
-                                ?.status ||
-                            'Tidak diketahui',
-
-                        shortLabel:
-                            requestData
-                                ?.status ||
-                            'Tidak diketahui',
-
-                        badgeClass:
-                            'text-bg-secondary',
-
-                        icon:
-                            'bi-info-circle-fill',
-
-                        description:
-                            'Status pengajuan tidak diketahui.',
-                    };
-
-                if (
-                    type ===
-                        'borrowing' &&
-                    isSekpimAssetRequest &&
-                    requestData
-                        ?.status ===
-                        'completed'
-                ) {
-                    return {
-                        ...baseStatus,
-
-                        label:
-                            'Barang Telah Diserahkan',
-
-                        shortLabel:
-                            'Selesai',
-
-                        badgeClass:
-                            'text-bg-success',
-
-                        icon:
-                            'bi-check2-all',
-
-                        description:
-                            'Request Barang telah selesai dan barang telah diserahkan kepada pemohon.',
-                    };
-                }
-
-                return baseStatus;
-            },
-            [
-                requestData
-                    ?.status,
-                type,
-                isSekpimAssetRequest,
-            ]
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | REQUEST CODE
-    |--------------------------------------------------------------------------
-    */
-
-    const requestCode =
-        useMemo(
-            () => {
-                if (
-                    !requestData
-                ) {
-                    return '-';
-                }
-
-                if (
-                    type ===
-                    'merchandise'
-                ) {
-                    return (
-                        requestData
-                            .order_code ||
-                        requestData
-                            .code ||
-                        `MER-${String(
-                            requestData
-                                .id
-                        ).padStart(
-                            4,
-                            '0'
-                        )}`
-                    );
-                }
-
-                if (
-                    type ===
-                    'humas'
-                ) {
-                    return (
-                        requestData
-                            .service_code ||
-                        requestData
-                            .code ||
-                        `HMS-${String(
-                            requestData
-                                .id
-                        ).padStart(
-                            4,
-                            '0'
-                        )}`
-                    );
-                }
-
-                return (
-                    requestData
-                        .borrow_code ||
-                    requestData
-                        .code ||
-                    (
-                        isSekpimAssetRequest
-                            ? `REQ-${String(
-                                  requestData
-                                      .id
-                              ).padStart(
-                                  4,
-                                  '0'
-                              )}`
-                            : `BRW-${String(
-                                  requestData
-                                      .id
-                              ).padStart(
-                                  4,
-                                  '0'
-                              )}`
-                    )
-                );
-            },
-            [
-                requestData,
-                type,
-                isSekpimAssetRequest,
-            ]
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | TITLE
-    |--------------------------------------------------------------------------
-    */
-
-    const requestTitle =
-        useMemo(
-            () => {
-                if (
-                    !requestData
-                ) {
-                    return '-';
-                }
-
-                if (
-                    type ===
-                    'humas'
-                ) {
-                    return (
-                        getCoverageLabels(
-                            requestData
-                                .coverage_type
-                        ) ||
-                        'Layanan Humas'
-                    );
-                }
-
-                if (
-                    type ===
-                    'borrowing'
-                ) {
-                    return (
-                        requestData
-                            .purpose ||
-                        sekpimTypeLabel
-                    );
-                }
-
-                return (
-                    requestData
-                        .title ||
-                    requestData
-                        .event_name ||
-                    requestData
-                        .activity_name ||
-                    displayTypeConfig
-                        ?.label ||
-                    'Pengajuan'
-                );
-            },
-            [
-                requestData,
-                type,
-                displayTypeConfig,
-                sekpimTypeLabel,
-            ]
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | TIMELINE
-    |--------------------------------------------------------------------------
-    */
-
-    const timelineItems =
-        useMemo(
-            () => {
-                if (
-                    !requestData
-                ) {
-                    return [];
-                }
-
-                const items =
-                    [];
-
-                items.push({
-                    label:
-                        'Pengajuan Dikirim',
-
-                    description:
-                        'Pengajuan berhasil dikirim ke sistem.',
-
-                    date:
-                        requestData
-                            .submitted_at ||
-                        requestData
-                            .created_at,
-
-                    icon:
-                        'bi-send-check-fill',
-
-                    status:
-                        'done',
-                });
-
-                if (
-                    requestData
-                        .status ===
-                    'pending'
-                ) {
-                    if (
-                        requestData
-                            .resubmitted_at
-                    ) {
-                        items.push({
-                            label:
-                                'Perbaikan Dikirim Ulang',
-
-                            description:
-                                'Pemohon telah mengirimkan data hasil perbaikan.',
-
-                            date:
-                                requestData
-                                    .resubmitted_at,
-
-                            icon:
-                                'bi-arrow-repeat',
-
-                            status:
-                                'done',
-                        });
-                    }
-
-                    items.push({
-                        label:
-                            'Menunggu Pemeriksaan',
-
-                        description:
-                            'Admin sedang memeriksa data pengajuan.',
-
-                        date:
-                            null,
-
-                        icon:
-                            'bi-hourglass-split',
-
-                        status:
-                            'active',
-                    });
-                }
-
-                if (
-                    requestData
-                        .status ===
-                    'revision'
-                ) {
-                    items.push({
-                        label:
-                            'Revisi Diminta',
-
-                        description:
-                            requestData
-                                .admin_note ||
-                            'Admin meminta pengajuan diperbaiki.',
-
-                        date:
-                            requestData
-                                .revision_requested_at ||
-                            requestData
-                                .updated_at,
-
-                        icon:
-                            'bi-pencil-square',
-
-                        status:
-                            'active',
-                    });
-                }
-
-                if (
-                    [
-                        'approved',
-                        'completed',
-                        'borrowed',
-                        'returned',
-                    ].includes(
-                        requestData
-                            .status
-                    )
-                ) {
-                    items.push({
-                        label:
-                            'Pengajuan Disetujui',
-
-                        description:
-                            'Admin telah menyetujui pengajuan.',
-
-                        date:
-                            requestData
-                                .approved_at ||
-                            requestData
-                                .updated_at,
-
-                        icon:
-                            'bi-check-circle-fill',
-
-                        status:
-                            'done',
-                    });
-                }
-
-                if (
-                    requestData
-                        .status ===
-                    'rejected'
-                ) {
-                    items.push({
-                        label:
-                            'Pengajuan Ditolak',
-
-                        description:
-                            requestData
-                                .admin_note ||
-                            'Pengajuan tidak dapat diproses.',
-
-                        date:
-                            requestData
-                                .rejected_at ||
-                            requestData
-                                .updated_at,
-
-                        icon:
-                            'bi-x-circle-fill',
-
-                        status:
-                            'rejected',
-                    });
-                }
-
-                /*
-                 * Khusus Peminjaman Barang.
-                 */
-                if (
-                    isSekpimBorrow &&
-                    [
-                        'borrowed',
-                        'returned',
-                    ].includes(
-                        requestData
-                            .status
-                    )
-                ) {
-                    items.push({
-                        label:
-                            'Barang Dipinjam',
-
-                        description:
-                            'Barang telah diserahkan kepada pemohon dan sedang digunakan.',
-
-                        date:
-                            requestData
-                                .borrowed_at ||
-                            requestData
-                                .updated_at,
-
-                        icon:
-                            'bi-box-arrow-up-right',
-
-                        status:
-                            'done',
-                    });
-                }
-
-                /*
-                 * Complete umum.
-                 */
-                if (
-                    requestData
-                        .status ===
-                    'completed'
-                ) {
-                    if (
-                        isSekpimAssetRequest
-                    ) {
-                        items.push({
-                            label:
-                                'Barang Diserahkan',
-
-                            description:
-                                'Barang telah diserahkan kepada pemohon dan Request Barang telah selesai.',
-
-                            date:
-                                requestData
-                                    .completed_at ||
-                                requestData
-                                    .updated_at,
-
-                            icon:
-                                'bi-box2-heart-fill',
-
-                            status:
-                                'done',
-                        });
-                    } else {
-                        items.push({
-                            label:
-                                'Layanan Selesai',
-
-                            description:
-                                type ===
-                                'humas'
-                                    ? 'Hasil pekerjaan Humas telah tersedia.'
-                                    : 'Seluruh proses pelayanan telah diselesaikan.',
-
-                            date:
-                                requestData
-                                    .completed_at ||
-                                requestData
-                                    .updated_at,
-
-                            icon:
-                                'bi-check2-all',
-
-                            status:
-                                'done',
-                        });
-                    }
-                }
-
-                /*
-                 * Khusus Peminjaman Barang.
-                 */
-                if (
-                    isSekpimBorrow &&
-                    requestData
-                        .status ===
-                        'returned'
-                ) {
-                    items.push({
-                        label:
-                            'Barang Dikembalikan',
-
-                        description:
-                            'Barang telah dikembalikan kepada petugas dan peminjaman selesai.',
-
-                        date:
-                            requestData
-                                .returned_at ||
-                            requestData
-                                .updated_at,
-
-                        icon:
-                            'bi-box-arrow-in-down-left',
-
-                        status:
-                            'done',
-                    });
-                }
-
-                return items;
-            },
-            [
-                requestData,
-                type,
-                isSekpimBorrow,
-                isSekpimAssetRequest,
-            ]
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | INVALID TYPE
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        !typeConfig
-    ) {
         return (
-            <div className="container-fluid px-0">
-                <div className="card border-0 shadow-sm rounded-5">
-                    <div className="card-body p-5 text-center">
-                        <i className="bi bi-exclamation-triangle-fill display-4 text-warning mb-3" />
+            requestData.title ||
+            requestData.event_name ||
+            requestData.activity_name ||
+            'Pengajuan Merchandise'
+        );
+    }, [
+        requestData,
+        type,
+        sekpimTypeLabel,
+        isDirectorateSchedule,
+    ]);
 
-                        <h4 className="fw-black">
-                            Jenis pengajuan tidak dikenali
-                        </h4>
+    const timelineItems = useMemo(() => {
+        if (!requestData) return [];
 
-                        <p className="text-muted">
-                            Halaman detail yang kamu buka tidak tersedia.
-                        </p>
+        const items = [
+            {
+                label: 'Pengajuan Dikirim',
+                description: 'Pengajuan berhasil dikirim ke sistem.',
+                date:
+                    requestData.submitted_at ||
+                    requestData.created_at,
+                icon: 'bi-send-check-fill',
+                status: 'done',
+            },
+        ];
 
-                        <Link
-                            to={
-                                historyPath
-                            }
-                            className="btn btn-danger rounded-pill px-4"
-                        >
-                            <i className="bi bi-arrow-left me-2" />
+        if (isDirectorateSchedule) {
+            if (requestData.edited_at) {
+                items.push({
+                    label: 'Pengajuan Disesuaikan Admin',
+                    description: `Data jadwal telah disesuaikan oleh ${requestData.editor_name || 'admin'
+                        }.`,
+                    date: requestData.edited_at,
+                    icon: 'bi-pencil-square',
+                    status: 'done',
+                });
+            }
 
-                            Kembali ke Riwayat
-                        </Link>
-                    </div>
+            if (requestData.status === 'pending') {
+                items.push({
+                    label: 'Menunggu Approval',
+                    description:
+                        'Admin atau superadmin sedang memeriksa pengajuan jadwal.',
+                    date: null,
+                    icon: 'bi-hourglass-split',
+                    status: 'active',
+                });
+            }
+
+            if (requestData.status === 'approved') {
+                items.push({
+                    label: 'Jadwal Disetujui',
+                    description: `Disetujui oleh ${requestData.reviewer_name || 'admin'
+                        } dan dimasukkan ke kalender.`,
+                    date: requestData.reviewed_at,
+                    icon: 'bi-calendar2-check-fill',
+                    status: 'done',
+                });
+            }
+
+            if (requestData.status === 'rejected') {
+                items.push({
+                    label: 'Pengajuan Ditolak',
+                    description:
+                        requestData.rejection_reason ||
+                        'Pengajuan tidak disetujui.',
+                    date: requestData.reviewed_at,
+                    icon: 'bi-x-circle-fill',
+                    status: 'rejected',
+                });
+            }
+
+            return items;
+        }
+
+        if (requestData.resubmitted_at) {
+            items.push({
+                label: 'Perbaikan Dikirim Ulang',
+                description:
+                    'Pemohon telah mengirimkan data perbaikan.',
+                date: requestData.resubmitted_at,
+                icon: 'bi-arrow-repeat',
+                status: 'done',
+            });
+        }
+
+        if (requestData.status === 'pending') {
+            items.push({
+                label: 'Menunggu Pemeriksaan',
+                description:
+                    'Admin sedang memeriksa pengajuan.',
+                date: null,
+                icon: 'bi-hourglass-split',
+                status: 'active',
+            });
+        }
+
+        if (requestData.status === 'revision') {
+            items.push({
+                label: 'Revisi Diminta',
+                description:
+                    requestData.admin_note ||
+                    'Admin meminta perbaikan data.',
+                date:
+                    requestData.revision_requested_at ||
+                    requestData.updated_at,
+                icon: 'bi-pencil-square',
+                status: 'active',
+            });
+        }
+
+        if (
+            ['approved', 'completed', 'borrowed', 'returned'].includes(
+                requestData.status
+            )
+        ) {
+            items.push({
+                label: 'Pengajuan Disetujui',
+                description: 'Admin telah menyetujui pengajuan.',
+                date:
+                    requestData.approved_at ||
+                    requestData.updated_at,
+                icon: 'bi-check-circle-fill',
+                status: 'done',
+            });
+        }
+
+        if (requestData.status === 'rejected') {
+            items.push({
+                label: 'Pengajuan Ditolak',
+                description:
+                    requestData.admin_note ||
+                    'Pengajuan tidak dapat diproses.',
+                date:
+                    requestData.rejected_at ||
+                    requestData.updated_at,
+                icon: 'bi-x-circle-fill',
+                status: 'rejected',
+            });
+        }
+
+        if (
+            isSekpimBorrow &&
+            ['borrowed', 'returned'].includes(requestData.status)
+        ) {
+            items.push({
+                label: 'Barang Dipinjam',
+                description:
+                    'Barang telah diserahkan kepada pemohon.',
+                date:
+                    requestData.borrowed_at ||
+                    requestData.updated_at,
+                icon: 'bi-box-arrow-up-right',
+                status: 'done',
+            });
+        }
+
+        if (requestData.status === 'completed') {
+            items.push({
+                label: isSekpimAssetRequest
+                    ? 'Barang Diserahkan'
+                    : 'Layanan Selesai',
+                description: isSekpimAssetRequest
+                    ? 'Barang telah diserahkan kepada pemohon.'
+                    : type === 'humas'
+                        ? 'Hasil pekerjaan Humas telah tersedia.'
+                        : 'Proses pelayanan telah selesai.',
+                date:
+                    requestData.completed_at ||
+                    requestData.updated_at,
+                icon: 'bi-check2-all',
+                status: 'done',
+            });
+        }
+
+        if (isSekpimBorrow && requestData.status === 'returned') {
+            items.push({
+                label: 'Barang Dikembalikan',
+                description:
+                    'Barang telah dikembalikan dan peminjaman selesai.',
+                date:
+                    requestData.returned_at ||
+                    requestData.updated_at,
+                icon: 'bi-box-arrow-in-down-left',
+                status: 'done',
+            });
+        }
+
+        return items;
+    }, [
+        requestData,
+        isDirectorateSchedule,
+        isSekpimBorrow,
+        isSekpimAssetRequest,
+        type,
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDASI JENIS
+    |--------------------------------------------------------------------------
+    */
+
+    if (!typeConfig) {
+        return (
+            <div className="card border-0 shadow-sm rounded-5">
+                <div className="card-body p-5 text-center">
+                    <i className="bi bi-exclamation-triangle-fill display-4 text-warning d-block mb-3" />
+
+                    <h4 className="fw-black mb-2">
+                        Jenis pengajuan tidak dikenali
+                    </h4>
+
+                    <p className="text-muted">
+                        Halaman detail tidak tersedia.
+                    </p>
+
+                    <Link
+                        to={historyPath}
+                        className="btn btn-danger rounded-pill px-4"
+                    >
+                        Kembali ke Riwayat
+                    </Link>
                 </div>
             </div>
         );
@@ -1784,23 +978,15 @@ export default function MyRequestDetailPage() {
     |--------------------------------------------------------------------------
     */
 
-    if (
-        loading
-    ) {
+    if (loading) {
         return (
-            <div className="container-fluid px-0">
-                <div className="card border-0 shadow-sm rounded-5">
-                    <div className="card-body py-5 text-center">
-                        <div className="spinner-border text-danger mb-3" />
+            <div className="card border-0 shadow-sm rounded-5">
+                <div className="card-body py-5 text-center">
+                    <div className="spinner-border text-danger mb-3" />
 
-                        <h5 className="fw-bold mb-1">
-                            Memuat detail pengajuan
-                        </h5>
-
-                        <p className="text-muted mb-0">
-                            Mohon tunggu sebentar.
-                        </p>
-                    </div>
+                    <h5 className="fw-bold">
+                        Memuat detail pengajuan
+                    </h5>
                 </div>
             </div>
         );
@@ -1812,61 +998,35 @@ export default function MyRequestDetailPage() {
     |--------------------------------------------------------------------------
     */
 
-    if (
-        errorMessage ||
-        !requestData
-    ) {
+    if (errorMessage || !requestData) {
         return (
-            <div className="container-fluid px-0">
-                <div className="card border-0 shadow-sm rounded-5">
-                    <div className="card-body p-5 text-center">
-                        <div
-                            className="mx-auto mb-3 rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center"
-                            style={{
-                                width:
-                                    86,
+            <div className="card border-0 shadow-sm rounded-5">
+                <div className="card-body p-5 text-center">
+                    <i className="bi bi-exclamation-circle-fill display-4 text-danger d-block mb-3" />
 
-                                height:
-                                    86,
-                            }}
+                    <h4 className="fw-black mb-2">
+                        Detail tidak dapat dimuat
+                    </h4>
+
+                    <p className="text-muted mb-4">
+                        {errorMessage}
+                    </p>
+
+                    <div className="d-flex justify-content-center flex-wrap gap-2">
+                        <button
+                            type="button"
+                            className="btn btn-outline-danger rounded-pill px-4"
+                            onClick={fetchDetail}
                         >
-                            <i className="bi bi-exclamation-circle-fill fs-1" />
-                        </div>
+                            Coba Lagi
+                        </button>
 
-                        <h4 className="fw-black mb-2">
-                            Detail tidak dapat dimuat
-                        </h4>
-
-                        <p className="text-muted mb-4">
-                            {
-                                errorMessage
-                            }
-                        </p>
-
-                        <div className="d-flex flex-wrap justify-content-center gap-2">
-                            <button
-                                type="button"
-                                className="btn btn-outline-danger rounded-pill px-4"
-                                onClick={
-                                    fetchDetail
-                                }
-                            >
-                                <i className="bi bi-arrow-clockwise me-2" />
-
-                                Coba Lagi
-                            </button>
-
-                            <Link
-                                to={
-                                    historyPath
-                                }
-                                className="btn btn-danger rounded-pill px-4"
-                            >
-                                <i className="bi bi-arrow-left me-2" />
-
-                                Kembali ke Riwayat
-                            </Link>
-                        </div>
+                        <Link
+                            to={historyPath}
+                            className="btn btn-danger rounded-pill px-4"
+                        >
+                            Kembali ke Riwayat
+                        </Link>
                     </div>
                 </div>
             </div>
@@ -1875,79 +1035,57 @@ export default function MyRequestDetailPage() {
 
     /*
     |--------------------------------------------------------------------------
-    | DATA
+    | DATA DETAIL
     |--------------------------------------------------------------------------
     */
 
-    const userData =
-        requestData
-            .user ||
-        {};
+    const userData = requestData.user || {};
 
     const orderItems =
-        requestData
-            .items ||
-        requestData
-            .order_items ||
+        requestData.items ||
+        requestData.order_items ||
         [];
 
     const borrowItems =
-        requestData
-            .items ||
-        requestData
-            .borrow_items ||
-        requestData
-            .borrow_request_items ||
+        requestData.items ||
+        requestData.borrow_items ||
+        requestData.borrow_request_items ||
         [];
 
     const revisionHistories =
-        requestData
-            .revision_histories ||
-        requestData
-            .revisionHistories ||
+        requestData.revision_histories ||
+        requestData.revisionHistories ||
         [];
 
-    const resolvedUnitName =
-        getResolvedUnitName(
-            requestData
-        );
-
-    const resultUrl =
-        normalizeExternalUrl(
-            requestData
-                .result_link
-        );
+    const resultUrl = normalizeExternalUrl(
+        requestData.result_link
+    );
 
     const resultFileUrl =
-        requestData
-            .result_file_url ||
-        requestData
-            .result_file_path ||
-        null;
+        requestData.result_file_url ||
+        requestData.result_file_path;
 
     const handoverEvidenceUrl =
-        requestData
-            .handover_evidence_url ||
-        requestData
-            .handover_evidence_path ||
-        null;
+        requestData.handover_evidence_url ||
+        requestData.handover_evidence_path;
 
     const returnEvidenceUrl =
-        requestData
-            .return_evidence_url ||
-        requestData
-            .return_evidence_path ||
-        null;
+        requestData.return_evidence_url ||
+        requestData.return_evidence_path;
+
+    const rejectionReason = isDirectorateSchedule
+        ? requestData.rejection_reason
+        : requestData.admin_note;
 
     /*
     |--------------------------------------------------------------------------
-    | VIEW
+    | RENDER
     |--------------------------------------------------------------------------
     */
 
     return (
-        <div className="container-fluid px-0">
-            {/* HERO */}
+        <div className="container-fluid px-0 my-request-detail-page">
+            {/* HEADER */}
 
             <section className="card border-0 shadow-sm rounded-5 mb-4">
                 <div className="card-body p-4 p-lg-5">
@@ -1956,11 +1094,8 @@ export default function MyRequestDetailPage() {
                             <div
                                 className={`rounded-4 bg-${displayTypeConfig.color}-subtle text-${displayTypeConfig.color} d-flex align-items-center justify-content-center flex-shrink-0`}
                                 style={{
-                                    width:
-                                        72,
-
-                                    height:
-                                        72,
+                                    width: 72,
+                                    height: 72,
                                 }}
                             >
                                 <i
@@ -1972,21 +1107,15 @@ export default function MyRequestDetailPage() {
                                 <span
                                     className={`badge rounded-pill bg-${displayTypeConfig.color}-subtle text-${displayTypeConfig.color} px-3 py-2 mb-3`}
                                 >
-                                    {
-                                        displayTypeConfig.label
-                                    }
+                                    {displayTypeConfig.label}
                                 </span>
 
                                 <h2 className="fw-black mb-2">
-                                    {
-                                        requestTitle
-                                    }
+                                    {requestTitle}
                                 </h2>
 
                                 <div className="text-danger fw-bold">
-                                    {
-                                        requestCode
-                                    }
+                                    {requestCode}
                                 </div>
                             </div>
                         </div>
@@ -1995,13 +1124,8 @@ export default function MyRequestDetailPage() {
                             <span
                                 className={`badge rounded-pill ${statusConfig.badgeClass} px-3 py-2 mb-3`}
                             >
-                                <i
-                                    className={`bi ${statusConfig.icon} me-2`}
-                                />
-
-                                {
-                                    statusConfig.shortLabel
-                                }
+                                <i className={`bi ${statusConfig.icon} me-2`} />
+                                {statusConfig.shortLabel}
                             </span>
 
                             <div className="small text-muted">
@@ -2009,21 +1133,16 @@ export default function MyRequestDetailPage() {
                             </div>
 
                             <div className="fw-bold">
-                                {formatDateTime(
-                                    requestData
-                                        .updated_at
-                                )}
+                                {formatDateTime(requestData.updated_at)}
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            {/* REJECT */}
+            {/* PENOLAKAN */}
 
-            {requestData
-                .status ===
-                'rejected' && (
+            {requestData.status === 'rejected' && (
                 <section className="alert alert-danger border-0 rounded-5 shadow-sm p-4 mb-4">
                     <div className="d-flex align-items-start gap-3">
                         <div className="icon-box bg-white text-danger">
@@ -2037,286 +1156,218 @@ export default function MyRequestDetailPage() {
 
                             <p
                                 className="mb-0"
-                                style={{
-                                    whiteSpace:
-                                        'pre-line',
-                                }}
+                                style={{ whiteSpace: 'pre-line' }}
                             >
-                                {requestData
-                                    .admin_note ||
+                                {rejectionReason ||
                                     'Admin tidak memberikan alasan tambahan.'}
                             </p>
+
+                            {isDirectorateSchedule &&
+                                requestData.reviewer_name && (
+                                    <div className="small mt-3">
+                                        Diproses oleh{' '}
+                                        <strong>
+                                            {requestData.reviewer_name}
+                                        </strong>
+                                        {' • '}
+                                        {formatDateTime(
+                                            requestData.reviewed_at
+                                        )}
+                                    </div>
+                                )}
                         </div>
                     </div>
                 </section>
             )}
 
-            {/* MERCHANDISE REVISION */}
+            {/* APPROVAL JADWAL DIREKTORAT */}
 
-            {type ===
-                'merchandise' &&
-                requestData
-                    .status ===
-                    'revision' && (
-                <section className="alert alert-info border-0 rounded-5 shadow-sm p-4 mb-4">
-                    <div className="d-flex align-items-start gap-3">
-                        <div className="icon-box bg-white text-info">
-                            <i className="bi bi-pencil-square" />
+            {isDirectorateSchedule &&
+                requestData.status === 'approved' && (
+                    <section className="alert alert-success border-0 rounded-5 shadow-sm p-4 mb-4">
+                        <div className="d-flex align-items-start gap-3">
+                            <div className="icon-box bg-white text-success">
+                                <i className="bi bi-calendar2-check-fill" />
+                            </div>
+
+                            <div>
+                                <h5 className="fw-black mb-2">
+                                    Jadwal Direktorat Disetujui
+                                </h5>
+
+                                <p className="mb-2">
+                                    Pengajuan telah disetujui dan dimasukkan
+                                    ke kalender Direktorat.
+                                </p>
+
+                                {requestData.reviewer_name && (
+                                    <div className="small mb-2">
+                                        Disetujui oleh{' '}
+                                        <strong>
+                                            {requestData.reviewer_name}
+                                        </strong>
+                                        {' • '}
+                                        {formatDateTime(
+                                            requestData.reviewed_at
+                                        )}
+                                    </div>
+                                )}
+
+                                <Link
+                                    to={`${basePath}/director-schedule`}
+                                    className="btn btn-sm btn-success rounded-pill px-3"
+                                >
+                                    <i className="bi bi-calendar3 me-2" />
+                                    Lihat Kalender
+                                </Link>
+                            </div>
                         </div>
+                    </section>
+                )}
 
-                        <div>
+            {/* REVISI MERCHANDISE */}
+
+            {type === 'merchandise' &&
+                requestData.status === 'revision' && (
+                    <>
+                        <section className="alert alert-info border-0 rounded-5 shadow-sm p-4 mb-4">
                             <h5 className="fw-black mb-2">
+                                <i className="bi bi-pencil-square me-2" />
                                 Pengajuan Perlu Direvisi
                             </h5>
 
                             <p
                                 className="mb-0"
-                                style={{
-                                    whiteSpace:
-                                        'pre-line',
-                                }}
+                                style={{ whiteSpace: 'pre-line' }}
                             >
-                                {requestData
-                                    .admin_note ||
-                                    'Silakan periksa dan perbaiki kembali data pengajuan.'}
+                                {requestData.admin_note ||
+                                    'Silakan perbaiki kembali data pengajuan.'}
                             </p>
-                        </div>
-                    </div>
-                </section>
-            )}
+                        </section>
 
-            {type ===
-                'merchandise' &&
-                requestData
-                    .status ===
-                    'revision' && (
-                <MerchandiseRevisionForm
-                    order={
-                        requestData
-                    }
-                    onSuccess={
-                        fetchDetail
-                    }
-                />
-            )}
+                        <MerchandiseRevisionForm
+                            order={requestData}
+                            onSuccess={fetchDetail}
+                        />
+                    </>
+                )}
 
-            {/* HUMAS RESULT */}
+            {/* HASIL LAYANAN HUMAS */}
 
-            {type ===
-                'humas' &&
-                requestData
-                    .status ===
-                    'completed' && (
-                <section className="card border-0 shadow-sm rounded-5 mb-4">
-                    <div className="card-body p-4">
-                        <div className="d-flex flex-wrap align-items-center justify-content-between gap-4 mb-4">
-                            <div className="d-flex align-items-start gap-3">
-                                <div className="icon-box bg-success-subtle text-success">
-                                    <i className="bi bi-cloud-check-fill" />
-                                </div>
-
+            {type === 'humas' &&
+                requestData.status === 'completed' && (
+                    <section className="card border-0 shadow-sm rounded-5 mb-4">
+                        <div className="card-body p-4">
+                            <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
                                 <div>
                                     <h4 className="fw-black mb-1">
                                         Hasil Pekerjaan Humas
                                     </h4>
 
                                     <p className="text-muted mb-0">
-                                        Request layanan Humas telah selesai diproses.
+                                        Hasil layanan yang telah diselesaikan admin.
                                     </p>
                                 </div>
+
+                                {resultUrl && (
+                                    <a
+                                        href={resultUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="btn btn-success rounded-pill px-4"
+                                    >
+                                        <i className="bi bi-box-arrow-up-right me-2" />
+                                        Buka Link Hasil
+                                    </a>
+                                )}
                             </div>
 
-                            {resultUrl && (
-                                <a
-                                    href={
-                                        resultUrl
-                                    }
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="btn btn-success rounded-pill px-4"
-                                >
-                                    <i className="bi bi-box-arrow-up-right me-2" />
-
-                                    Buka Link Hasil
-                                </a>
-                            )}
-                        </div>
-
-                        <div className="row g-3">
-                            <FileCard
-                                label="File Hasil Admin"
-                                fileName={
-                                    requestData
-                                        .result_file_name
-                                }
-                                fileUrl={
-                                    resultFileUrl
-                                }
-                                icon="bi-file-earmark-check-fill"
-                                color="success"
-                            />
-
-                            <div className="col-md-6">
-                                <div className="p-3 rounded-4 border bg-white h-100">
-                                    <div className="d-flex align-items-center gap-3">
-                                        <div className="icon-box bg-success-subtle text-success">
-                                            <i className="bi bi-link-45deg" />
-                                        </div>
-
-                                        <div className="flex-grow-1">
-                                            <div className="small text-muted fw-bold mb-1">
-                                                Link Hasil
-                                            </div>
-
-                                            {resultUrl ? (
-                                                <a
-                                                    href={
-                                                        resultUrl
-                                                    }
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="fw-bold text-success text-decoration-none"
-                                                >
-                                                    Buka hasil
-
-                                                    <i className="bi bi-box-arrow-up-right ms-2" />
-                                                </a>
-                                            ) : (
-                                                <div className="fw-bold">
-                                                    Tidak tersedia
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {requestData
-                            .result_note && (
-                            <div className="mt-4 p-3 rounded-4 bg-light border">
-                                <div className="small fw-bold text-muted mb-1">
-                                    Catatan Hasil
-                                </div>
-
-                                <div
-                                    className="text-dark"
-                                    style={{
-                                        whiteSpace:
-                                            'pre-line',
-                                    }}
-                                >
-                                    {
-                                        requestData
-                                            .result_note
-                                    }
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </section>
-            )}
-
-            {/* SEKPiM EVIDENCE */}
-
-            {type ===
-                'borrowing' &&
-                (
-                    handoverEvidenceUrl ||
-                    (
-                        isSekpimBorrow &&
-                        returnEvidenceUrl
-                    )
-                ) && (
-                <section className="card border-0 shadow-sm rounded-5 mb-4">
-                    <div className="card-body p-4">
-                        <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
-                            <div>
-                                <h4 className="fw-black mb-1">
-                                    {isSekpimBorrow
-                                        ? 'Bukti Proses Peminjaman'
-                                        : 'Bukti Penyerahan Barang'}
-                                </h4>
-
-                                <p className="text-muted mb-0">
-                                    {isSekpimBorrow
-                                        ? 'Bukti serah terima dan pengembalian yang diunggah admin.'
-                                        : 'Bukti penyerahan Request Barang yang diunggah admin.'}
-                                </p>
-                            </div>
-
-                            <div
-                                className={`icon-box ${
-                                    isSekpimBorrow
-                                        ? 'bg-success-subtle text-success'
-                                        : 'bg-info-subtle text-info'
-                                }`}
-                            >
-                                <i className="bi bi-folder-check" />
-                            </div>
-                        </div>
-
-                        <div className="row g-3">
-                            <FileCard
-                                label={
-                                    isSekpimBorrow
-                                        ? 'Bukti Serah Terima'
-                                        : 'Bukti Penyerahan Barang'
-                                }
-                                fileName={
-                                    requestData
-                                        .handover_evidence_name
-                                }
-                                fileUrl={
-                                    handoverEvidenceUrl
-                                }
-                                icon={
-                                    isSekpimBorrow
-                                        ? 'bi-box-arrow-up-right'
-                                        : 'bi-box2-heart-fill'
-                                }
-                                color={
-                                    isSekpimBorrow
-                                        ? 'success'
-                                        : 'info'
-                                }
-                            />
-
-                            {isSekpimBorrow && (
+                            <div className="row g-3">
                                 <FileCard
-                                    label="Bukti Pengembalian"
-                                    fileName={
-                                        requestData
-                                            .return_evidence_name
-                                    }
-                                    fileUrl={
-                                        returnEvidenceUrl
-                                    }
-                                    icon="bi-box-arrow-in-down-left"
+                                    label="File Hasil Admin"
+                                    fileName={requestData.result_file_name}
+                                    fileUrl={resultFileUrl}
+                                    icon="bi-file-earmark-check-fill"
                                     color="success"
                                 />
-                            )}
+
+                                <InfoItem
+                                    label="Link Hasil"
+                                    value={resultUrl}
+                                    icon="bi-link-45deg"
+                                    isLink
+                                />
+
+                                {requestData.result_note && (
+                                    <InfoItem
+                                        label="Catatan Hasil"
+                                        value={requestData.result_note}
+                                        icon="bi-chat-left-text-fill"
+                                        fullWidth
+                                    />
+                                )}
+                            </div>
                         </div>
-                    </div>
-                </section>
-            )}
+                    </section>
+                )}
 
-            <div className="row g-4">
-                {/* LEFT */}
+            {/* BUKTI SEKPiM */}
 
-                <div className="col-xl-8">
-                    {/* INFO */}
-
+            {type === 'borrowing' &&
+                (handoverEvidenceUrl ||
+                    (isSekpimBorrow && returnEvidenceUrl)) && (
                     <section className="card border-0 shadow-sm rounded-5 mb-4">
                         <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
+                            <h4 className="fw-black mb-1">
+                                {isSekpimBorrow
+                                    ? 'Bukti Proses Peminjaman'
+                                    : 'Bukti Penyerahan Barang'}
+                            </h4>
+
+                            <p className="text-muted mb-4">
+                                Dokumen serah terima dan pengembalian barang.
+                            </p>
+
+                            <div className="row g-3">
+                                <FileCard
+                                    label={
+                                        isSekpimBorrow
+                                            ? 'Bukti Serah Terima'
+                                            : 'Bukti Penyerahan Barang'
+                                    }
+                                    fileName={requestData.handover_evidence_name}
+                                    fileUrl={handoverEvidenceUrl}
+                                    color={isSekpimBorrow ? 'success' : 'info'}
+                                />
+
+                                {isSekpimBorrow && (
+                                    <FileCard
+                                        label="Bukti Pengembalian"
+                                        fileName={requestData.return_evidence_name}
+                                        fileUrl={returnEvidenceUrl}
+                                        icon="bi-box-arrow-in-down-left"
+                                        color="success"
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    </section>
+                )}
+
+            <div className="row g-4">
+                {/* KOLOM KIRI */}
+
+                <div className="col-xl-8">
+                    <section className="card border-0 shadow-sm rounded-5 mb-4">
+                        <div className="card-body p-4">
+                            <div className="d-flex justify-content-between align-items-center gap-3 mb-4">
                                 <div>
                                     <h4 className="fw-black mb-1">
                                         Informasi Pengajuan
                                     </h4>
 
                                     <p className="text-muted mb-0">
-                                        Data utama pengajuan yang dikirim.
+                                        Detail informasi pengajuan yang dikirim.
                                     </p>
                                 </div>
 
@@ -2330,45 +1381,156 @@ export default function MyRequestDetailPage() {
                             </div>
 
                             <div className="row g-3">
+                                {/* NAMA PEMOHON */}
+
                                 <InfoItem
                                     label="Nama Pemohon"
                                     value={
-                                        requestData
-                                            .applicant_name ||
-                                        userData
-                                            .name ||
-                                        requestData
-                                            .requester_name ||
-                                        '-'
+                                        requestData.applicant_name ||
+                                        userData.name ||
+                                        requestData.requester_name ||
+                                        (Number(requestData.requested_by) ===
+                                            Number(currentUser.id)
+                                            ? currentUser.name
+                                            : null)
                                     }
                                     icon="bi-person-fill"
                                 />
 
-                                {type !==
-                                    'merchandise' &&
-                                    type !==
-                                        'borrowing' && (
-                                    <InfoItem
-                                        label="Unit / Bagian"
-                                        value={
-                                            resolvedUnitName
-                                        }
-                                        icon="bi-building-fill"
-                                    />
+                                {/* JADWAL DIREKTORAT */}
+
+                                {isDirectorateSchedule && (
+                                    <>
+                                        <InfoItem
+                                            label="Unit Pengaju"
+                                            value={requestData.requester_unit}
+                                            icon="bi-building-fill"
+                                        />
+
+                                        <InfoItem
+                                            label="Nama PIC"
+                                            value={requestData.pic_name}
+                                            icon="bi-person-check-fill"
+                                        />
+                                        
+                                        <InfoItem
+                                            label="Agenda Untuk"
+                                            value={
+                                                DIRECTORATES[
+                                                requestData.directorate
+                                                ] ||
+                                                requestData.directorate
+                                            }
+                                            icon="bi-person-vcard-fill"
+                                        />
+
+                                        <InfoItem
+                                            label="Judul Agenda"
+                                            value={requestData.title}
+                                            icon="bi-calendar2-event-fill"
+                                            fullWidth
+                                        />
+
+                                        <InfoItem
+                                            label="Tanggal Agenda"
+                                            value={formatDate(
+                                                requestData.event_date
+                                            )}
+                                            icon="bi-calendar-date-fill"
+                                        />
+
+                                        <InfoItem
+                                            label="Waktu Agenda"
+                                            value={
+                                                requestData.all_day
+                                                    ? 'Sepanjang Hari'
+                                                    : `${formatTime(
+                                                        requestData.start_time
+                                                    )} - ${formatTime(
+                                                        requestData.end_time
+                                                    )} WIB`
+                                            }
+                                            icon="bi-clock-fill"
+                                        />
+
+                                        <InfoItem
+                                            label="Kategori Agenda"
+                                            value={requestData.agenda_type}
+                                            icon="bi-tag-fill"
+                                        />
+
+                                        <InfoItem
+                                            label="Lokasi Agenda"
+                                            value={requestData.location}
+                                            icon="bi-geo-alt-fill"
+                                        />
+
+                                        <InfoItem
+                                            label="Visibilitas"
+                                            value={
+                                                requestData.is_public
+                                                    ? 'Publik'
+                                                    : 'Internal'
+                                            }
+                                            icon={
+                                                requestData.is_public
+                                                    ? 'bi-globe2'
+                                                    : 'bi-lock-fill'
+                                            }
+                                        />
+
+                                        <InfoItem
+                                            label="Tanggal Pengajuan"
+                                            value={formatDateTime(
+                                                requestData.created_at
+                                            )}
+                                            icon="bi-send-check-fill"
+                                        />
+
+                                        <InfoItem
+                                            label="Deskripsi / Keperluan"
+                                            value={requestData.description}
+                                            icon="bi-chat-left-text-fill"
+                                            fullWidth
+                                        />
+
+                                        {requestData.edited_by && (
+                                            <InfoItem
+                                                label="Terakhir Disesuaikan Admin"
+                                                value={`${requestData.editor_name ||
+                                                    'Admin'
+                                                    } • ${formatDateTime(
+                                                        requestData.edited_at
+                                                    )}`}
+                                                icon="bi-pencil-square"
+                                                fullWidth
+                                            />
+                                        )}
+
+                                        {requestData.reviewed_by && (
+                                            <InfoItem
+                                                label="Keputusan Admin"
+                                                value={`${requestData.reviewer_name ||
+                                                    'Admin'
+                                                    } • ${formatDateTime(
+                                                        requestData.reviewed_at
+                                                    )}`}
+                                                icon="bi-person-check-fill"
+                                                fullWidth
+                                            />
+                                        )}
+                                    </>
                                 )}
 
                                 {/* MERCHANDISE */}
 
-                                {type ===
-                                    'merchandise' && (
+                                {type === 'merchandise' && (
                                     <>
                                         <InfoItem
                                             label="Nama Kegiatan"
                                             value={
-                                                requestData
-                                                    .event_name ||
-                                                requestData
-                                                    .activity_name
+                                                requestData.event_name ||
+                                                requestData.activity_name
                                             }
                                             icon="bi-calendar-event-fill"
                                         />
@@ -2376,8 +1538,7 @@ export default function MyRequestDetailPage() {
                                         <InfoItem
                                             label="Tanggal Kegiatan"
                                             value={formatDate(
-                                                requestData
-                                                    .activity_date
+                                                requestData.activity_date
                                             )}
                                             icon="bi-calendar-date-fill"
                                         />
@@ -2385,63 +1546,44 @@ export default function MyRequestDetailPage() {
                                         <InfoItem
                                             label="Tanggal Pengambilan Merchandise"
                                             value={formatDate(
-                                                requestData
-                                                    .pickup_date
+                                                requestData.pickup_date
                                             )}
                                             icon="bi-calendar-check-fill"
                                         />
 
                                         <InfoItem
                                             label="Nama PIC"
-                                            value={
-                                                requestData
-                                                    .pic_name
-                                            }
+                                            value={requestData.pic_name}
                                             icon="bi-person-check-fill"
                                         />
 
                                         <InfoItem
                                             label="Nomor PIC"
-                                            value={
-                                                requestData
-                                                    .pic_phone
-                                            }
+                                            value={requestData.pic_phone}
                                             icon="bi-whatsapp"
                                         />
 
                                         <InfoItem
                                             label="Instansi Tamu"
-                                            value={
-                                                requestData
-                                                    .institution_name
-                                            }
+                                            value={requestData.institution_name}
                                             icon="bi-buildings-fill"
                                         />
 
                                         <InfoItem
                                             label="Nama Tamu"
-                                            value={
-                                                requestData
-                                                    .guest_name
-                                            }
+                                            value={requestData.guest_name}
                                             icon="bi-person-badge-fill"
                                         />
 
                                         <InfoItem
                                             label="Jabatan Tamu"
-                                            value={
-                                                requestData
-                                                    .guest_position
-                                            }
+                                            value={requestData.guest_position}
                                             icon="bi-briefcase-fill"
                                         />
 
                                         <InfoItem
                                             label="Alasan / Catatan Pengajuan"
-                                            value={
-                                                requestData
-                                                    .user_note
-                                            }
+                                            value={requestData.user_note}
                                             icon="bi-chat-left-text-fill"
                                             fullWidth
                                         />
@@ -2450,65 +1592,57 @@ export default function MyRequestDetailPage() {
 
                                 {/* HUMAS */}
 
-                                {type ===
-                                    'humas' && (
+                                {type === 'humas' && (
                                     <>
                                         <InfoItem
-                                            label="Nomor WhatsApp PIC"
-                                            value={
+                                            label="Unit / Bagian"
+                                            value={getResolvedUnitName(
                                                 requestData
-                                                    .pic_whatsapp
-                                            }
+                                            )}
+                                            icon="bi-building-fill"
+                                        />
+
+                                        <InfoItem
+                                            label="Nomor WhatsApp PIC"
+                                            value={requestData.pic_whatsapp}
                                             icon="bi-whatsapp"
                                         />
 
                                         <InfoItem
                                             label="Jenis Layanan Humas"
                                             value={getCoverageLabels(
-                                                requestData
-                                                    .coverage_type
+                                                requestData.coverage_type
                                             )}
                                             icon={getCoverageIcon(
-                                                requestData
-                                                    .coverage_type
+                                                requestData.coverage_type
                                             )}
                                         />
 
                                         <InfoItem
                                             label="Tanggal Kegiatan"
                                             value={formatDate(
-                                                requestData
-                                                    .event_date
+                                                requestData.event_date
                                             )}
                                             icon="bi-calendar-date-fill"
                                         />
 
                                         <InfoItem
                                             label="Lokasi Kegiatan"
-                                            value={
-                                                requestData
-                                                    .event_location
-                                            }
+                                            value={requestData.event_location}
                                             icon="bi-geo-alt-fill"
                                         />
 
                                         <InfoItem
                                             label="Link Referensi"
-                                            value={
-                                                requestData
-                                                    .reference_link
-                                            }
+                                            value={requestData.reference_link}
                                             icon="bi-link-45deg"
-                                            isLink
                                             fullWidth
+                                            isLink
                                         />
 
                                         <InfoItem
                                             label="Detail Kegiatan"
-                                            value={
-                                                requestData
-                                                    .activity_detail
-                                            }
+                                            value={requestData.activity_detail}
                                             icon="bi-file-earmark-text-fill"
                                             fullWidth
                                         />
@@ -2517,42 +1651,34 @@ export default function MyRequestDetailPage() {
 
                                 {/* SEKPiM */}
 
-                                {type ===
-                                    'borrowing' && (
+                                {type === 'borrowing' && (
                                     <>
                                         <InfoItem
                                             label="Jenis Pengajuan"
-                                            value={
-                                                sekpimTypeLabel
+                                            value={sekpimTypeLabel}
+                                            icon={
+                                                isSekpimAssetRequest
+                                                    ? 'bi-box2-heart-fill'
+                                                    : 'bi-box-arrow-up-right'
                                             }
-                                            icon={getSekpimTypeIcon(
-                                                requestData
-                                            )}
                                         />
 
                                         <InfoItem
                                             label="Nama PIC"
-                                            value={
-                                                requestData
-                                                    .pic_name
-                                            }
+                                            value={requestData.pic_name}
                                             icon="bi-person-badge-fill"
                                         />
 
                                         <InfoItem
                                             label="Nomor PIC"
-                                            value={
-                                                requestData
-                                                    .pic_phone
-                                            }
+                                            value={requestData.pic_phone}
                                             icon="bi-whatsapp"
                                         />
 
                                         <InfoItem
                                             label="Tanggal Kegiatan"
                                             value={formatDate(
-                                                requestData
-                                                    .activity_date
+                                                requestData.activity_date
                                             )}
                                             icon="bi-calendar-event-fill"
                                         />
@@ -2560,8 +1686,7 @@ export default function MyRequestDetailPage() {
                                         <InfoItem
                                             label="Tanggal Pengambilan"
                                             value={formatDate(
-                                                requestData
-                                                    .borrow_date
+                                                requestData.borrow_date
                                             )}
                                             icon="bi-calendar-check-fill"
                                         />
@@ -2570,8 +1695,7 @@ export default function MyRequestDetailPage() {
                                             <InfoItem
                                                 label="Tanggal Pengembalian"
                                                 value={formatDate(
-                                                    requestData
-                                                        .return_date
+                                                    requestData.return_date
                                                 )}
                                                 icon="bi-calendar-minus-fill"
                                             />
@@ -2583,10 +1707,7 @@ export default function MyRequestDetailPage() {
                                                     ? 'Keperluan Peminjaman'
                                                     : 'Keperluan Request Barang'
                                             }
-                                            value={
-                                                requestData
-                                                    .purpose
-                                            }
+                                            value={requestData.purpose}
                                             icon="bi-chat-left-text-fill"
                                             fullWidth
                                         />
@@ -2596,282 +1717,208 @@ export default function MyRequestDetailPage() {
                         </div>
                     </section>
 
-                    {/* REVISION HISTORY */}
+                    {/* RIWAYAT REVISI MERCHANDISE */}
 
-                    {type ===
-                        'merchandise' &&
-                        revisionHistories
-                            .length >
-                            0 && (
+                    {type === 'merchandise' && (
                         <RevisionHistoryCard
-                            histories={
-                                revisionHistories
-                            }
+                            histories={revisionHistories}
                         />
                     )}
 
-                    {/* MERCHANDISE ITEMS */}
+                    {/* DAFTAR MERCHANDISE */}
 
-                    {type ===
-                        'merchandise' &&
-                        orderItems
-                            .length >
-                            0 && (
-                        <section className="card border-0 shadow-sm rounded-5 mb-4">
+                    {type === 'merchandise' &&
+                        Array.isArray(orderItems) &&
+                        orderItems.length > 0 && (
+                            <section className="card border-0 shadow-sm rounded-5 mb-4">
+                                <div className="card-body p-4">
+                                    <h4 className="fw-black mb-4">
+                                        Paket Merchandise
+                                    </h4>
+
+                                    <div className="table-responsive">
+                                        <table className="table align-middle">
+                                            <thead className="table-light">
+                                                <tr>
+                                                    <th>Produk</th>
+                                                    <th className="text-center">
+                                                        Jumlah
+                                                    </th>
+                                                </tr>
+                                            </thead>
+
+                                            <tbody>
+                                                {orderItems.map(
+                                                    (item, index) => (
+                                                        <tr
+                                                            key={
+                                                                item.id ||
+                                                                index
+                                                            }
+                                                        >
+                                                            <td className="fw-bold">
+                                                                {item.product?.name ||
+                                                                    item.product_name ||
+                                                                    item.name ||
+                                                                    'Produk'}
+                                                            </td>
+
+                                                            <td className="text-center fw-black">
+                                                                {formatNumber(
+                                                                    item.quantity
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
+                    {/* DAFTAR BARANG SEKPiM */}
+
+                    {type === 'borrowing' &&
+                        Array.isArray(borrowItems) &&
+                        borrowItems.length > 0 && (
+                            <section className="card border-0 shadow-sm rounded-5 mb-4">
+                                <div className="card-body p-4">
+                                    <h4 className="fw-black mb-2">
+                                        {isSekpimBorrow
+                                            ? 'Barang Dipinjam'
+                                            : 'Barang yang Diminta'}
+                                    </h4>
+
+                                    <p className="text-muted mb-4">
+                                        Daftar barang yang diajukan.
+                                    </p>
+
+                                    <div className="table-responsive">
+                                        <table className="table align-middle">
+                                            <thead className="table-light">
+                                                <tr>
+                                                    <th>Barang</th>
+                                                    <th className="text-center">
+                                                        Jumlah
+                                                    </th>
+                                                </tr>
+                                            </thead>
+
+                                            <tbody>
+                                                {borrowItems.map(
+                                                    (item, index) => (
+                                                        <tr
+                                                            key={
+                                                                item.id ||
+                                                                index
+                                                            }
+                                                        >
+                                                            <td className="fw-bold">
+                                                                {item.product?.name ||
+                                                                    item.product_name ||
+                                                                    item.name ||
+                                                                    'Barang'}
+                                                            </td>
+
+                                                            <td className="text-center fw-black">
+                                                                {formatNumber(
+                                                                    item.quantity
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
+                    {/* DOKUMEN PENDUKUNG */}
+
+                    {!isDirectorateSchedule && (
+                        <section className="card border-0 shadow-sm rounded-5">
                             <div className="card-body p-4">
-                                <h4 className="fw-black mb-4">
-                                    Paket Merchandise
+                                <h4 className="fw-black mb-1">
+                                    Dokumen Pendukung
                                 </h4>
 
-                                <div className="table-responsive">
-                                    <table className="table align-middle">
-                                        <thead className="table-light">
-                                            <tr>
-                                                <th>
-                                                    Produk
-                                                </th>
+                                <p className="text-muted mb-4">
+                                    Lampiran dan dokumen proses pengajuan.
+                                </p>
 
-                                                <th className="text-center">
-                                                    Jumlah
-                                                </th>
-                                            </tr>
-                                        </thead>
-
-                                        <tbody>
-                                            {orderItems.map(
-                                                (
-                                                    item,
-                                                    index
-                                                ) => (
-                                                    <tr
-                                                        key={
-                                                            item.id ||
-                                                            index
-                                                        }
-                                                    >
-                                                        <td>
-                                                            <div className="fw-bold">
-                                                                {item
-                                                                    .product
-                                                                    ?.name ||
-                                                                    item
-                                                                        .product_name ||
-                                                                    item
-                                                                        .name ||
-                                                                    'Produk'}
-                                                            </div>
-                                                        </td>
-
-                                                        <td className="text-center fw-black">
-                                                            {formatNumber(
-                                                                item
-                                                                    .quantity
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </section>
-                    )}
-
-                    {/* SEKPiM ITEMS */}
-
-                    {type ===
-                        'borrowing' &&
-                        borrowItems
-                            .length >
-                            0 && (
-                        <section className="card border-0 shadow-sm rounded-5 mb-4">
-                            <div className="card-body p-4">
-                                <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
-                                    <div>
-                                        <h4 className="fw-black mb-1">
-                                            {isSekpimBorrow
-                                                ? 'Barang Dipinjam'
-                                                : 'Barang yang Diminta'}
-                                        </h4>
-
-                                        <p className="text-muted mb-0">
-                                            {isSekpimBorrow
-                                                ? 'Daftar barang yang diajukan untuk dipinjam.'
-                                                : 'Daftar barang yang diajukan pada Request Barang.'}
-                                        </p>
-                                    </div>
-
-                                    <span
-                                        className={`badge rounded-pill px-3 py-2 ${
-                                            isSekpimBorrow
-                                                ? 'bg-success-subtle text-success'
-                                                : 'bg-info-subtle text-info'
-                                        }`}
-                                    >
-                                        {
-                                            borrowItems.length
-                                        }{' '}
-                                        item
-                                    </span>
-                                </div>
-
-                                <div className="table-responsive">
-                                    <table className="table align-middle">
-                                        <thead className="table-light">
-                                            <tr>
-                                                <th>
-                                                    Barang
-                                                </th>
-
-                                                <th className="text-center">
-                                                    Jumlah
-                                                </th>
-                                            </tr>
-                                        </thead>
-
-                                        <tbody>
-                                            {borrowItems.map(
-                                                (
-                                                    item,
-                                                    index
-                                                ) => (
-                                                    <tr
-                                                        key={
-                                                            item.id ||
-                                                            index
-                                                        }
-                                                    >
-                                                        <td>
-                                                            <div className="fw-bold">
-                                                                {item
-                                                                    .product
-                                                                    ?.name ||
-                                                                    item
-                                                                        .product_name ||
-                                                                    item
-                                                                        .name ||
-                                                                    'Barang'}
-                                                            </div>
-                                                        </td>
-
-                                                        <td className="text-center fw-black">
-                                                            {formatNumber(
-                                                                item
-                                                                    .quantity
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </section>
-                    )}
-
-                    {/* DOCUMENT */}
-
-                    <section className="card border-0 shadow-sm rounded-5">
-                        <div className="card-body p-4">
-                            <h4 className="fw-black mb-1">
-                                Dokumen Pendukung
-                            </h4>
-
-                            <p className="text-muted mb-4">
-                                Lampiran dan bukti yang tersedia pada pengajuan.
-                            </p>
-
-                            <div className="row g-3">
-                                {type ===
-                                    'merchandise' && (
-                                    <FileCard
-                                        label="Bukti Undangan / Dokumen"
-                                        fileName={
-                                            requestData
-                                                .proof_file_name
-                                        }
-                                        fileUrl={
-                                            requestData
-                                                .proof_file_url ||
-                                            requestData
-                                                .proof_file_path
-                                        }
-                                        color="primary"
-                                    />
-                                )}
-
-                                {type ===
-                                    'humas' && (
-                                    <FileCard
-                                        label="Lampiran / Brief Kegiatan"
-                                        fileName={
-                                            requestData
-                                                .article_draft_name ||
-                                            'Lampiran / Brief Kegiatan'
-                                        }
-                                        fileUrl={
-                                            requestData
-                                                .article_draft_url ||
-                                            requestData
-                                                .article_draft_path
-                                        }
-                                        icon="bi-file-earmark-arrow-up-fill"
-                                        color="danger"
-                                    />
-                                )}
-
-                                {type ===
-                                    'borrowing' && (
-                                    <>
+                                <div className="row g-3">
+                                    {type === 'merchandise' && (
                                         <FileCard
-                                            label={
-                                                isSekpimBorrow
-                                                    ? 'Bukti Serah Terima'
-                                                    : 'Bukti Penyerahan Barang'
-                                            }
+                                            label="Bukti Undangan / Dokumen"
                                             fileName={
-                                                requestData
-                                                    .handover_evidence_name
+                                                requestData.proof_file_name
                                             }
                                             fileUrl={
-                                                handoverEvidenceUrl
+                                                requestData.proof_file_url ||
+                                                requestData.proof_file_path
                                             }
-                                            icon={
-                                                isSekpimBorrow
-                                                    ? 'bi-box-arrow-up-right'
-                                                    : 'bi-box2-heart-fill'
-                                            }
-                                            color={
-                                                isSekpimBorrow
-                                                    ? 'success'
-                                                    : 'info'
-                                            }
+                                            color="primary"
                                         />
+                                    )}
 
-                                        {isSekpimBorrow && (
+                                    {type === 'humas' && (
+                                        <FileCard
+                                            label="Lampiran / Brief Kegiatan"
+                                            fileName={
+                                                requestData.article_draft_name ||
+                                                'Lampiran / Brief Kegiatan'
+                                            }
+                                            fileUrl={
+                                                requestData.article_draft_url ||
+                                                requestData.article_draft_path
+                                            }
+                                            icon="bi-file-earmark-arrow-up-fill"
+                                            color="danger"
+                                        />
+                                    )}
+
+                                    {type === 'borrowing' && (
+                                        <>
                                             <FileCard
-                                                label="Bukti Pengembalian"
+                                                label={
+                                                    isSekpimBorrow
+                                                        ? 'Bukti Serah Terima'
+                                                        : 'Bukti Penyerahan Barang'
+                                                }
                                                 fileName={
-                                                    requestData
-                                                        .return_evidence_name
+                                                    requestData.handover_evidence_name
                                                 }
-                                                fileUrl={
-                                                    returnEvidenceUrl
+                                                fileUrl={handoverEvidenceUrl}
+                                                color={
+                                                    isSekpimBorrow
+                                                        ? 'success'
+                                                        : 'info'
                                                 }
-                                                icon="bi-box-arrow-in-down-left"
-                                                color="success"
                                             />
-                                        )}
-                                    </>
-                                )}
+
+                                            {isSekpimBorrow && (
+                                                <FileCard
+                                                    label="Bukti Pengembalian"
+                                                    fileName={
+                                                        requestData.return_evidence_name
+                                                    }
+                                                    fileUrl={returnEvidenceUrl}
+                                                    color="success"
+                                                />
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    </section>
+                        </section>
+                    )}
                 </div>
 
-                {/* RIGHT */}
+                {/* KOLOM KANAN */}
 
                 <div className="col-xl-4">
                     <section className="card border-0 shadow-sm rounded-5 mb-4">
@@ -2881,18 +1928,15 @@ export default function MyRequestDetailPage() {
                             </h4>
 
                             <p className="text-muted mb-4">
-                                Perkembangan proses pelayanan.
+                                Perkembangan proses pengajuan.
                             </p>
 
                             <div className="text-center p-4 rounded-4 bg-light mb-4">
                                 <div
                                     className={`mx-auto mb-3 rounded-circle d-flex align-items-center justify-content-center ${statusConfig.badgeClass}`}
                                     style={{
-                                        width:
-                                            70,
-
-                                        height:
-                                            70,
+                                        width: 70,
+                                        height: 70,
                                     }}
                                 >
                                     <i
@@ -2901,154 +1945,113 @@ export default function MyRequestDetailPage() {
                                 </div>
 
                                 <h5 className="fw-black">
-                                    {
-                                        statusConfig.label
-                                    }
+                                    {statusConfig.label}
                                 </h5>
 
                                 <p className="text-muted small mb-0">
-                                    {
-                                        statusConfig.description
-                                    }
+                                    {statusConfig.description}
                                 </p>
                             </div>
 
-                            {type ===
-                                'merchandise' &&
-                                requestData
-                                    .pickup_date && (
-                                <div className="p-3 rounded-4 bg-primary-subtle mb-4">
-                                    <div className="small text-muted mb-1">
-                                        Jadwal Pengambilan Merchandise
+                            {/* PENGAMBILAN MERCHANDISE */}
+
+                            {type === 'merchandise' &&
+                                requestData.pickup_date && (
+                                    <div className="p-3 rounded-4 bg-primary-subtle mb-4">
+                                        <div className="small text-muted mb-1">
+                                            Jadwal Pengambilan Merchandise
+                                        </div>
+
+                                        <div className="fw-black text-primary">
+                                            <i className="bi bi-calendar-check-fill me-2" />
+                                            {formatDate(
+                                                requestData.pickup_date
+                                            )}
+                                        </div>
                                     </div>
+                                )}
 
-                                    <div className="fw-black text-primary">
-                                        <i className="bi bi-calendar-check-fill me-2" />
+                            {/* PENGAMBILAN SEKPiM */}
 
-                                        {formatDate(
-                                            requestData
-                                                .pickup_date
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {type ===
-                                'borrowing' &&
-                                requestData
-                                    .borrow_date && (
-                                <div
-                                    className={`p-3 rounded-4 mb-4 ${
-                                        isSekpimBorrow
-                                            ? 'bg-success-subtle'
-                                            : 'bg-info-subtle'
-                                    }`}
-                                >
-                                    <div className="small text-muted mb-1">
-                                        Jadwal Pengambilan Barang
-                                    </div>
-
+                            {type === 'borrowing' &&
+                                requestData.borrow_date && (
                                     <div
-                                        className={`fw-black ${
-                                            isSekpimBorrow
-                                                ? 'text-success'
-                                                : 'text-info'
-                                        }`}
-                                    >
-                                        <i className="bi bi-calendar-check-fill me-2" />
-
-                                        {formatDate(
-                                            requestData
-                                                .borrow_date
-                                        )}
-                                    </div>
-
-                                    {isSekpimBorrow &&
-                                        requestData
-                                            .return_date && (
-                                            <>
-                                                <hr />
-
-                                                <div className="small text-muted mb-1">
-                                                    Jadwal Pengembalian
-                                                </div>
-
-                                                <div className="fw-black text-success">
-                                                    <i className="bi bi-calendar-minus-fill me-2" />
-
-                                                    {formatDate(
-                                                        requestData
-                                                            .return_date
-                                                    )}
-                                                </div>
-                                            </>
-                                        )}
-                                </div>
-                            )}
-
-                            <div className="request-timeline">
-                                {timelineItems.map(
-                                    (
-                                        item,
-                                        index
-                                    ) => (
-                                        <div
-                                            className={`request-timeline-item ${
-                                                item.status ===
-                                                'active'
-                                                    ? 'active'
-                                                    : item.status ===
-                                                        'rejected'
-                                                      ? 'rejected'
-                                                      : 'done'
+                                        className={`p-3 rounded-4 mb-4 ${isSekpimBorrow
+                                                ? 'bg-success-subtle'
+                                                : 'bg-info-subtle'
                                             }`}
-                                            key={`${item.label}-${index}`}
-                                        >
-                                            <div className="request-timeline-marker">
-                                                <i
-                                                    className={`bi ${item.icon}`}
-                                                />
-                                            </div>
+                                    >
+                                        <div className="small text-muted mb-1">
+                                            Jadwal Pengambilan Barang
+                                        </div>
 
-                                            <div className="request-timeline-content">
-                                                <div className="fw-black mb-1">
-                                                    {
-                                                        item.label
-                                                    }
-                                                </div>
+                                        <div className="fw-black">
+                                            {formatDate(
+                                                requestData.borrow_date
+                                            )}
+                                        </div>
 
-                                                <div className="small text-muted mb-1">
-                                                    {
-                                                        item.description
-                                                    }
-                                                </div>
+                                        {isSekpimBorrow &&
+                                            requestData.return_date && (
+                                                <>
+                                                    <hr />
 
-                                                {item.date && (
-                                                    <div className="small fw-bold text-danger">
-                                                        {formatDateTime(
-                                                            item.date
+                                                    <div className="small text-muted mb-1">
+                                                        Jadwal Pengembalian
+                                                    </div>
+
+                                                    <div className="fw-black text-success">
+                                                        {formatDate(
+                                                            requestData.return_date
                                                         )}
                                                     </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )
+                                                </>
+                                            )}
+                                    </div>
                                 )}
-                            </div>
+
+                            {/* JADWAL DIREKTORAT */}
+
+                            {isDirectorateSchedule && (
+                                <div className="p-3 rounded-4 bg-danger-subtle mb-4">
+                                    <div className="small text-muted mb-1">
+                                        Jadwal yang Diajukan
+                                    </div>
+
+                                    <div className="fw-black text-danger">
+                                        <i className="bi bi-calendar-event me-2" />
+                                        {formatDate(
+                                            requestData.event_date
+                                        )}
+                                    </div>
+
+                                    <div className="small mt-2">
+                                        <i className="bi bi-clock me-2" />
+                                        {requestData.all_day
+                                            ? 'Sepanjang hari'
+                                            : `${formatTime(
+                                                requestData.start_time
+                                            )} - ${formatTime(
+                                                requestData.end_time
+                                            )} WIB`}
+                                    </div>
+                                </div>
+                            )}
+
+                            <Timeline items={timelineItems} />
                         </div>
                     </section>
+
+                    {/* NAVIGASI */}
 
                     <section className="card border-0 shadow-sm rounded-5">
                         <div className="card-body p-4">
                             <div className="d-grid gap-2">
                                 <Link
-                                    to={
-                                        historyPath
-                                    }
+                                    to={historyPath}
                                     className="btn btn-danger rounded-pill"
                                 >
                                     <i className="bi bi-arrow-left me-2" />
-
                                     Kembali ke Riwayat
                                 </Link>
 
@@ -3056,13 +2059,10 @@ export default function MyRequestDetailPage() {
                                     type="button"
                                     className="btn btn-outline-secondary rounded-pill"
                                     onClick={() =>
-                                        navigate(
-                                            dashboardPath
-                                        )
+                                        navigate(dashboardPath)
                                     }
                                 >
                                     <i className="bi bi-house-door-fill me-2" />
-
                                     Dashboard
                                 </button>
                             </div>
@@ -3070,6 +2070,95 @@ export default function MyRequestDetailPage() {
                     </section>
                 </div>
             </div>
+
+            <style>{`
+                .my-request-detail-page {
+                    min-width: 0;
+                }
+
+                .my-request-detail-page .fw-black {
+                    font-weight: 900 !important;
+                }
+
+                .my-request-detail-page .text-break {
+                    overflow-wrap: anywhere;
+                }
+
+                .my-request-detail-page .request-timeline {
+                    position: relative;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0;
+                }
+
+                .my-request-detail-page .request-timeline-item {
+                    position: relative;
+                    display: grid;
+                    grid-template-columns: 40px minmax(0, 1fr);
+                    gap: 10px;
+                    padding-bottom: 24px;
+                }
+
+                .my-request-detail-page .request-timeline-item::before {
+                    content: '';
+                    position: absolute;
+                    left: 19px;
+                    top: 40px;
+                    bottom: 0;
+                    width: 2px;
+                    background: #e2e8f0;
+                }
+
+                .my-request-detail-page
+                .request-timeline-item:last-child::before {
+                    display: none;
+                }
+
+                .my-request-detail-page .request-timeline-marker {
+                    position: relative;
+                    z-index: 1;
+                    display: grid;
+                    place-items: center;
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 13px;
+                    background: #ecfdf5;
+                    color: #047857;
+                }
+
+                .my-request-detail-page
+                .request-timeline-item.active
+                .request-timeline-marker {
+                    background: #fef3c7;
+                    color: #b45309;
+                }
+
+                .my-request-detail-page
+                .request-timeline-item.rejected
+                .request-timeline-marker {
+                    background: #fef2f2;
+                    color: #dc2626;
+                }
+
+                .my-request-detail-page .request-timeline-content {
+                    min-width: 0;
+                    padding-top: 3px;
+                }
+
+                @media (max-width: 767px) {
+                    .my-request-detail-page h2 {
+                        font-size: 1.45rem;
+                    }
+
+                    .my-request-detail-page .card-body {
+                        padding: 18px !important;
+                    }
+
+                    .my-request-detail-page .row {
+                        --bs-gutter-x: 12px;
+                    }
+                }
+            `}</style>
         </div>
     );
 }

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\BorrowRequestController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EventScheduleController;
+use App\Http\Controllers\Api\EventScheduleRequestController;
 use App\Http\Controllers\Api\HumasServiceRequestController;
 use App\Http\Controllers\Api\HumasSettingController;
 use App\Http\Controllers\Api\OrderController;
@@ -14,824 +15,588 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Public Routes
+| PUBLIC
 |--------------------------------------------------------------------------
 */
 
-Route::post(
-    '/admin/login',
-    [
+Route::post('/admin/login', [
+    AuthController::class,
+    'login',
+]);
+
+Route::get('/event-schedules/public', [
+    EventScheduleController::class,
+    'publicIndex',
+]);
+
+/*
+|--------------------------------------------------------------------------
+| AUTHENTICATED
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth:sanctum')->group(function (): void {
+
+    /*
+    |--------------------------------------------------------------------------
+    | AUTH
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/admin/me', [
         AuthController::class,
-        'login',
-    ]
-);
+        'me',
+    ]);
 
-/*
-|--------------------------------------------------------------------------
-| Public Jadwal Direktorat
-|--------------------------------------------------------------------------
-|
-| Digunakan pada halaman login.
-|
-| Hanya menampilkan agenda dengan:
-| is_public = true
-|
-*/
-
-Route::get(
-    '/event-schedules/public',
-    [
-        EventScheduleController::class,
-        'publicIndex',
-    ]
-);
-
-/*
-|--------------------------------------------------------------------------
-| Authenticated Routes
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware(
-    'auth:sanctum'
-)->group(function (): void {
-    /*
-    |--------------------------------------------------------------------------
-    | Authentication
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get(
-        '/admin/me',
-        [
-            AuthController::class,
-            'me',
-        ]
-    );
-
-    Route::post(
-        '/admin/logout',
-        [
-            AuthController::class,
-            'logout',
-        ]
-    );
+    Route::post('/admin/logout', [
+        AuthController::class,
+        'logout',
+    ]);
 
     /*
     |--------------------------------------------------------------------------
-    | Dashboard
+    | DASHBOARD
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:dashboard.view'
-    )->group(function (): void {
-        Route::get(
-            '/dashboard/analytics',
-            [
+    Route::middleware('permission:dashboard.view')
+        ->group(function (): void {
+            Route::get('/dashboard/analytics', [
                 DashboardController::class,
                 'analytics',
-            ]
-        );
+            ]);
 
-        Route::get(
-            '/dashboard/export',
-            [
+            Route::get('/dashboard/export', [
                 DashboardController::class,
                 'export',
-            ]
-        );
-    });
+            ]);
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Jadwal Direktorat
+    | JADWAL DIREKTORAT - KALENDER
     |--------------------------------------------------------------------------
     |
-    | READ:
-    | Semua user yang sudah login.
-    |
-    | CREATE / UPDATE / DELETE:
-    | Dibatasi di EventScheduleController:
-    |
-    | - admin
-    | - admin_humas
-    | - admin_sekpim
-    | - superadmin
+    | Semua user login dapat melihat.
+    | Hak kelola agenda divalidasi oleh EventScheduleController.
     |
     */
 
-    Route::get(
-        '/event-schedules',
-        [
-            EventScheduleController::class,
-            'index',
-        ]
-    );
+    Route::get('/event-schedules', [
+        EventScheduleController::class,
+        'index',
+    ]);
+
+    Route::get('/event-schedules/activity', [
+        EventScheduleController::class,
+        'activity',
+    ]);
+
+    Route::get('/event-schedules/{eventSchedule}', [
+        EventScheduleController::class,
+        'show',
+    ])->whereNumber('eventSchedule');
+
+    Route::post('/event-schedules', [
+        EventScheduleController::class,
+        'store',
+    ]);
+
+    Route::put('/event-schedules/{eventSchedule}', [
+        EventScheduleController::class,
+        'update',
+    ])->whereNumber('eventSchedule');
+
+    Route::patch('/event-schedules/{eventSchedule}', [
+        EventScheduleController::class,
+        'update',
+    ])->whereNumber('eventSchedule');
+
+    Route::delete('/event-schedules/{eventSchedule}', [
+        EventScheduleController::class,
+        'destroy',
+    ])->whereNumber('eventSchedule');
 
     /*
     |--------------------------------------------------------------------------
-    | Activity Log Jadwal Direktorat
+    | REQUEST JADWAL DIREKTORAT - BARU
     |--------------------------------------------------------------------------
     |
-    | Hanya dapat diakses role admin yang diizinkan controller.
-    | History tetap dapat dibaca meskipun agenda asal sudah dihapus.
+    | Semua user login:
+    | - membuat pengajuan
+    | - melihat pengajuan sendiri
+    | - melihat detail pengajuan miliknya
+    |
+    | Admin / Superadmin:
+    | - melihat semua pengajuan
+    | - edit pending
+    | - approve
+    | - reject
+    |
+    | Otorisasi dilakukan pada controller.
     |
     */
 
-    Route::get(
-        '/event-schedules/activity',
-        [
-            EventScheduleController::class,
-            'activity',
-        ]
-    );
+    Route::get('/my-event-schedule-requests', [
+        EventScheduleRequestController::class,
+        'myRequests',
+    ]);
 
-    Route::get(
-        '/event-schedules/{eventSchedule}',
-        [
-            EventScheduleController::class,
-            'show',
-        ]
-    )->whereNumber(
-        'eventSchedule'
-    );
+    Route::get('/event-schedule-requests', [
+        EventScheduleRequestController::class,
+        'index',
+    ]);
 
-    Route::post(
-        '/event-schedules',
-        [
-            EventScheduleController::class,
-            'store',
-        ]
-    );
+    Route::post('/event-schedule-requests', [
+        EventScheduleRequestController::class,
+        'store',
+    ]);
 
-    Route::put(
-        '/event-schedules/{eventSchedule}',
-        [
-            EventScheduleController::class,
-            'update',
-        ]
-    )->whereNumber(
-        'eventSchedule'
-    );
+    Route::get('/event-schedule-requests/{scheduleRequest}', [
+        EventScheduleRequestController::class,
+        'show',
+    ])->whereNumber('scheduleRequest');
 
-    Route::patch(
-        '/event-schedules/{eventSchedule}',
-        [
-            EventScheduleController::class,
-            'update',
-        ]
-    )->whereNumber(
-        'eventSchedule'
-    );
+    Route::put('/event-schedule-requests/{scheduleRequest}', [
+        EventScheduleRequestController::class,
+        'update',
+    ])->whereNumber('scheduleRequest');
 
-    Route::delete(
-        '/event-schedules/{eventSchedule}',
-        [
-            EventScheduleController::class,
-            'destroy',
-        ]
-    )->whereNumber(
-        'eventSchedule'
-    );
+    Route::patch('/event-schedule-requests/{scheduleRequest}', [
+        EventScheduleRequestController::class,
+        'update',
+    ])->whereNumber('scheduleRequest');
+
+    Route::put('/event-schedule-requests/{scheduleRequest}/approve', [
+        EventScheduleRequestController::class,
+        'approve',
+    ])->whereNumber('scheduleRequest');
+
+    Route::put('/event-schedule-requests/{scheduleRequest}/reject', [
+        EventScheduleRequestController::class,
+        'reject',
+    ])->whereNumber('scheduleRequest');
 
     /*
     |--------------------------------------------------------------------------
-    | Pengaturan Layanan Humas
+    | PENGATURAN LAYANAN
     |--------------------------------------------------------------------------
     */
 
-    Route::get(
-        '/humas-settings',
-        [
-            HumasSettingController::class,
-            'show',
-        ]
-    );
+    Route::get('/humas-settings', [
+        HumasSettingController::class,
+        'show',
+    ]);
 
-    Route::put(
-        '/humas-settings/service',
-        [
-            HumasSettingController::class,
-            'updateService',
-        ]
-    );
+    Route::put('/humas-settings/service', [
+        HumasSettingController::class,
+        'updateService',
+    ]);
 
-    Route::put(
-        '/humas-settings/submission-rule',
-        [
-            HumasSettingController::class,
-            'updateSubmissionRule',
-        ]
-    );
+    Route::put('/humas-settings/submission-rule', [
+        HumasSettingController::class,
+        'updateSubmissionRule',
+    ]);
 
     /*
     |--------------------------------------------------------------------------
-    | Kategori - Read
+    | KATEGORI - READ
     |--------------------------------------------------------------------------
     */
 
     Route::middleware(
         'permission:categories.view,categories.manage,products.manage,request.merchandise.create,request.borrowing.create'
     )->group(function (): void {
-        Route::get(
-            '/categories',
-            [
-                CategoryController::class,
-                'index',
-            ]
-        );
+        Route::get('/categories', [
+            CategoryController::class,
+            'index',
+        ]);
 
-        Route::get(
-            '/categories/{category}',
-            [
-                CategoryController::class,
-                'show',
-            ]
-        )->whereNumber(
-            'category'
-        );
+        Route::get('/categories/{category}', [
+            CategoryController::class,
+            'show',
+        ])->whereNumber('category');
     });
 
     /*
     |--------------------------------------------------------------------------
-    | Produk - Read
+    | PRODUK - READ
     |--------------------------------------------------------------------------
     */
 
     Route::middleware(
         'permission:products.view,products.manage,request.merchandise.create,request.borrowing.create'
     )->group(function (): void {
-        Route::get(
-            '/products',
-            [
-                ProductController::class,
-                'index',
-            ]
-        );
+        Route::get('/products', [
+            ProductController::class,
+            'index',
+        ]);
 
-        Route::get(
-            '/products/{product}',
-            [
-                ProductController::class,
-                'show',
-            ]
-        )->whereNumber(
-            'product'
-        );
+        Route::get('/products/{product}', [
+            ProductController::class,
+            'show',
+        ])->whereNumber('product');
     });
 
     /*
     |--------------------------------------------------------------------------
-    | Riwayat Pengajuan Pribadi
+    | RIWAYAT PENGAJUAN PRIBADI
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:request.history.view'
-    )->group(function (): void {
-        Route::get(
-            '/my-orders',
-            [
+    Route::middleware('permission:request.history.view')
+        ->group(function (): void {
+            Route::get('/my-orders', [
                 OrderController::class,
                 'myOrders',
-            ]
-        );
+            ]);
 
-        Route::get(
-            '/my-humas-service-requests',
-            [
+            Route::get('/my-humas-service-requests', [
                 HumasServiceRequestController::class,
                 'myHumasServiceRequests',
-            ]
-        );
+            ]);
 
-        Route::get(
-            '/my-borrow-requests',
-            [
+            Route::get('/my-borrow-requests', [
                 BorrowRequestController::class,
                 'myBorrowRequests',
-            ]
-        );
-    });
+            ]);
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Pengajuan Merchandise
+    | MERCHANDISE - STORE
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:request.merchandise.create'
-    )->group(function (): void {
-        Route::post(
-            '/orders',
-            [
+    Route::middleware('permission:request.merchandise.create')
+        ->group(function (): void {
+            Route::post('/orders', [
                 OrderController::class,
                 'store',
-            ]
-        );
-    });
+            ]);
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Detail Merchandise
+    | MERCHANDISE - DETAIL
     |--------------------------------------------------------------------------
     */
 
     Route::middleware(
         'permission:request.history.view,approval.merchandise.view'
     )->group(function (): void {
-        Route::get(
-            '/orders/{id}',
-            [
-                OrderController::class,
-                'show',
-            ]
-        )->whereNumber(
-            'id'
-        );
+        Route::get('/orders/{id}', [
+            OrderController::class,
+            'show',
+        ])->whereNumber('id');
     });
 
     /*
     |--------------------------------------------------------------------------
-    | Approval Merchandise - Read
+    | MERCHANDISE - APPROVAL READ
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:approval.merchandise.view'
-    )->group(function (): void {
-        Route::get(
-            '/orders',
-            [
+    Route::middleware('permission:approval.merchandise.view')
+        ->group(function (): void {
+            Route::get('/orders', [
                 OrderController::class,
                 'index',
-            ]
-        );
-    });
+            ]);
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Approval Merchandise - Process
+    | MERCHANDISE - APPROVAL PROCESS
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:approval.merchandise.process'
-    )->group(function (): void {
-        Route::put(
-            '/orders/{id}/approve',
-            [
+    Route::middleware('permission:approval.merchandise.process')
+        ->group(function (): void {
+            Route::put('/orders/{id}/approve', [
                 OrderController::class,
                 'approve',
-            ]
-        )->whereNumber(
-            'id'
-        );
+            ])->whereNumber('id');
 
-        Route::put(
-            '/orders/{id}/revision',
-            [
+            Route::put('/orders/{id}/revision', [
                 OrderController::class,
                 'revision',
-            ]
-        )->whereNumber(
-            'id'
-        );
+            ])->whereNumber('id');
 
-        Route::put(
-            '/orders/{id}/reject',
-            [
+            Route::put('/orders/{id}/reject', [
                 OrderController::class,
                 'reject',
-            ]
-        )->whereNumber(
-            'id'
-        );
+            ])->whereNumber('id');
 
-        Route::put(
-            '/orders/{id}/complete',
-            [
+            Route::put('/orders/{id}/complete', [
                 OrderController::class,
                 'complete',
-            ]
-        )->whereNumber(
-            'id'
-        );
+            ])->whereNumber('id');
 
-        Route::post(
-            '/orders/{id}/resubmit',
-            [
+            Route::post('/orders/{id}/resubmit', [
                 OrderController::class,
                 'resubmit',
-            ]
-        )->whereNumber(
-            'id'
-        );
-    });
+            ])->whereNumber('id');
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Pengajuan Layanan Humas
+    | HUMAS - STORE
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:request.humas.create'
-    )->group(function (): void {
-        Route::post(
-            '/humas-service-requests',
-            [
+    Route::middleware('permission:request.humas.create')
+        ->group(function (): void {
+            Route::post('/humas-service-requests', [
                 HumasServiceRequestController::class,
                 'store',
-            ]
-        );
-    });
+            ]);
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Detail Layanan Humas
+    | HUMAS - DETAIL
     |--------------------------------------------------------------------------
     */
 
     Route::middleware(
         'permission:request.history.view,approval.humas.view'
     )->group(function (): void {
-        Route::get(
-            '/humas-service-requests/{id}',
-            [
-                HumasServiceRequestController::class,
-                'show',
-            ]
-        )->whereNumber(
-            'id'
-        );
+        Route::get('/humas-service-requests/{id}', [
+            HumasServiceRequestController::class,
+            'show',
+        ])->whereNumber('id');
     });
 
     /*
     |--------------------------------------------------------------------------
-    | Approval Layanan Humas - Read
+    | HUMAS - APPROVAL READ
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:approval.humas.view'
-    )->group(function (): void {
-        Route::get(
-            '/humas-service-requests',
-            [
+    Route::middleware('permission:approval.humas.view')
+        ->group(function (): void {
+            Route::get('/humas-service-requests', [
                 HumasServiceRequestController::class,
                 'index',
-            ]
-        );
-    });
+            ]);
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Approval Layanan Humas - Process
+    | HUMAS - APPROVAL PROCESS
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:approval.humas.process'
-    )->group(function (): void {
-        Route::put(
-            '/humas-service-requests/{id}/approve',
-            [
+    Route::middleware('permission:approval.humas.process')
+        ->group(function (): void {
+            Route::put('/humas-service-requests/{id}/approve', [
                 HumasServiceRequestController::class,
                 'approve',
-            ]
-        )->whereNumber(
-            'id'
-        );
+            ])->whereNumber('id');
 
-        Route::put(
-            '/humas-service-requests/{id}/reject',
-            [
+            Route::put('/humas-service-requests/{id}/reject', [
                 HumasServiceRequestController::class,
                 'reject',
-            ]
-        )->whereNumber(
-            'id'
-        );
+            ])->whereNumber('id');
 
-        Route::put(
-            '/humas-service-requests/{id}/complete',
-            [
+            Route::put('/humas-service-requests/{id}/complete', [
                 HumasServiceRequestController::class,
                 'complete',
-            ]
-        )->whereNumber(
-            'id'
-        );
-    });
+            ])->whereNumber('id');
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Pengajuan SEKPiM
+    | SEKPiM - STORE
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:request.borrowing.create'
-    )->group(function (): void {
-        Route::post(
-            '/borrow-requests',
-            [
+    Route::middleware('permission:request.borrowing.create')
+        ->group(function (): void {
+            Route::post('/borrow-requests', [
                 BorrowRequestController::class,
                 'store',
-            ]
-        );
-    });
+            ]);
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Detail Pengajuan SEKPiM
+    | SEKPiM - DETAIL
     |--------------------------------------------------------------------------
     */
 
     Route::middleware(
         'permission:request.history.view,approval.borrowing.view'
     )->group(function (): void {
-        Route::get(
-            '/borrow-requests/{id}',
-            [
-                BorrowRequestController::class,
-                'show',
-            ]
-        )->whereNumber(
-            'id'
-        );
+        Route::get('/borrow-requests/{id}', [
+            BorrowRequestController::class,
+            'show',
+        ])->whereNumber('id');
     });
 
     /*
     |--------------------------------------------------------------------------
-    | Approval SEKPiM - Read
+    | SEKPiM - APPROVAL READ
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:approval.borrowing.view'
-    )->group(function (): void {
-        Route::get(
-            '/borrow-requests',
-            [
+    Route::middleware('permission:approval.borrowing.view')
+        ->group(function (): void {
+            Route::get('/borrow-requests', [
                 BorrowRequestController::class,
                 'index',
-            ]
-        );
-    });
+            ]);
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Approval SEKPiM - Process
+    | SEKPiM - APPROVAL PROCESS
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:approval.borrowing.process'
-    )->group(function (): void {
-        Route::put(
-            '/borrow-requests/{id}/approve',
-            [
+    Route::middleware('permission:approval.borrowing.process')
+        ->group(function (): void {
+            Route::put('/borrow-requests/{id}/approve', [
                 BorrowRequestController::class,
                 'approve',
-            ]
-        )->whereNumber(
-            'id'
-        );
+            ])->whereNumber('id');
 
-        Route::put(
-            '/borrow-requests/{id}/reject',
-            [
+            Route::put('/borrow-requests/{id}/reject', [
                 BorrowRequestController::class,
                 'reject',
-            ]
-        )->whereNumber(
-            'id'
-        );
+            ])->whereNumber('id');
 
-        Route::put(
-            '/borrow-requests/{id}/borrowed',
-            [
+            Route::put('/borrow-requests/{id}/borrowed', [
                 BorrowRequestController::class,
                 'borrowed',
-            ]
-        )->whereNumber(
-            'id'
-        );
+            ])->whereNumber('id');
 
-        Route::put(
-            '/borrow-requests/{id}/returned',
-            [
+            Route::put('/borrow-requests/{id}/returned', [
                 BorrowRequestController::class,
                 'returned',
-            ]
-        )->whereNumber(
-            'id'
-        );
+            ])->whereNumber('id');
 
-        Route::put(
-            '/borrow-requests/{id}/complete',
-            [
+            Route::put('/borrow-requests/{id}/complete', [
                 BorrowRequestController::class,
                 'complete',
-            ]
-        )->whereNumber(
-            'id'
-        );
-    });
+            ])->whereNumber('id');
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Manajemen Produk
+    | PRODUK - MANAGEMENT
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:products.manage'
-    )->group(function (): void {
-        Route::post(
-            '/products',
-            [
+    Route::middleware('permission:products.manage')
+        ->group(function (): void {
+            Route::post('/products', [
                 ProductController::class,
                 'store',
-            ]
-        );
+            ]);
 
-        Route::put(
-            '/products/{product}',
-            [
+            Route::put('/products/{product}', [
                 ProductController::class,
                 'update',
-            ]
-        )->whereNumber(
-            'product'
-        );
+            ])->whereNumber('product');
 
-        Route::patch(
-            '/products/{product}',
-            [
+            Route::patch('/products/{product}', [
                 ProductController::class,
                 'update',
-            ]
-        )->whereNumber(
-            'product'
-        );
+            ])->whereNumber('product');
 
-        Route::delete(
-            '/products/{product}',
-            [
+            Route::delete('/products/{product}', [
                 ProductController::class,
                 'destroy',
-            ]
-        )->whereNumber(
-            'product'
-        );
-    });
+            ])->whereNumber('product');
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Manajemen Kategori
+    | KATEGORI - MANAGEMENT
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(
-        'permission:categories.manage'
-    )->group(function (): void {
-        Route::post(
-            '/categories',
-            [
+    Route::middleware('permission:categories.manage')
+        ->group(function (): void {
+            Route::post('/categories', [
                 CategoryController::class,
                 'store',
-            ]
-        );
+            ]);
 
-        Route::put(
-            '/categories/{category}',
-            [
+            Route::put('/categories/{category}', [
                 CategoryController::class,
                 'update',
-            ]
-        )->whereNumber(
-            'category'
-        );
+            ])->whereNumber('category');
 
-        Route::patch(
-            '/categories/{category}',
-            [
+            Route::patch('/categories/{category}', [
                 CategoryController::class,
                 'update',
-            ]
-        )->whereNumber(
-            'category'
-        );
+            ])->whereNumber('category');
 
-        Route::delete(
-            '/categories/{category}',
-            [
+            Route::delete('/categories/{category}', [
                 CategoryController::class,
                 'destroy',
-            ]
-        )->whereNumber(
-            'category'
-        );
-    });
+            ])->whereNumber('category');
+        });
 
     /*
     |--------------------------------------------------------------------------
-    | Manajemen User
+    | USER MANAGEMENT
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix(
-        'admin'
-    )->group(function (): void {
-        Route::get(
-            '/users/permissions',
-            [
-                UserController::class,
-                'permissions',
-            ]
-        )->middleware(
-            'permission:users.manage'
-        );
+    Route::prefix('admin')->group(function (): void {
+        Route::get('/users/permissions', [
+            UserController::class,
+            'permissions',
+        ])->middleware('permission:users.manage');
 
-        Route::get(
-            '/users',
-            [
-                UserController::class,
-                'index',
-            ]
-        )->middleware(
+        Route::get('/users', [
+            UserController::class,
+            'index',
+        ])->middleware(
             'permission:users.view,users.manage'
         );
 
-        Route::post(
-            '/users',
-            [
-                UserController::class,
-                'store',
-            ]
-        )->middleware(
-            'permission:users.manage'
-        );
+        Route::post('/users', [
+            UserController::class,
+            'store',
+        ])->middleware('permission:users.manage');
 
-        Route::get(
-            '/users/{user}',
-            [
-                UserController::class,
-                'show',
-            ]
-        )
-            ->whereNumber(
-                'user'
-            )
+        Route::get('/users/{user}', [
+            UserController::class,
+            'show',
+        ])
+            ->whereNumber('user')
             ->middleware(
                 'permission:users.view,users.manage'
             );
 
-        Route::put(
-            '/users/{user}',
-            [
-                UserController::class,
-                'update',
-            ]
-        )
-            ->whereNumber(
-                'user'
-            )
-            ->middleware(
-                'permission:users.manage'
-            );
+        Route::put('/users/{user}', [
+            UserController::class,
+            'update',
+        ])
+            ->whereNumber('user')
+            ->middleware('permission:users.manage');
 
-        Route::patch(
-            '/admin/users/{user}',
-            [
-                UserController::class,
-                'update',
-            ]
-        )
-            ->whereNumber(
-                'user'
-            )
-            ->middleware(
-                'permission:users.manage'
-            );
+        /*
+         * Mempertahankan route PATCH persis dari
+         * api.php sebelumnya.
+         */
+        Route::patch('/admin/users/{user}', [
+            UserController::class,
+            'update',
+        ])
+            ->whereNumber('user')
+            ->middleware('permission:users.manage');
 
-        Route::delete(
-            '/users/{user}',
-            [
-                UserController::class,
-                'destroy',
-            ]
-        )
-            ->whereNumber(
-                'user'
-            )
-            ->middleware(
-                'permission:users.manage'
-            );
+        Route::delete('/users/{user}', [
+            UserController::class,
+            'destroy',
+        ])
+            ->whereNumber('user')
+            ->middleware('permission:users.manage');
     });
 });
