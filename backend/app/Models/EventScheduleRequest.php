@@ -13,6 +13,8 @@ class EventScheduleRequest extends Model
 
     protected $fillable = [
         'requested_by',
+        'requester_unit',
+        'pic_name',
         'directorate',
         'title',
         'description',
