@@ -81,7 +81,7 @@ const canAccessRequestedPath =
         }
 
         /*
-         * Jadwal Direktur tersedia
+         * Jadwal Direktorat tersedia
          * untuk seluruh akun login.
          */
         if (

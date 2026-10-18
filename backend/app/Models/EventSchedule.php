@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class EventSchedule extends Model
 {
     protected $fillable = [
+        'directorate',
         'title',
         'description',
         'event_date',
@@ -59,7 +60,7 @@ class EventSchedule extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | HISTORIES
+    | HISTORY
     |--------------------------------------------------------------------------
     */
 

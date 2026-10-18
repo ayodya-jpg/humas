@@ -22,12 +22,6 @@ class EventScheduleHistory extends Model
         'new_values' => 'array',
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | RELATIONSHIPS
-    |--------------------------------------------------------------------------
-    */
-
     public function eventSchedule(): BelongsTo
     {
         return $this->belongsTo(

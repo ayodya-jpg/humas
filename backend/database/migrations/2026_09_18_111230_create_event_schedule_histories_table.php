@@ -8,53 +8,138 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('event_schedule_histories', function (Blueprint $table) {
-            $table->id();
+        Schema::create(
+            'event_schedule_histories',
+            function (Blueprint $table) {
+                $table->id();
 
-            $table
-                ->foreignId('event_schedule_id')
-                ->nullable()
-                ->constrained('event_schedules')
-                ->nullOnDelete();
+                /*
+                |--------------------------------------------------------------------------
+                | EVENT
+                |--------------------------------------------------------------------------
+                |
+                | nullable karena ketika agenda dihapus,
+                | history tetap disimpan.
+                |
+                */
 
-            $table
-                ->foreignId('user_id')
-                ->nullable()
-                ->constrained('users')
-                ->nullOnDelete();
+                $table
+                    ->foreignId(
+                        'event_schedule_id'
+                    )
+                    ->nullable()
+                    ->constrained(
+                        'event_schedules'
+                    )
+                    ->nullOnDelete();
 
-            $table->string('action', 30);
+                /*
+                |--------------------------------------------------------------------------
+                | USER
+                |--------------------------------------------------------------------------
+                |
+                | nullable agar history tetap tersimpan
+                | apabila akun admin suatu saat dihapus.
+                |
+                */
 
-            $table
-                ->string('event_title', 255)
-                ->nullable();
+                $table
+                    ->foreignId(
+                        'user_id'
+                    )
+                    ->nullable()
+                    ->constrained(
+                        'users'
+                    )
+                    ->nullOnDelete();
 
-            $table
-                ->json('old_values')
-                ->nullable();
+                /*
+                |--------------------------------------------------------------------------
+                | ACTION
+                |--------------------------------------------------------------------------
+                |
+                | created
+                | updated
+                | deleted
+                |
+                */
 
-            $table
-                ->json('new_values')
-                ->nullable();
+                $table
+                    ->string(
+                        'action',
+                        30
+                    );
 
-            $table
-                ->text('description')
-                ->nullable();
+                /*
+                |--------------------------------------------------------------------------
+                | EVENT TITLE
+                |--------------------------------------------------------------------------
+                |
+                | Disimpan terpisah agar nama agenda
+                | masih diketahui setelah agenda dihapus.
+                |
+                */
 
-            $table->timestamps();
+                $table
+                    ->string(
+                        'event_title',
+                        255
+                    )
+                    ->nullable();
 
-            $table->index([
-                'event_schedule_id',
-                'created_at',
-            ]);
+                /*
+                |--------------------------------------------------------------------------
+                | CHANGES
+                |--------------------------------------------------------------------------
+                */
 
-            $table->index([
-                'user_id',
-                'created_at',
-            ]);
+                $table
+                    ->json(
+                        'old_values'
+                    )
+                    ->nullable();
 
-            $table->index('action');
-        });
+                $table
+                    ->json(
+                        'new_values'
+                    )
+                    ->nullable();
+
+                /*
+                |--------------------------------------------------------------------------
+                | DESCRIPTION
+                |--------------------------------------------------------------------------
+                */
+
+                $table
+                    ->text(
+                        'description'
+                    )
+                    ->nullable();
+
+                $table->timestamps();
+
+                /*
+                |--------------------------------------------------------------------------
+                | INDEX
+                |--------------------------------------------------------------------------
+                */
+
+                $table->index([
+                    'event_schedule_id',
+                    'created_at',
+                ]);
+
+                $table->index([
+                    'user_id',
+                    'created_at',
+                ]);
+
+                $table->index(
+                    'action'
+                );
+            }
+        );
     }
 
     public function down(): void
