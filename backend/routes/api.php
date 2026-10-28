@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Http\Controllers\Api\AuthController;
@@ -8,6 +9,7 @@ use App\Http\Controllers\Api\EventScheduleController;
 use App\Http\Controllers\Api\EventScheduleRequestController;
 use App\Http\Controllers\Api\HumasServiceRequestController;
 use App\Http\Controllers\Api\HumasSettingController;
+use App\Http\Controllers\Api\IntegratedCalendarController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\UserController;
@@ -74,11 +76,32 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     /*
     |--------------------------------------------------------------------------
+    | KALENDER KEGIATAN TERINTEGRASI - BARU
+    |--------------------------------------------------------------------------
+    |
+    | Menggabungkan:
+    | - Agenda Direktorat resmi
+    | - Request Jadwal Direktorat pending
+    | - Pengajuan layanan HUMAS
+    | - Pengajuan peminjaman SEKPiM
+    |
+    | Hanya admin yang diperbolehkan membaca data
+    | gabungan. Validasi role dilakukan oleh controller.
+    |
+    */
+
+    Route::get('/integrated-calendar/events', [
+        IntegratedCalendarController::class,
+        'index',
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
     | JADWAL DIREKTORAT - KALENDER
     |--------------------------------------------------------------------------
     |
-    | Semua user login dapat melihat.
-    | Hak kelola agenda divalidasi oleh EventScheduleController.
+    | Semua user login dapat melihat jadwal.
+    | Hak kelola divalidasi oleh controller.
     |
     */
 
@@ -119,22 +142,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     /*
     |--------------------------------------------------------------------------
-    | REQUEST JADWAL DIREKTORAT - BARU
+    | REQUEST JADWAL DIREKTORAT
     |--------------------------------------------------------------------------
-    |
-    | Semua user login:
-    | - membuat pengajuan
-    | - melihat pengajuan sendiri
-    | - melihat detail pengajuan miliknya
-    |
-    | Admin / Superadmin:
-    | - melihat semua pengajuan
-    | - edit pending
-    | - approve
-    | - reject
-    |
-    | Otorisasi dilakukan pada controller.
-    |
     */
 
     Route::get('/my-event-schedule-requests', [
@@ -556,9 +565,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/users', [
             UserController::class,
             'index',
-        ])->middleware(
-            'permission:users.view,users.manage'
-        );
+        ])->middleware('permission:users.view,users.manage');
 
         Route::post('/users', [
             UserController::class,
@@ -570,9 +577,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
             'show',
         ])
             ->whereNumber('user')
-            ->middleware(
-                'permission:users.view,users.manage'
-            );
+            ->middleware('permission:users.view,users.manage');
 
         Route::put('/users/{user}', [
             UserController::class,
@@ -581,10 +586,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
             ->whereNumber('user')
             ->middleware('permission:users.manage');
 
-        /*
-         * Mempertahankan route PATCH persis dari
-         * api.php sebelumnya.
-         */
+        // Dipertahankan dari route yang kamu kirim.
         Route::patch('/admin/users/{user}', [
             UserController::class,
             'update',
