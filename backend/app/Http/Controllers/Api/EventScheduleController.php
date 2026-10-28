@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Http\Controllers\Api;
@@ -53,6 +52,12 @@ class EventScheduleController extends Controller
         'color',
         'is_public',
     ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | ACCESS CONTROL
+    |--------------------------------------------------------------------------
+    */
 
     private function canManage(Request $request): bool
     {

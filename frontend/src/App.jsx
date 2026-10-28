@@ -1,3 +1,4 @@
+
 import {
     Navigate,
     Route,
@@ -45,9 +46,11 @@ import MyRequestDetailPage from './pages/requests/MyRequestDetailPage';
 import DirectorSchedulePage from './pages/schedule/DirectorSchedulePage';
 import EventScheduleActivityPage from './pages/schedule/EventScheduleActivityPage';
 
-// FITUR BARU: Request Jadwal Direktorat
 import DirectorateScheduleRequestPage from './pages/requests/DirectorateScheduleRequestPage';
 import DirectorateScheduleApprovalPage from './pages/schedule/DirectorateScheduleApprovalPage';
+
+// BARU: Kalender kegiatan terintegrasi
+import IntegratedCalendarPage from './pages/schedule/IntegratedCalendarPage';
 
 import UnauthorizedPage from './pages/errors/UnauthorizedPage';
 import NotFoundPage from './pages/errors/NotFoundPage';
@@ -153,7 +156,7 @@ function App() {
                         }
                     />
 
-                    {/* BARU: Pengajuan Jadwal Direktorat */}
+                    {/* Request Jadwal Direktorat */}
 
                     <Route
                         path="request/directorate-schedule"
@@ -185,7 +188,7 @@ function App() {
                         }
                     />
 
-                    {/* Layanan Humas */}
+                    {/* Layanan HUMAS */}
 
                     <Route
                         path="request/humas-service"
@@ -287,6 +290,17 @@ function App() {
                         }
                     />
 
+                    {/* BARU: Kalender Kegiatan Terintegrasi */}
+
+                    <Route
+                        path="integrated-calendar"
+                        element={
+                            <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                                <IntegratedCalendarPage />
+                            </ProtectedRoute>
+                        }
+                    />
+
                     {/* Riwayat Aktivitas Jadwal */}
 
                     <Route
@@ -298,7 +312,7 @@ function App() {
                         }
                     />
 
-                    {/* BARU: Pengajuan Jadwal Direktorat oleh admin */}
+                    {/* Pengajuan Jadwal Direktorat oleh Admin */}
 
                     <Route
                         path="request/directorate-schedule"
@@ -309,7 +323,7 @@ function App() {
                         }
                     />
 
-                    {/* BARU: Approval Jadwal Direktorat */}
+                    {/* Approval Jadwal Direktorat */}
 
                     <Route
                         path="director-schedule/requests"
@@ -343,7 +357,7 @@ function App() {
                         }
                     />
 
-                    {/* Pengajuan Humas */}
+                    {/* Pengajuan HUMAS */}
 
                     <Route
                         path="request/humas-service"
@@ -423,7 +437,7 @@ function App() {
                         }
                     />
 
-                    {/* Approval Humas */}
+                    {/* Approval HUMAS */}
 
                     <Route
                         path="humas-services"
