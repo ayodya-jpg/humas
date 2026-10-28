@@ -1,11 +1,6 @@
-import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from 'react';
 
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/react/daygrid';
 import timeGridPlugin from '@fullcalendar/react/timegrid';
@@ -17,7 +12,6 @@ import '@fullcalendar/react/themes/monarch/theme.css';
 import '@fullcalendar/react/themes/monarch/palettes/red.css';
 
 import api from '../../api/axios';
-
 import {
     closeAlert,
     showConfirmAlert,
@@ -27,72 +21,19 @@ import {
     showWarningAlert,
 } from '../../utils/sweetAlert';
 
-/*
-|--------------------------------------------------------------------------
-| KONFIGURASI DIREKTORAT
-|--------------------------------------------------------------------------
-*/
-
 const DIRECTORATES = [
-    {
-        value: 'direktorat',
-        label: 'Direktorat',
-        short: 'DIREKTORAT',
-        icon: 'bi-people-fill',
-        description:
-            'Direktur + Wakil Direktur I + Wakil Direktur II',
-    },
-    {
-        value: 'direktur',
-        label: 'Direktur',
-        short: 'DIREKTUR',
-        icon: 'bi-person-badge-fill',
-        description: 'Agenda khusus Direktur',
-    },
-    {
-        value: 'wakil_direktur_1',
-        label: 'Wakil Direktur I',
-        short: 'WADIR I',
-        icon: 'bi-person-workspace',
-        description: 'Agenda khusus Wakil Direktur I',
-    },
-    {
-        value: 'wakil_direktur_2',
-        label: 'Wakil Direktur II',
-        short: 'WADIR II',
-        icon: 'bi-person-workspace',
-        description: 'Agenda khusus Wakil Direktur II',
-    },
+    { value: 'direktorat', label: 'Direktorat', short: 'DIREKTORAT', icon: 'bi-people-fill' },
+    { value: 'direktur', label: 'Direktur', short: 'DIREKTUR', icon: 'bi-person-badge-fill' },
+    { value: 'wakil_direktur_1', label: 'Wakil Direktur I', short: 'WADIR I', icon: 'bi-person-workspace' },
+    { value: 'wakil_direktur_2', label: 'Wakil Direktur II', short: 'WADIR II', icon: 'bi-person-workspace' },
 ];
 
-const FILTERS = [
-    {
-        value: 'semua',
-        label: 'Semua Jadwal',
-        short: 'SEMUA',
-        icon: 'bi-grid-fill',
-        description: 'Seluruh agenda Direktorat',
-    },
-    ...DIRECTORATES,
+const AGENDA_TYPES = [
+    'Rapat', 'Kunjungan', 'Internal', 'Eksternal',
+    'Seremonial', 'Akademik', 'Lainnya',
 ];
 
-/*
-|--------------------------------------------------------------------------
-| KONFIGURASI KATEGORI AGENDA
-|--------------------------------------------------------------------------
-*/
-
-const TYPES = [
-    'Rapat',
-    'Kunjungan',
-    'Internal',
-    'Eksternal',
-    'Seremonial',
-    'Akademik',
-    'Lainnya',
-];
-
-const COLORS = {
+const AGENDA_COLORS = {
     Rapat: '#7F1D1D',
     Kunjungan: '#1D4ED8',
     Internal: '#4338CA',
@@ -102,17 +43,27 @@ const COLORS = {
     Lainnya: '#475569',
 };
 
-const ICONS = {
-    Rapat: 'bi-people-fill',
-    Kunjungan: 'bi-building-fill-check',
-    Internal: 'bi-building-fill',
-    Eksternal: 'bi-globe2',
-    Seremonial: 'bi-stars',
-    Akademik: 'bi-mortarboard-fill',
-    Lainnya: 'bi-calendar-event-fill',
+const SOURCES = [
+    { key: 'all', label: 'Semua Kegiatan', icon: 'bi-grid-fill', color: '#334155' },
+    { key: 'directorate', label: 'Jadwal Direktorat', icon: 'bi-calendar-event-fill', color: '#7F1D1D' },
+    { key: 'humas', label: 'Liputan HUMAS', icon: 'bi-camera-reels-fill', color: '#2563EB' },
+    { key: 'merchandise', label: 'Merchandise', icon: 'bi-gift-fill', color: '#9333EA' },
+    { key: 'asset_request', label: 'Request Barang', icon: 'bi-box2-heart-fill', color: '#0891B2' },
+    { key: 'borrowing', label: 'Peminjaman SEKPiM', icon: 'bi-box-seam-fill', color: '#047857' },
+    { key: 'pending_schedule', label: 'Pengajuan Jadwal', icon: 'bi-hourglass-split', color: '#D97706' },
+];
+
+const STATUS = {
+    pending: 'Menunggu',
+    revision: 'Perlu Revisi',
+    approved: 'Disetujui',
+    completed: 'Selesai',
+    borrowed: 'Dipinjam',
+    returned: 'Dikembalikan',
+    rejected: 'Ditolak',
 };
 
-const AUDIT_FIELDS = {
+const AUDIT_LABELS = {
     directorate: 'Agenda Untuk',
     title: 'Judul Agenda',
     description: 'Deskripsi',
@@ -126,940 +77,552 @@ const AUDIT_FIELDS = {
     is_public: 'Visibilitas',
 };
 
-/*
-|--------------------------------------------------------------------------
-| HELPER DIREKTORAT
-|--------------------------------------------------------------------------
-*/
-
-const owner = (value) =>
-    DIRECTORATES.find((item) => item.value === value);
-
 const ownerLabel = (value) =>
-    owner(value)?.label || 'Direktorat';
+    DIRECTORATES.find((item) => item.value === value)?.label || 'Direktorat';
 
 const ownerShort = (value) =>
-    owner(value)?.short || 'DIREKTORAT';
+    DIRECTORATES.find((item) => item.value === value)?.short || 'DIREKTORAT';
 
-const colorOf = (type) =>
-    COLORS[type] || COLORS.Lainnya;
+const agendaColor = (value) => AGENDA_COLORS[value] || AGENDA_COLORS.Lainnya;
 
-/*
-|--------------------------------------------------------------------------
-| HELPER WAKTU DAN TANGGAL
-|--------------------------------------------------------------------------
-*/
+const clock = (value) => (value ? String(value).slice(0, 5) : '');
 
-const time = (value) =>
-    value ? String(value).slice(0, 5) : '';
+const dateKey = (date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-const toMinutes = (value) => {
-    const [h, m] = time(value).split(':').map(Number);
-
-    return Number.isFinite(h) && Number.isFinite(m)
-        ? h * 60 + m
-        : null;
-};
-
-const fromMinutes = (value) =>
-    `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(
-        value % 60
-    ).padStart(2, '0')}`;
-
-const dateKey = (value) =>
-    `${value.getFullYear()}-${String(
-        value.getMonth() + 1
-    ).padStart(2, '0')}-${String(value.getDate()).padStart(
-        2,
-        '0'
-    )}`;
-
-const localDate = (value, clock = '00:00') => {
+function parseLocalDate(value, time = '00:00') {
     if (!value) return null;
 
-    const [y, m, d] = String(value)
-        .slice(0, 10)
-        .split('-')
-        .map(Number);
-
-    const [h, min] = time(clock).split(':').map(Number);
-
-    const result = new Date(
-        y,
-        m - 1,
-        d,
-        h || 0,
-        min || 0
-    );
+    const [year, month, day] = String(value).slice(0, 10).split('-').map(Number);
+    const [hour, minute] = clock(time).split(':').map(Number);
+    const result = new Date(year, month - 1, day, hour || 0, minute || 0);
 
     return Number.isNaN(result.getTime()) ? null : result;
-};
+}
 
-const dateText = (value, short = false) => {
-    const parsed = localDate(value);
+function formatDate(value) {
+    const date = parseLocalDate(value);
 
-    return parsed
-        ? parsed.toLocaleDateString(
-              'id-ID',
-              short
-                  ? {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                    }
-                  : {
-                        weekday: 'long',
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                    }
-          )
-        : '-';
-};
-
-const dateTimeText = (value) => {
-    const parsed = value ? new Date(value) : null;
-
-    return parsed && !Number.isNaN(parsed.getTime())
-        ? parsed.toLocaleString('id-ID', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
+    return date
+        ? date.toLocaleDateString('id-ID', {
+              weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
           })
         : '-';
-};
+}
 
-const timeText = (event) =>
-    event?.all_day || event?.allDay
-        ? 'Sepanjang Hari'
-        : `${time(event?.start_time) || '-'} - ${
-              time(event?.end_time) || '-'
-          }`;
+function formatDateTime(value) {
+    if (!value) return '-';
 
-/*
-|--------------------------------------------------------------------------
-| FORM DEFAULT
-|--------------------------------------------------------------------------
-*/
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+        ? '-'
+        : date.toLocaleString('id-ID', {
+              day: '2-digit', month: 'short', year: 'numeric',
+              hour: '2-digit', minute: '2-digit',
+          });
+}
 
-const blankForm = (
-    date = '',
-    directorate = ''
-) => ({
-    id: null,
-    directorate,
-    title: '',
-    description: '',
-    event_date: date,
-    start_time: '09:00',
-    end_time: '10:00',
-    all_day: false,
-    location: '',
-    agenda_type: 'Rapat',
-    color: COLORS.Rapat,
-    is_public: true,
-});
-
-/*
-|--------------------------------------------------------------------------
-| HELPER BENTROK JADWAL
-|--------------------------------------------------------------------------
-*/
-
-const conflictOwners = (directorate) =>
-    directorate === 'direktorat'
-        ? DIRECTORATES.map((item) => item.value)
-        : ['direktorat', directorate];
-
-const potentialConflicts = (
-    events,
-    form,
-    excludeId = null
-) =>
-    events.filter(
-        (item) =>
-            conflictOwners(form.directorate).includes(
-                item.directorate
-            ) &&
-            item.event_date === form.event_date &&
-            (excludeId === null ||
-                Number(item.id) !== Number(excludeId))
-    );
-
-const scheduleConflict = (
-    events,
-    form,
-    excludeId = null
-) => {
-    if (!form.directorate || !form.event_date) {
-        return null;
-    }
-
-    const candidates = potentialConflicts(
-        events,
-        form,
-        excludeId
-    );
-
-    if (form.all_day) {
-        return candidates[0] || null;
-    }
-
-    const begin = toMinutes(form.start_time);
-    const finish = toMinutes(form.end_time);
-
-    if (
-        begin === null ||
-        finish === null ||
-        finish <= begin
-    ) {
-        return null;
-    }
-
-    return (
-        candidates.find((item) => {
-            if (item.all_day || item.allDay) {
-                return true;
-            }
-
-            const a = toMinutes(item.start_time);
-            const b = toMinutes(item.end_time);
-
-            return (
-                a !== null &&
-                b !== null &&
-                begin < b &&
-                finish > a
-            );
-        }) || null
-    );
-};
-
-/*
-|--------------------------------------------------------------------------
-| HELPER ERROR
-|--------------------------------------------------------------------------
-*/
-
-const errorMessage = (error) => {
+function getError(error) {
     const data = error?.response?.data;
-
     return (
-        Object.values(data?.errors || {})
-            .flat()
-            .find(Boolean) ||
+        Object.values(data?.errors || {}).flat().find(Boolean) ||
         data?.message ||
         'Terjadi kesalahan pada server.'
     );
-};
+}
 
-/*
-|--------------------------------------------------------------------------
-| HELPER AUDIT TRAIL
-|--------------------------------------------------------------------------
-*/
+function toMinutes(value) {
+    const [h, m] = clock(value).split(':').map(Number);
+    return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
+}
 
-const auditValue = (field, value) => {
-    if (
-        value === null ||
-        value === undefined ||
-        value === ''
-    ) {
-        return '-';
-    }
+function fromMinutes(value) {
+    return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+}
 
-    if (field === 'directorate') {
-        return ownerLabel(value);
-    }
+function initialForm(date = '', directorate = '') {
+    return {
+        id: null,
+        directorate,
+        title: '',
+        description: '',
+        event_date: date,
+        start_time: '09:00',
+        end_time: '10:00',
+        all_day: false,
+        location: '',
+        agenda_type: 'Rapat',
+        is_public: true,
+    };
+}
 
-    if (field === 'event_date') {
-        return dateText(value, true);
-    }
+function findConflict(events, form, excludedId = null) {
+    if (!form.directorate || !form.event_date) return null;
 
-    if (
-        field === 'start_time' ||
-        field === 'end_time'
-    ) {
-        return time(value);
-    }
+    const owners = form.directorate === 'direktorat'
+        ? DIRECTORATES.map((item) => item.value)
+        : ['direktorat', form.directorate];
 
-    if (field === 'all_day') {
-        return value ? 'Ya' : 'Tidak';
-    }
+    const candidates = events.filter((item) =>
+        owners.includes(item.directorate) &&
+        String(item.event_date).slice(0, 10) === form.event_date &&
+        (excludedId === null || Number(item.id) !== Number(excludedId))
+    );
 
-    if (field === 'is_public') {
-        return value ? 'Publik' : 'Internal';
-    }
+    if (form.all_day) return candidates[0] || null;
 
-    return String(value);
-};
+    const a = toMinutes(form.start_time);
+    const b = toMinutes(form.end_time);
 
-const auditChanges = (entry) =>
-    [
-        ...new Set([
-            ...Object.keys(entry.old_values || {}),
-            ...Object.keys(entry.new_values || {}),
-        ]),
-    ]
-        .map((field) => ({
-            field,
-            label: AUDIT_FIELDS[field] || field,
-            old: auditValue(
-                field,
-                entry.old_values?.[field]
-            ),
-            next: auditValue(
-                field,
-                entry.new_values?.[field]
-            ),
-        }))
-        .filter((item) => item.old !== item.next);
+    if (a === null || b === null || b <= a) return null;
 
-/*
-|--------------------------------------------------------------------------
-| KOMPONEN FIELD
-|--------------------------------------------------------------------------
-*/
+    return candidates.find((item) => {
+        if (item.all_day || item.allDay) return true;
 
-function Field({
-    label,
-    children,
-    required = false,
-}) {
+        const c = toMinutes(item.start_time);
+        const d = toMinutes(item.end_time);
+
+        return c !== null && d !== null && a < d && b > c;
+    }) || null;
+}
+
+function getSource(event) {
+    const props = event.extendedProps || {};
+
+    if (props.record_type === 'pending_request') return 'pending_schedule';
+    return props.source_type || 'directorate';
+}
+
+function getSourceConfig(source) {
+    return SOURCES.find((item) => item.key === source) || SOURCES[0];
+}
+
+function InfoBox({ label, value, children }) {
     return (
-        <label className="d-block">
-            <span className="form-label fw-bold d-block mb-2">
-                {label}
-
-                {required && (
-                    <span className="text-danger ms-1">
-                        *
-                    </span>
-                )}
-            </span>
-
-            {children}
-        </label>
+        <div className="p-3 rounded-4 bg-light h-100">
+            <div className="small text-muted mb-1">{label}</div>
+            {children || (
+                <div className="fw-bold text-break" style={{ whiteSpace: 'pre-wrap' }}>
+                    {value === null || value === undefined || value === '' ? '-' : String(value)}
+                </div>
+            )}
+        </div>
     );
 }
 
-/*
-|--------------------------------------------------------------------------
-| HALAMAN UTAMA
-|--------------------------------------------------------------------------
-*/
+function FormField({ label, required = false, children }) {
+    return (
+        <div>
+            <label className="form-label fw-bold">
+                {label}
+                {required && <span className="text-danger ms-1">*</span>}
+            </label>
+            {children}
+        </div>
+    );
+}
 
 export default function DirectorSchedulePage() {
     const calendarRef = useRef(null);
 
-    /*
-    |--------------------------------------------------------------------------
-    | STATE DATA
-    |--------------------------------------------------------------------------
-    */
+    const [officialEvents, setOfficialEvents] = useState([]);
+    const [integratedEvents, setIntegratedEvents] = useState([]);
 
-    const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [syncing, setSyncing] = useState(false);
+    const [integratedError, setIntegratedError] = useState('');
 
     const [canManage, setCanManage] = useState(false);
+    const [isCalendarAdmin, setIsCalendarAdmin] = useState(false);
 
-    const [activeOwner, setActiveOwner] =
-        useState('semua');
-
-    const [activeType, setActiveType] =
-        useState('Semua');
-
+    const [sourceFilter, setSourceFilter] = useState('all');
+    const [ownerFilter, setOwnerFilter] = useState('semua');
+    const [typeFilter, setTypeFilter] = useState('Semua');
     const [search, setSearch] = useState('');
 
-    /*
-    |--------------------------------------------------------------------------
-    | STATE MODAL
-    |--------------------------------------------------------------------------
-    */
+    const [calendarRange, setCalendarRange] = useState(null);
+    const [compact, setCompact] = useState(
+        () => window.matchMedia('(max-width: 1250px)').matches
+    );
 
-    const [modalOpen, setModalOpen] =
-        useState(false);
-
-    const [detailMode, setDetailMode] =
-        useState(false);
-
-    const [selectedEvent, setSelectedEvent] =
-        useState(null);
-
-    const [form, setForm] = useState(blankForm());
+    const [modalOpen, setModalOpen] = useState(false);
+    const [detailMode, setDetailMode] = useState(false);
+    const [selectedOfficial, setSelectedOfficial] = useState(null);
+    const [selectedIntegrated, setSelectedIntegrated] = useState(null);
+    const [form, setForm] = useState(initialForm());
 
     const [saving, setSaving] = useState(false);
-
-    const [detailLoading, setDetailLoading] =
-        useState(false);
-
+    const [detailLoading, setDetailLoading] = useState(false);
     const [histories, setHistories] = useState([]);
+    const [historyError, setHistoryError] = useState(false);
 
-    const [historyError, setHistoryError] =
-        useState(false);
-
-    const [now, setNow] = useState(() => new Date());
-
-    /*
-    |--------------------------------------------------------------------------
-    | RESPONSIVE CALENDAR
-    |--------------------------------------------------------------------------
-    |
-    | PERBAIKAN UTAMA:
-    |
-    | PC:
-    | - FullCalendar height = 100%
-    | - Parent memiliki tinggi tertentu.
-    |
-    | HP / TABLET:
-    | - FullCalendar height = auto
-    | - Parent mengikuti tinggi konten.
-    |
-    */
-
-    const [compact, setCompact] = useState(
-        () =>
-            typeof window !== 'undefined' &&
-            window
-                .matchMedia('(max-width: 1250px)')
-                .matches
-    );
+    const [now, setNow] = useState(new Date());
 
     useEffect(() => {
-        const media = window.matchMedia(
-            '(max-width: 1250px)'
+        let user = {};
+
+        try {
+            user = JSON.parse(localStorage.getItem('admin_user') || '{}');
+        } catch {
+            user = {};
+        }
+
+        setIsCalendarAdmin(
+            ['admin', 'admin_humas', 'admin_sekpim', 'superadmin'].includes(user.role)
         );
-
-        const change = () => {
-            setCompact(media.matches);
-        };
-
-        change();
-
-        media.addEventListener('change', change);
-
-        return () => {
-            media.removeEventListener(
-                'change',
-                change
-            );
-        };
     }, []);
 
-    /*
-    |--------------------------------------------------------------------------
-    | CLOCK
-    |--------------------------------------------------------------------------
-    */
-
     useEffect(() => {
-        const timer = window.setInterval(
-            () => setNow(new Date()),
-            60000
-        );
+        const media = window.matchMedia('(max-width: 1250px)');
+        const onChange = () => setCompact(media.matches);
 
-        return () => {
-            window.clearInterval(timer);
-        };
+        media.addEventListener('change', onChange);
+        return () => media.removeEventListener('change', onChange);
     }, []);
 
-    /*
-    |--------------------------------------------------------------------------
-    | UPDATE CALENDAR SIZE
-    |--------------------------------------------------------------------------
-    */
+    useEffect(() => {
+        const timer = window.setInterval(() => setNow(new Date()), 60000);
+        return () => window.clearInterval(timer);
+    }, []);
 
     useEffect(() => {
-        const frame = window.requestAnimationFrame(
-            () => {
-                calendarRef.current
-                    ?.getApi()
-                    ?.updateSize();
-            }
-        );
+        const frame = window.requestAnimationFrame(() => {
+            calendarRef.current?.getApi()?.updateSize();
+        });
 
-        return () => {
-            window.cancelAnimationFrame(frame);
-        };
+        return () => window.cancelAnimationFrame(frame);
     }, [compact]);
 
-    /*
-    |--------------------------------------------------------------------------
-    | LOAD EVENTS
-    |--------------------------------------------------------------------------
-    */
-
-    const loadEvents = useCallback(async () => {
+    const loadOfficial = useCallback(async (withLoader = true) => {
         try {
-            setLoading(true);
+            if (withLoader) setLoading(true);
 
-            const response = await api.get(
-                '/event-schedules'
-            );
+            const response = await api.get('/event-schedules');
+            const data = response?.data?.data || {};
 
-            const data =
-                response?.data?.data || {};
-
-            setEvents(
-                Array.isArray(data.events)
-                    ? data.events
-                    : []
-            );
-
+            setOfficialEvents(Array.isArray(data.events) ? data.events : []);
             setCanManage(Boolean(data.can_manage));
         } catch (error) {
-            console.error(
-                'Load directorate schedules:',
-                error?.response?.data || error
-            );
-
-            await showErrorAlert(
-                'Gagal Memuat Jadwal',
-                errorMessage(error)
-            );
+            console.error('Load Director Schedule:', error);
+            await showErrorAlert('Gagal Memuat Agenda', getError(error));
         } finally {
-            setLoading(false);
+            if (withLoader) setLoading(false);
         }
     }, []);
 
-    useEffect(() => {
-        loadEvents();
-    }, [loadEvents]);
+    const loadIntegrated = useCallback(async () => {
+        if (!isCalendarAdmin || !calendarRange) return;
 
-    /*
-    |--------------------------------------------------------------------------
-    | HITUNG TOTAL AGENDA
-    |--------------------------------------------------------------------------
-    */
+        try {
+            setSyncing(true);
+            setIntegratedError('');
+
+            const response = await api.get('/integrated-calendar/events', {
+                params: {
+                    start: calendarRange.start,
+                    end: calendarRange.end,
+                },
+            });
+
+            const items = response?.data?.data?.events;
+            setIntegratedEvents(Array.isArray(items) ? items : []);
+        } catch (error) {
+            console.error('Integrated Calendar:', error);
+            setIntegratedError(getError(error));
+            setIntegratedEvents([]);
+        } finally {
+            setSyncing(false);
+        }
+    }, [isCalendarAdmin, calendarRange]);
+
+    useEffect(() => {
+        loadOfficial();
+    }, [loadOfficial]);
+
+    useEffect(() => {
+        loadIntegrated();
+    }, [loadIntegrated]);
+
+    const handleDatesSet = useCallback((info) => {
+        // FullCalendar memakai tanggal akhir eksklusif.
+        const lastDay = new Date(info.end);
+        lastDay.setDate(lastDay.getDate() - 1);
+
+        const start = dateKey(info.start);
+        const end = dateKey(lastDay);
+
+        setCalendarRange((previous) => {
+            if (previous?.start === start && previous?.end === end) {
+                return previous;
+            }
+
+            return { start, end };
+        });
+    }, []);
+
+    const refresh = async () => {
+        await loadOfficial(false);
+        await loadIntegrated();
+    };
+
+    const counts = useMemo(() => {
+        const result = {
+            directorate: officialEvents.length,
+            humas: 0,
+            merchandise: 0,
+            asset_request: 0,
+            borrowing: 0,
+            pending_schedule: 0,
+        };
+
+        integratedEvents.forEach((event) => {
+            const source = getSource(event);
+
+            // Event resmi Direktorat tidak dihitung ulang.
+            if (source !== 'directorate' && source in result) {
+                result[source] += 1;
+            }
+        });
+
+        result.all = Object.values(result).reduce((sum, value) => sum + value, 0);
+        return result;
+    }, [officialEvents, integratedEvents]);
 
     const ownerCounts = useMemo(() => {
-        const counts = {
-            semua: events.length,
-        };
+        const result = { semua: officialEvents.length };
 
         DIRECTORATES.forEach((item) => {
-            counts[item.value] = events.filter(
-                (event) =>
-                    event.directorate === item.value
+            result[item.value] = officialEvents.filter(
+                (event) => event.directorate === item.value
             ).length;
         });
 
-        return counts;
-    }, [events]);
+        return result;
+    }, [officialEvents]);
 
-    /*
-    |--------------------------------------------------------------------------
-    | FILTER DIREKTORAT
-    |--------------------------------------------------------------------------
-    */
+    const visibleOfficial = useMemo(() => {
+        if (!['all', 'directorate'].includes(sourceFilter)) return [];
 
-    const ownerEvents = useMemo(
-        () =>
-            activeOwner === 'semua'
-                ? events
-                : events.filter(
-                      (event) =>
-                          event.directorate ===
-                          activeOwner
-                  ),
-        [events, activeOwner]
-    );
+        const keyword = search.trim().toLowerCase();
 
-    const activeOwnerInfo =
-        FILTERS.find(
-            (item) => item.value === activeOwner
-        ) || FILTERS[0];
+        return officialEvents.filter((event) => {
+            if (ownerFilter !== 'semua' && event.directorate !== ownerFilter) {
+                return false;
+            }
 
-    /*
-    |--------------------------------------------------------------------------
-    | HITUNG KATEGORI
-    |--------------------------------------------------------------------------
-    */
+            if (typeFilter !== 'Semua' && event.agenda_type !== typeFilter) {
+                return false;
+            }
 
-    const typeCounts = useMemo(() => {
-        const counts = {
-            Semua: ownerEvents.length,
-        };
+            return !keyword || [
+                event.title,
+                event.description,
+                event.location,
+                ownerLabel(event.directorate),
+            ].filter(Boolean).join(' ').toLowerCase().includes(keyword);
+        });
+    }, [officialEvents, sourceFilter, ownerFilter, typeFilter, search]);
 
-        TYPES.forEach((type) => {
-            counts[type] = ownerEvents.filter(
-                (event) =>
-                    event.agenda_type === type
-            ).length;
+    const visibleIntegrated = useMemo(() => {
+        if (!isCalendarAdmin || sourceFilter === 'directorate') return [];
+
+        const keyword = search.trim().toLowerCase();
+
+        return integratedEvents.filter((event) => {
+            const props = event.extendedProps || {};
+            const source = getSource(event);
+
+            // Jangan menggandakan agenda Direktorat resmi.
+            if (source === 'directorate') return false;
+
+            if (sourceFilter !== 'all' && sourceFilter !== source) {
+                return false;
+            }
+
+            // Filter pemilik hanya berlaku untuk agenda Direktorat.
+            if (
+                ownerFilter !== 'semua' &&
+                props.directorate !== ownerFilter
+            ) {
+                return false;
+            }
+
+            if (
+                typeFilter !== 'Semua' &&
+                source === 'pending_schedule' &&
+                props.agenda_type !== typeFilter
+            ) {
+                return false;
+            }
+
+            return !keyword || [
+                event.title,
+                props.description,
+                props.location,
+                props.requester_unit,
+                props.pic_name,
+                props.coverage_type,
+                props.service_code,
+            ].filter(Boolean).join(' ').toLowerCase().includes(keyword);
+        });
+    }, [
+        integratedEvents,
+        isCalendarAdmin,
+        sourceFilter,
+        ownerFilter,
+        typeFilter,
+        search,
+    ]);
+
+    const calendarEvents = useMemo(() => {
+        const official = visibleOfficial.map((event) => {
+            const allDay = Boolean(event.allDay ?? event.all_day);
+            const color = event.color || agendaColor(event.agenda_type);
+
+            return {
+                id: `official-${event.id}`,
+                title: `[${ownerShort(event.directorate)}] ${event.title}`,
+                start: event.start || (
+                    allDay
+                        ? String(event.event_date).slice(0, 10)
+                        : `${String(event.event_date).slice(0, 10)}T${clock(event.start_time)}:00`
+                ),
+                end: event.end || (
+                    allDay
+                        ? null
+                        : `${String(event.event_date).slice(0, 10)}T${clock(event.end_time)}:00`
+                ),
+                allDay,
+                backgroundColor: color,
+                borderColor: color,
+                textColor: '#ffffff',
+                extendedProps: {
+                    source_type: 'official',
+                    source_id: event.id,
+                },
+            };
         });
 
-        return counts;
-    }, [ownerEvents]);
+        const external = visibleIntegrated.map((event) => {
+            const source = getSource(event);
+            const config = getSourceConfig(source);
+            const props = event.extendedProps || {};
 
-    /*
-    |--------------------------------------------------------------------------
-    | FILTER AGENDA
-    |--------------------------------------------------------------------------
-    */
+            return {
+                ...event,
+                id: String(event.id),
+                title: source === 'pending_schedule'
+                    ? event.title
+                    : `[${config.label}] ${event.title}`,
+                backgroundColor: config.color,
+                borderColor: config.color,
+                textColor: '#ffffff',
+                extendedProps: {
+                    ...props,
+                    display_source: source,
+                },
+            };
+        });
 
-    const filteredEvents = useMemo(
-        () =>
-            ownerEvents.filter((event) => {
-                if (
-                    activeType !== 'Semua' &&
-                    event.agenda_type !== activeType
-                ) {
-                    return false;
-                }
+        return [...official, ...external];
+    }, [visibleOfficial, visibleIntegrated]);
 
-                const term = search
-                    .trim()
-                    .toLowerCase();
-
-                return (
-                    !term ||
-                    [
-                        event.title,
-                        event.description,
-                        event.location,
-                        event.directorate_label,
-                        ownerLabel(event.directorate),
-                    ]
-                        .filter(Boolean)
-                        .join(' ')
-                        .toLowerCase()
-                        .includes(term)
-                );
-            }),
-        [ownerEvents, activeType, search]
+    const todayOfficial = useMemo(
+        () => officialEvents.filter(
+            (event) =>
+                String(event.event_date).slice(0, 10) === dateKey(now)
+        ),
+        [officialEvents, now]
     );
-
-    /*
-    |--------------------------------------------------------------------------
-    | AGENDA HARI INI
-    |--------------------------------------------------------------------------
-    */
-
-    const todayEvents = useMemo(
-        () =>
-            ownerEvents
-                .filter(
-                    (event) =>
-                        event.event_date ===
-                        dateKey(now)
-                )
-                .sort(
-                    (a, b) =>
-                        Number(Boolean(b.all_day)) -
-                            Number(
-                                Boolean(a.all_day)
-                            ) ||
-                        String(
-                            a.start_time || ''
-                        ).localeCompare(
-                            String(b.start_time || '')
-                        )
-                ),
-        [ownerEvents, now]
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | AGENDA TERDEKAT
-    |--------------------------------------------------------------------------
-    */
-
-    const nearest = useMemo(() => {
-        const candidates = ownerEvents
-            .map((event) => ({
-                event,
-
-                start: localDate(
-                    event.event_date,
-                    event.all_day
-                        ? '00:00'
-                        : event.start_time || '00:00'
-                ),
-
-                end: localDate(
-                    event.event_date,
-                    event.all_day
-                        ? '23:59'
-                        : event.end_time || '23:59'
-                ),
-            }))
-            .filter(
-                (item) =>
-                    item.start &&
-                    item.end &&
-                    item.end >= now
-            )
-            .sort(
-                (a, b) => a.start - b.start
-            );
-
-        const active = candidates.find(
-            (item) =>
-                item.start <= now &&
-                item.end >= now
-        );
-
-        const next = active || candidates[0];
-
-        return next
-            ? {
-                  ...next,
-                  status: active
-                      ? 'ongoing'
-                      : 'upcoming',
-              }
-            : null;
-    }, [ownerEvents, now]);
-
-    /*
-    |--------------------------------------------------------------------------
-    | DETEKSI BENTROK
-    |--------------------------------------------------------------------------
-    */
 
     const conflict = useMemo(
-        () =>
-            detailMode
-                ? null
-                : scheduleConflict(
-                      events,
-                      form,
-                      form.id
-                  ),
-        [events, form, detailMode]
+        () => detailMode ? null : findConflict(officialEvents, form, form.id),
+        [officialEvents, form, detailMode]
     );
 
-    const availability = useMemo(() => {
-        if (
-            detailMode ||
-            !form.directorate ||
-            !form.event_date
-        ) {
-            return null;
-        }
-
-        if (
-            !form.all_day &&
-            (!form.start_time ||
-                !form.end_time ||
-                form.end_time <= form.start_time)
-        ) {
-            return 'invalid';
-        }
-
-        return conflict
-            ? 'conflict'
-            : 'available';
-    }, [form, detailMode, conflict]);
-
-    /*
-    |--------------------------------------------------------------------------
-    | SARAN WAKTU
-    |--------------------------------------------------------------------------
-    */
+    const invalidTime =
+        !form.all_day &&
+        Boolean(form.start_time && form.end_time) &&
+        form.end_time <= form.start_time;
 
     const suggestions = useMemo(() => {
-        if (
-            !conflict ||
-            form.all_day ||
-            detailMode
-        ) {
-            return [];
-        }
+        if (!conflict || form.all_day || invalidTime) return [];
 
-        const begin = toMinutes(
-            form.start_time
-        );
+        const begin = toMinutes(form.start_time);
+        const finish = toMinutes(form.end_time);
 
-        const finish = toMinutes(
-            form.end_time
-        );
-
-        if (
-            begin === null ||
-            finish === null ||
-            finish <= begin
-        ) {
-            return [];
-        }
-
-        const candidates = potentialConflicts(
-            events,
-            form,
-            form.id
-        );
-
-        if (
-            candidates.some(
-                (item) =>
-                    item.all_day || item.allDay
-            )
-        ) {
+        if (begin === null || finish === null || finish <= begin) {
             return [];
         }
 
         const duration = finish - begin;
-        const slots = [];
+        const options = [];
 
-        for (
-            let minute = 360;
-            minute + duration <= 1320;
-            minute += 30
-        ) {
-            const start = fromMinutes(minute);
-
-            const end = fromMinutes(
-                minute + duration
-            );
-
-            const checking = {
+        for (let minute = 360; minute + duration <= 1320; minute += 30) {
+            const candidate = {
                 ...form,
-                start_time: start,
-                end_time: end,
+                start_time: fromMinutes(minute),
+                end_time: fromMinutes(minute + duration),
             };
 
-            if (
-                !scheduleConflict(
-                    events,
-                    checking,
-                    form.id
-                )
-            ) {
-                slots.push({
-                    start,
-                    end,
-                    distance: Math.abs(
-                        minute - begin
-                    ),
-                    minute,
+            if (!findConflict(officialEvents, candidate, form.id)) {
+                options.push({
+                    start: candidate.start_time,
+                    end: candidate.end_time,
+                    distance: Math.abs(minute - begin),
                 });
             }
         }
 
-        return slots
-            .sort(
-                (a, b) =>
-                    a.distance - b.distance ||
-                    a.minute - b.minute
-            )
-            .slice(0, 3);
-    }, [
-        events,
-        form,
-        detailMode,
-        conflict,
-    ]);
+        return options.sort((a, b) => a.distance - b.distance).slice(0, 3);
+    }, [conflict, invalidTime, form, officialEvents]);
 
-    /*
-    |--------------------------------------------------------------------------
-    | FORM CHANGE
-    |--------------------------------------------------------------------------
-    */
-
-    const setField = (field, value) => {
-        setForm((old) => ({
-            ...old,
-            [field]: value,
-
-            ...(field === 'agenda_type'
-                ? {
-                      color: colorOf(value),
-                  }
-                : {}),
-        }));
+    const updateField = (field, value) => {
+        setForm((previous) => ({ ...previous, [field]: value }));
     };
-
-    /*
-    |--------------------------------------------------------------------------
-    | CLOSE MODAL
-    |--------------------------------------------------------------------------
-    */
 
     const closeModal = () => {
         if (saving) return;
-
         setModalOpen(false);
         setDetailMode(false);
-        setSelectedEvent(null);
+        setSelectedOfficial(null);
         setHistories([]);
         setHistoryError(false);
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | CREATE MODAL
-    |--------------------------------------------------------------------------
-    */
-
     const openCreateModal = (date = '') => {
-        setSelectedEvent(null);
+        setSelectedOfficial(null);
         setHistories([]);
         setHistoryError(false);
         setDetailMode(false);
 
-        setForm(
-            blankForm(
-                date,
-                activeOwner === 'semua'
-                    ? ''
-                    : activeOwner
-            )
-        );
+        setForm(initialForm(
+            date,
+            ownerFilter === 'semua' ? '' : ownerFilter
+        ));
 
         setModalOpen(true);
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | APPLY EVENT
-    |--------------------------------------------------------------------------
-    */
-
-    const applyEvent = (event) => {
+    const applyOfficial = (event) => {
         setForm({
             id: event.id,
-            directorate:
-                event.directorate || 'direktur',
+            directorate: event.directorate || 'direktur',
             title: event.title || '',
-            description:
-                event.description || '',
-            event_date:
-                event.event_date || '',
-            start_time:
-                time(event.start_time) || '09:00',
-            end_time:
-                time(event.end_time) || '10:00',
-            all_day: Boolean(
-                event.all_day ?? event.allDay
-            ),
-            location:
-                event.location || '',
-            agenda_type:
-                event.agenda_type || 'Rapat',
-            color:
-                event.color ||
-                colorOf(event.agenda_type),
-            is_public: Boolean(
-                event.is_public
-            ),
+            description: event.description || '',
+            event_date: String(event.event_date || '').slice(0, 10),
+            start_time: clock(event.start_time) || '09:00',
+            end_time: clock(event.end_time) || '10:00',
+            all_day: Boolean(event.all_day ?? event.allDay),
+            location: event.location || '',
+            agenda_type: event.agenda_type || 'Rapat',
+            is_public: Boolean(event.is_public),
         });
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | DETAIL MODAL
-    |--------------------------------------------------------------------------
-    */
-
-    const openDetailModal = async (event) => {
-        if (!event?.id) return;
-
-        setSelectedEvent(event);
-
-        applyEvent(event);
-
+    const openOfficialDetail = async (event) => {
+        setSelectedOfficial(event);
+        applyOfficial(event);
         setDetailMode(true);
         setHistories([]);
         setHistoryError(false);
@@ -1068,781 +631,465 @@ export default function DirectorSchedulePage() {
         try {
             setDetailLoading(true);
 
-            const response = await api.get(
-                `/event-schedules/${event.id}`
-            );
-
-            const detail =
-                response?.data?.data;
+            const response = await api.get(`/event-schedules/${event.id}`);
+            const detail = response?.data?.data;
 
             if (detail) {
-                setSelectedEvent(detail);
-                applyEvent(detail);
-
-                setHistories(
-                    Array.isArray(
-                        detail.histories
-                    )
-                        ? detail.histories
-                        : []
-                );
+                setSelectedOfficial(detail);
+                applyOfficial(detail);
+                setHistories(Array.isArray(detail.histories) ? detail.histories : []);
             }
         } catch (error) {
-            console.error(
-                'Load schedule detail:',
-                error?.response?.data || error
-            );
-
+            console.error('Detail Direktorat:', error);
             setHistoryError(true);
         } finally {
             setDetailLoading(false);
         }
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | VALIDASI FORM
-    |--------------------------------------------------------------------------
-    */
+    const onCalendarEvent = (info) => {
+        const props = info.event.extendedProps || {};
+
+        if (props.source_type === 'official') {
+            const found = officialEvents.find(
+                (event) => Number(event.id) === Number(props.source_id)
+            );
+            if (found) openOfficialDetail(found);
+            return;
+        }
+
+        setSelectedIntegrated({
+            id: info.event.id,
+            title: info.event.title,
+            extendedProps: props,
+        });
+    };
 
     const validateForm = async () => {
         if (!form.directorate) {
             await showWarningAlert(
-                'Agenda Untuk Siapa?',
-                'Pilih Direktorat, Direktur, Wakil Direktur I, atau Wakil Direktur II.'
+                'Pilih Direktorat',
+                'Tentukan pemilik agenda terlebih dahulu.'
             );
-
             return false;
         }
 
         if (!form.title.trim()) {
-            await showWarningAlert(
-                'Judul Belum Diisi',
-                'Judul agenda wajib diisi.'
-            );
-
+            await showWarningAlert('Judul Wajib', 'Judul agenda belum diisi.');
             return false;
         }
 
         if (!form.event_date) {
-            await showWarningAlert(
-                'Tanggal Belum Dipilih',
-                'Tanggal agenda wajib dipilih.'
-            );
-
+            await showWarningAlert('Tanggal Wajib', 'Tanggal agenda belum diisi.');
             return false;
         }
 
         if (
             !form.all_day &&
-            (!form.start_time ||
-                !form.end_time ||
-                form.end_time <= form.start_time)
+            (!form.start_time || !form.end_time || invalidTime)
         ) {
             await showWarningAlert(
                 'Jam Tidak Valid',
-                'Jam selesai harus setelah jam mulai.'
+                'Jam selesai harus lebih besar dari jam mulai.'
             );
-
             return false;
         }
 
         if (conflict) {
             await showWarningAlert(
                 'Jadwal Bentrok',
-                `Agenda ${ownerLabel(
-                    form.directorate
-                )} bentrok dengan "${
-                    conflict.title
-                }" (${ownerLabel(
-                    conflict.directorate
-                )}), ${dateText(
-                    conflict.event_date
-                )} pukul ${timeText(conflict)}.`
+                `Bentrok dengan "${conflict.title}" milik ${ownerLabel(conflict.directorate)}.`
             );
-
             return false;
         }
 
         return true;
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | SAVE AGENDA
-    |--------------------------------------------------------------------------
-    */
-
     const handleSave = async () => {
-        if (!canManage) {
-            await showErrorAlert(
-                'Akses Ditolak',
-                'Akun tidak memiliki izin mengelola agenda.'
-            );
-
-            return;
-        }
-
-        if (!(await validateForm())) {
-            return;
-        }
+        if (!canManage || !(await validateForm())) return;
 
         const editing = Boolean(form.id);
 
-        const confirmed =
-            await showConfirmAlert({
-                title: editing
-                    ? 'Simpan Perubahan Agenda?'
-                    : 'Tambahkan Agenda?',
+        const confirmation = await showConfirmAlert({
+            title: editing ? 'Simpan Perubahan Agenda?' : 'Tambahkan Agenda?',
+            text: `Agenda ${ownerLabel(form.directorate)} akan disimpan.`,
+            confirmButtonText: 'Ya, simpan',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#7F1D1D',
+        });
 
-                text: `Agenda untuk ${ownerLabel(
-                    form.directorate
-                )} akan ${
-                    editing
-                        ? 'diperbarui'
-                        : 'ditambahkan'
-                }.`,
-
-                confirmButtonText: editing
-                    ? 'Ya, simpan'
-                    : 'Ya, tambahkan',
-
-                confirmButtonColor:
-                    '#7f1d1d',
-            });
-
-        if (!confirmed?.isConfirmed) {
-            return;
-        }
+        if (!confirmation?.isConfirmed) return;
 
         const payload = {
             directorate: form.directorate,
             title: form.title.trim(),
-
-            description:
-                form.description.trim() || null,
-
+            description: form.description.trim() || null,
             event_date: form.event_date,
-
-            start_time: form.all_day
-                ? null
-                : time(form.start_time),
-
-            end_time: form.all_day
-                ? null
-                : time(form.end_time),
-
-            all_day: Boolean(
-                form.all_day
-            ),
-
-            location:
-                form.location.trim() || null,
-
-            agenda_type:
-                form.agenda_type,
-
-            color: colorOf(
-                form.agenda_type
-            ),
-
-            is_public: Boolean(
-                form.is_public
-            ),
+            start_time: form.all_day ? null : clock(form.start_time),
+            end_time: form.all_day ? null : clock(form.end_time),
+            all_day: Boolean(form.all_day),
+            location: form.location.trim() || null,
+            agenda_type: form.agenda_type,
+            color: agendaColor(form.agenda_type),
+            is_public: Boolean(form.is_public),
         };
 
         try {
             setSaving(true);
-
-            showLoadingAlert(
-                editing
-                    ? 'Menyimpan Agenda'
-                    : 'Menambahkan Agenda',
-                'Sistem sedang memeriksa bentrok jadwal.'
-            );
+            showLoadingAlert('Menyimpan Agenda', 'Sedang memproses jadwal.');
 
             const response = editing
-                ? await api.put(
-                      `/event-schedules/${form.id}`,
-                      payload
-                  )
-                : await api.post(
-                      '/event-schedules',
-                      payload
-                  );
+                ? await api.put(`/event-schedules/${form.id}`, payload)
+                : await api.post('/event-schedules', payload);
 
             closeAlert();
 
             await showSuccessAlert(
-                editing
-                    ? 'Agenda Diperbarui'
-                    : 'Agenda Ditambahkan',
-                response?.data?.message ||
-                    'Agenda berhasil disimpan.'
+                editing ? 'Agenda Diperbarui' : 'Agenda Ditambahkan',
+                response?.data?.message || 'Agenda berhasil disimpan.'
             );
 
-            if (
-                activeOwner !== 'semua'
-            ) {
-                setActiveOwner(
-                    form.directorate
-                );
-            }
-
             setModalOpen(false);
-            setSelectedEvent(null);
+            setSelectedOfficial(null);
             setDetailMode(false);
-            setHistories([]);
 
-            await loadEvents();
+            await loadOfficial(false);
+            await loadIntegrated();
         } catch (error) {
             closeAlert();
 
-            const info =
-                error?.response?.data;
-
-            if (
-                error?.response?.status === 409 &&
-                info?.code ===
-                    'SCHEDULE_CONFLICT'
-            ) {
-                const item =
-                    info?.data?.conflict;
-
-                await showWarningAlert(
-                    'Jadwal Bentrok',
-                    `${info.message ||
-                        'Agenda tidak dapat disimpan.'}
-
-${item?.directorate_label || ''}
-${item?.title || ''}
-${dateText(item?.event_date)}
-${item?.time_text || ''}`
-                );
+            if (error?.response?.status === 409) {
+                await showWarningAlert('Jadwal Bentrok', getError(error));
             } else {
-                await showErrorAlert(
-                    'Gagal Menyimpan Agenda',
-                    errorMessage(error)
-                );
+                await showErrorAlert('Gagal Menyimpan Agenda', getError(error));
             }
         } finally {
             setSaving(false);
         }
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | DELETE AGENDA
-    |--------------------------------------------------------------------------
-    */
-
     const handleDelete = async () => {
-        if (
-            !canManage ||
-            !selectedEvent
-        ) {
-            return;
-        }
+        if (!canManage || !selectedOfficial) return;
 
-        const confirmed =
-            await showConfirmAlert({
-                title: 'Hapus Agenda?',
+        const confirmation = await showConfirmAlert({
+            title: 'Hapus Agenda?',
+            text: `Agenda "${selectedOfficial.title}" akan dihapus.`,
+            icon: 'warning',
+            confirmButtonText: 'Ya, hapus',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#dc2626',
+        });
 
-                text: `Agenda "${selectedEvent.title}" akan dihapus.`,
-
-                icon: 'warning',
-
-                confirmButtonText:
-                    'Ya, hapus',
-
-                confirmButtonColor:
-                    '#dc2626',
-            });
-
-        if (!confirmed?.isConfirmed) {
-            return;
-        }
+        if (!confirmation?.isConfirmed) return;
 
         try {
             setSaving(true);
+            showLoadingAlert('Menghapus Agenda', 'Mohon tunggu sebentar.');
 
-            showLoadingAlert(
-                'Menghapus Agenda',
-                'Mohon tunggu sebentar.'
-            );
-
-            await api.delete(
-                `/event-schedules/${selectedEvent.id}`
-            );
+            await api.delete(`/event-schedules/${selectedOfficial.id}`);
 
             closeAlert();
-
-            await showSuccessAlert(
-                'Agenda Dihapus',
-                'Agenda berhasil dihapus.'
-            );
+            await showSuccessAlert('Agenda Dihapus', 'Agenda berhasil dihapus.');
 
             setModalOpen(false);
-            setSelectedEvent(null);
-            setDetailMode(false);
-            setHistories([]);
+            setSelectedOfficial(null);
 
-            await loadEvents();
+            await loadOfficial(false);
+            await loadIntegrated();
         } catch (error) {
             closeAlert();
-
-            await showErrorAlert(
-                'Gagal Menghapus Agenda',
-                errorMessage(error)
-            );
+            await showErrorAlert('Gagal Menghapus Agenda', getError(error));
         } finally {
             setSaving(false);
         }
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | FULLCALENDAR EVENTS
-    |--------------------------------------------------------------------------
-    */
+    const selectedProps = selectedIntegrated?.extendedProps || {};
+    const selectedSource = selectedProps.display_source || '';
+    const selectedSourceInfo = getSourceConfig(selectedSource);
 
-    const calendarEvents = useMemo(
-        () =>
-            filteredEvents.map((event) => ({
-                id: String(event.id),
-
-                title: `[${ownerShort(
-                    event.directorate
-                )}] ${event.title}`,
-
-                start:
-                    event.start ||
-                    `${event.event_date}${
-                        event.all_day
-                            ? ''
-                            : `T${time(
-                                  event.start_time
-                              )}:00`
-                    }`,
-
-                end:
-                    event.end ||
-                    (event.all_day
-                        ? null
-                        : `${event.event_date}T${time(
-                              event.end_time
-                          )}:00`),
-
-                allDay: Boolean(
-                    event.allDay ??
-                        event.all_day
-                ),
-
-                backgroundColor:
-                    event.color ||
-                    colorOf(
-                        event.agenda_type
-                    ),
-
-                borderColor:
-                    event.color ||
-                    colorOf(
-                        event.agenda_type
-                    ),
-
-                textColor:
-                    '#ffffff',
-            })),
-        [filteredEvents]
-    );
-
-    const onCalendarEvent = (info) => {
-        const found = events.find(
-            (item) =>
-                Number(item.id) ===
-                Number(info.event.id)
-        );
-
-        if (found) {
-            openDetailModal(found);
-        }
-    };
-
-    /*
-    |--------------------------------------------------------------------------
-    | LOADING
-    |--------------------------------------------------------------------------
-    */
+    const detailUrl = selectedSource === 'humas'
+        ? `/admin/humas-services/${selectedProps.source_id}`
+        : selectedSource === 'merchandise'
+          ? `/admin/orders/${selectedProps.source_id}`
+          : ['borrowing', 'asset_request'].includes(selectedSource)
+            ? `/admin/borrow-requests/${selectedProps.source_id}`
+            : selectedSource === 'pending_schedule'
+              ? '/admin/director-schedule/requests'
+              : null;
 
     if (loading) {
         return (
-            <div className="card border-0 shadow-sm rounded-4">
-                <div className="card-body text-center py-5">
-                    <span className="spinner-border text-danger mb-3" />
-
-                    <h5 className="fw-bold mb-0">
-                        Memuat Jadwal Direktorat
-                    </h5>
+            <div className="card border-0 shadow-sm rounded-5">
+                <div className="card-body p-5 text-center">
+                    <div className="spinner-border text-danger mb-3" />
+                    <h5 className="fw-bold">Memuat Jadwal Direktorat</h5>
                 </div>
             </div>
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | RENDER PAGE
-    |--------------------------------------------------------------------------
-    */
-
     return (
         <div className="director-schedule-page">
-            {/* HEADER */}
-
-            <header className="director-schedule-header">
+            <header className="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
                 <div>
-                    <div className="d-flex flex-wrap gap-2 mb-2">
-                        <span className="badge rounded-pill bg-danger-subtle text-danger px-3 py-2">
-                            SEKRETARIAT PIMPINAN
-                        </span>
+                    <span className="badge bg-danger-subtle text-danger rounded-pill px-3 py-2 mb-2">
+                        SEKRETARIAT PIMPINAN
+                    </span>
 
-                        <span className="badge rounded-pill border bg-white text-dark px-3 py-2">
-                            <i className="bi bi-calendar-event me-2" />
-                            {events.length} Agenda
-                        </span>
-                    </div>
-
-                    <h2 className="fw-black mb-1">
-                        Jadwal Direktorat
-                    </h2>
+                    <h2 className="fw-black mb-1">Kalender Jadwal Terintegrasi</h2>
 
                     <p className="text-muted mb-0">
-                        Agenda Direktur, Wakil Direktur I,
-                        Wakil Direktur II, serta agenda
-                        bersama Direktorat.
+                        Agenda Direktorat, liputan HUMAS, Merchandise,
+                        Request Barang dan Peminjaman SEKPiM dalam satu kalender.
                     </p>
                 </div>
 
-                {canManage && (
+                <div className="d-flex gap-2">
                     <button
                         type="button"
-                        className="btn btn-danger rounded-pill fw-bold px-4"
-                        onClick={() =>
-                            openCreateModal()
-                        }
-                    >
-                        <i className="bi bi-plus-lg me-2" />
-                        Tambah Agenda
-                    </button>
-                )}
-            </header>
-
-            {/* FILTER DIREKTORAT */}
-
-            <section className="directorate-filter-grid">
-                {FILTERS.map((item) => (
-                    <button
-                        key={item.value}
-                        type="button"
-                        className={`directorate-filter-card ${
-                            activeOwner === item.value
-                                ? 'active'
-                                : ''
-                        }`}
-                        onClick={() => {
-                            setActiveOwner(
-                                item.value
-                            );
-
-                            setActiveType(
-                                'Semua'
-                            );
-
-                            setSearch('');
+                        className="btn btn-outline-danger rounded-pill"
+                        disabled={syncing}
+                        onClick={async () => {
+                            await loadOfficial(false);
+                            await loadIntegrated();
                         }}
                     >
-                        <span className="directorate-filter-icon">
-                            <i
-                                className={`bi ${item.icon}`}
-                            />
-                        </span>
-
-                        <span className="directorate-filter-content">
-                            <strong>
-                                {item.label}
-                            </strong>
-
-                            <small>
-                                {item.description}
-                            </small>
-                        </span>
-
-                        <span className="directorate-filter-count">
-                            {ownerCounts[
-                                item.value
-                            ] || 0}
-                        </span>
+                        <i className="bi bi-arrow-clockwise me-2" />
+                        Refresh
                     </button>
-                ))}
-            </section>
 
-            {/* FILTER AGENDA */}
+                    {canManage && (
+                        <button
+                            type="button"
+                            className="btn btn-danger rounded-pill px-4"
+                            onClick={() => openCreateModal()}
+                        >
+                            <i className="bi bi-plus-lg me-2" />
+                            Tambah Agenda
+                        </button>
+                    )}
+                </div>
+            </header>
 
-            <section className="schedule-control-panel">
-                <div className="schedule-control-main">
-                    <div className="schedule-control-heading">
-                        <div>
-                            <strong>
-                                <i className="bi bi-funnel-fill text-danger me-2" />
-                                Filter Agenda
-                            </strong>
-
-                            <div className="small text-muted">
-                                Menampilkan{' '}
-                                {filteredEvents.length}{' '}
-                                dari{' '}
-                                {ownerEvents.length}{' '}
-                                agenda{' '}
-                                {activeOwnerInfo.label}.
-                            </div>
-                        </div>
-
-                        <div className="schedule-control-tools">
-                            <div className="schedule-search">
-                                <i className="bi bi-search" />
-
-                                <input
-                                    type="search"
-                                    aria-label="Cari agenda"
-                                    placeholder="Cari agenda, lokasi..."
-                                    value={search}
-                                    onChange={(event) =>
-                                        setSearch(
-                                            event.target.value
-                                        )
-                                    }
-                                />
-
-                                {search && (
-                                    <button
-                                        type="button"
-                                        aria-label="Hapus pencarian"
-                                        onClick={() =>
-                                            setSearch('')
-                                        }
-                                    >
-                                        <i className="bi bi-x" />
-                                    </button>
-                                )}
+            {/* FILTER JENIS KEGIATAN */}
+            {isCalendarAdmin && (
+                <section className="card border-0 shadow-sm rounded-5 mb-4">
+                    <div className="card-body p-4">
+                        <div className="d-flex justify-content-between gap-3 flex-wrap mb-3">
+                            <div>
+                                <h5 className="fw-black mb-1">Sumber Kegiatan</h5>
+                                <p className="small text-muted mb-0">
+                                    Pilih kategori kegiatan yang ingin ditampilkan.
+                                </p>
                             </div>
 
-                            <button
-                                type="button"
-                                className="schedule-today"
-                                onClick={() =>
-                                    calendarRef.current
-                                        ?.getApi()
-                                        ?.today()
-                                }
-                            >
-                                <i className="bi bi-calendar2-day-fill" />
-                                Hari Ini
-                            </button>
+                            {syncing && (
+                                <span className="small text-primary">
+                                    <span className="spinner-border spinner-border-sm me-2" />
+                                    Memuat integrasi...
+                                </span>
+                            )}
                         </div>
-                    </div>
 
-                    {/* KATEGORI */}
-
-                    <div className="schedule-category-list">
-                        {[
-                            'Semua',
-                            ...TYPES,
-                        ].map((type) => (
-                            <button
-                                key={type}
-                                type="button"
-                                className={`schedule-category-button ${
-                                    activeType === type
-                                        ? 'active'
-                                        : ''
-                                }`}
-                                style={
-                                    activeType ===
-                                        type &&
-                                    type !== 'Semua'
-                                        ? {
-                                              color:
-                                                  colorOf(
-                                                      type
-                                                  ),
-                                              borderColor:
-                                                  colorOf(
-                                                      type
-                                                  ),
-                                          }
-                                        : undefined
-                                }
-                                onClick={() =>
-                                    setActiveType(
-                                        type
-                                    )
-                                }
-                            >
-                                <span
-                                    className="agenda-dot"
-                                    style={{
-                                        background:
-                                            type ===
-                                            'Semua'
-                                                ? '#334155'
-                                                : colorOf(
-                                                      type
-                                                  ),
+                        <div className="d-flex flex-wrap gap-2">
+                            {SOURCES.map((source) => (
+                                <button
+                                    type="button"
+                                    key={source.key}
+                                    className={`btn rounded-pill ${
+                                        sourceFilter === source.key
+                                            ? 'btn-dark'
+                                            : 'btn-outline-secondary'
+                                    }`}
+                                    onClick={() => {
+                                        setSourceFilter(source.key);
+                                        setOwnerFilter('semua');
+                                        setTypeFilter('Semua');
                                     }}
                                 >
                                     <i
-                                        className={`bi ${
-                                            type ===
-                                            'Semua'
-                                                ? 'bi-grid-fill'
-                                                : ICONS[
-                                                      type
-                                                  ]
-                                        }`}
+                                        className={`bi ${source.icon} me-2`}
+                                        style={
+                                            sourceFilter === source.key
+                                                ? undefined
+                                                : { color: source.color }
+                                        }
                                     />
-                                </span>
 
-                                {type}
+                                    {source.label}
 
-                                <span className="agenda-count">
-                                    {typeCounts[
-                                        type
-                                    ] || 0}
+                                    <span className="badge rounded-pill bg-light text-dark ms-2">
+                                        {counts[source.key] || 0}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {integratedError && (
+                            <div className="alert alert-warning rounded-4 mt-3 mb-0">
+                                <strong>Integrasi belum berhasil dimuat:</strong>{' '}
+                                {integratedError}
+                            </div>
+                        )}
+                    </div>
+                </section>
+            )}
+
+            {/* FILTER PEMILIK AGENDA */}
+            <section className="row g-2 mb-4">
+                {[
+                    { value: 'semua', label: 'Semua Direktorat', icon: 'bi-grid' },
+                    ...DIRECTORATES,
+                ].map((item) => (
+                    <div className="col-6 col-lg" key={item.value}>
+                        <button
+                            type="button"
+                            className={`director-owner-button ${
+                                ownerFilter === item.value ? 'active' : ''
+                            }`}
+                            onClick={() => {
+                                setOwnerFilter(item.value);
+                                setTypeFilter('Semua');
+
+                                if (!['all', 'directorate', 'pending_schedule'].includes(sourceFilter)) {
+                                    setSourceFilter('directorate');
+                                }
+                            }}
+                        >
+                            <i className={`bi ${item.icon} fs-5`} />
+                            <span className="flex-grow-1">
+                                <strong>{item.label}</strong>
+                                <small>
+                                    {ownerCounts[item.value] || 0} agenda
+                                </small>
+                            </span>
+                        </button>
+                    </div>
+                ))}
+            </section>
+
+            {/* FILTER LANJUTAN */}
+            <section className="card border-0 shadow-sm rounded-5 mb-4">
+                <div className="card-body p-4">
+                    <div className="row g-3">
+                        <div className="col-lg-7">
+                            <label className="form-label fw-bold">Cari Kegiatan</label>
+                            <div className="input-group">
+                                <span className="input-group-text">
+                                    <i className="bi bi-search" />
                                 </span>
+                                <input
+                                    type="search"
+                                    className="form-control"
+                                    placeholder="Judul, lokasi, pemohon, PIC..."
+                                    value={search}
+                                    onChange={(event) => setSearch(event.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="col-lg-5">
+                            <label className="form-label fw-bold">
+                                Kategori Agenda Direktorat
+                            </label>
+
+                            <select
+                                className="form-select"
+                                value={typeFilter}
+                                onChange={(event) => setTypeFilter(event.target.value)}
+                            >
+                                <option value="Semua">Semua Kategori</option>
+                                {AGENDA_TYPES.map((type) => (
+                                    <option value={type} key={type}>{type}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="col-12 d-flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                className="btn btn-outline-danger rounded-pill"
+                                onClick={() => calendarRef.current?.getApi()?.today()}
+                            >
+                                <i className="bi bi-calendar2-day me-2" />
+                                Hari Ini
                             </button>
-                        ))}
-                    </div>
-                </div>
 
-                {/* RINGKASAN */}
-
-                <div className="schedule-summary-grid">
-                    <div className="schedule-summary-card">
-                        <span className="schedule-summary-icon today">
-                            <i className="bi bi-calendar2-check-fill" />
-                        </span>
-
-                        <div className="min-w-0">
-                            <div className="schedule-summary-label">
-                                Agenda Hari Ini
-                            </div>
-
-                            <strong>
-                                {todayEvents.length}{' '}
-                                Agenda
-                            </strong>
-
-                            <div className="schedule-summary-description">
-                                {todayEvents[0]
-                                    ? `${ownerShort(
-                                          todayEvents[0]
-                                              .directorate
-                                      )} • ${
-                                          todayEvents[0]
-                                              .title
-                                      }`
-                                    : 'Tidak ada agenda hari ini'}
-                            </div>
+                            <button
+                                type="button"
+                                className="btn btn-light border rounded-pill"
+                                onClick={() => {
+                                    setSearch('');
+                                    setOwnerFilter('semua');
+                                    setTypeFilter('Semua');
+                                    setSourceFilter('all');
+                                }}
+                            >
+                                <i className="bi bi-arrow-counterclockwise me-2" />
+                                Reset Filter
+                            </button>
                         </div>
                     </div>
 
-                    <button
-                        type="button"
-                        className="schedule-summary-card"
-                        disabled={!nearest}
-                        onClick={() =>
-                            nearest &&
-                            openDetailModal(
-                                nearest.event
-                            )
-                        }
-                    >
-                        <span className="schedule-summary-icon next">
-                            <i
-                                className={`bi ${
-                                    nearest?.status ===
-                                    'ongoing'
-                                        ? 'bi-broadcast-pin'
-                                        : 'bi-clock-history'
-                                }`}
-                            />
-                        </span>
-
-                        <div className="min-w-0">
-                            <div className="schedule-summary-label">
-                                {nearest?.status ===
-                                'ongoing'
-                                    ? 'Sedang Berlangsung'
-                                    : 'Agenda Terdekat'}
-                            </div>
-
-                            <strong className="schedule-summary-title">
-                                {nearest?.event.title ||
-                                    'Belum ada agenda'}
-                            </strong>
-
-                            {nearest && (
-                                <div className="schedule-summary-description">
-                                    {ownerShort(
-                                        nearest.event
-                                            .directorate
-                                    )}{' '}
-                                    •{' '}
-                                    {dateText(
-                                        nearest.event
-                                            .event_date,
-                                        true
-                                    )}{' '}
-                                    •{' '}
-                                    {timeText(
-                                        nearest.event
-                                    )}
+                    <div className="row g-3 mt-1">
+                        <div className="col-md-6">
+                            <div className="bg-light rounded-4 p-3">
+                                <div className="small text-muted">
+                                    Agenda Pimpinan Hari Ini
                                 </div>
-                            )}
+                                <div className="fs-4 fw-black">
+                                    {todayOfficial.length} Agenda
+                                </div>
+                            </div>
                         </div>
-                    </button>
+
+                        <div className="col-md-6">
+                            <div className="bg-light rounded-4 p-3">
+                                <div className="small text-muted">
+                                    Kegiatan Terlihat pada Kalender
+                                </div>
+                                <div className="fs-4 fw-black">
+                                    {calendarEvents.length} Kegiatan
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            {/* KALENDER */}
-
-            <section className="card border-0 shadow-sm director-calendar-card">
-                <div className="calendar-active-banner">
-                    <span className="calendar-active-icon">
-                        <i
-                            className={`bi ${activeOwnerInfo.icon}`}
+            {/* LEGENDA */}
+            <section className="d-flex flex-wrap gap-3 mb-3">
+                {SOURCES.filter((item) => item.key !== 'all').map((item) => (
+                    <div
+                        className="d-inline-flex align-items-center gap-2 small"
+                        key={item.key}
+                    >
+                        <span
+                            className="rounded-circle"
+                            style={{
+                                width: 11,
+                                height: 11,
+                                backgroundColor: item.color,
+                            }}
                         />
-                    </span>
-
-                    <div>
-                        <div className="calendar-active-label">
-                            Kalender Aktif
-                        </div>
-
-                        <strong>
-                            {activeOwnerInfo.label}
-                        </strong>
+                        <span>{item.label}</span>
                     </div>
+                ))}
+            </section>
 
-                    {activeOwner === 'semua' && (
-                        <div className="ms-auto calendar-all-info">
-                            Agenda bersamaan tetap
-                            ditampilkan bila pemiliknya
-                            berbeda.
-                        </div>
-                    )}
+            {/* KALENDER */}
+            <section className="card border-0 shadow-sm rounded-5 overflow-hidden">
+                <div className="director-calendar-banner">
+                    <i className="bi bi-calendar3 fs-4" />
+                    <div>
+                        <div className="small opacity-75">Kalender Aktif</div>
+                        <strong>{getSourceConfig(sourceFilter).label}</strong>
+                    </div>
                 </div>
 
-                <div className="card-body director-calendar-body">
+                <div className="card-body p-3">
                     <div className="director-calendar-viewport">
                         <FullCalendar
                             ref={calendarRef}
@@ -1855,47 +1102,20 @@ ${item?.time_text || ''}`
                             initialView="dayGridMonth"
                             locale="id"
                             firstDay={1}
-                            height={
-                                compact
-                                    ? 'auto'
-                                    : '100%'
-                            }
-                            expandRows={
-                                !compact
-                            }
-                            events={
-                                calendarEvents
-                            }
-                            dateClick={(info) =>
-                                canManage &&
-                                openCreateModal(
-                                    info.dateStr.slice(
-                                        0,
-                                        10
-                                    )
-                                )
-                            }
-                            eventClick={
-                                onCalendarEvent
-                            }
-                            headerToolbar={{
-                                start:
-                                    'prev,next',
-                                center:
-                                    'title',
-                                end:
-                                    'dayGridMonth,timeGridWeek,timeGridDay',
+                            height={compact ? 'auto' : '100%'}
+                            expandRows={!compact}
+                            events={calendarEvents}
+                            datesSet={handleDatesSet}
+                            eventClick={onCalendarEvent}
+                            dateClick={(info) => {
+                                if (canManage) {
+                                    openCreateModal(info.dateStr.slice(0, 10));
+                                }
                             }}
-                            buttons={{
-                                dayGridMonth: {
-                                    text: 'Bulan',
-                                },
-                                timeGridWeek: {
-                                    text: 'Minggu',
-                                },
-                                timeGridDay: {
-                                    text: 'Hari',
-                                },
+                            headerToolbar={{
+                                start: 'prev,next',
+                                center: 'title',
+                                end: 'dayGridMonth,timeGridWeek,timeGridDay',
                             }}
                             eventTimeFormat={{
                                 hour: '2-digit',
@@ -1912,862 +1132,487 @@ ${item?.time_text || ''}`
                             slotDuration="00:30:00"
                             nowIndicator
                             navLinks
-                            selectable={
-                                canManage
-                            }
-                            dayMaxEvents={
-                                compact
-                                    ? 2
-                                    : 6
-                            }
-                            fixedWeekCount={
-                                false
-                            }
+                            dayMaxEvents={compact ? 2 : 6}
+                            fixedWeekCount={false}
                         />
                     </div>
                 </div>
             </section>
 
-            {/* MODAL AGENDA */}
+            {/* MODAL DETAIL LAYANAN */}
+            {selectedIntegrated && (
+                <div className="modal fade show d-block director-modal-backdrop" role="dialog" aria-modal="true">
+                    <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+                        <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
+                            <div
+                                style={{
+                                    height: 7,
+                                    background: selectedSourceInfo.color,
+                                }}
+                            />
 
+                            <div className="modal-header border-0 px-4 pt-4">
+                                <div>
+                                    <div className="small fw-bold mb-2" style={{ color: selectedSourceInfo.color }}>
+                                        {selectedSourceInfo.label.toUpperCase()}
+                                    </div>
+                                    <h4 className="fw-black mb-0">
+                                        {selectedIntegrated.title}
+                                    </h4>
+                                </div>
+                                <button
+                                    className="btn-close"
+                                    type="button"
+                                    aria-label="Tutup"
+                                    onClick={() => setSelectedIntegrated(null)}
+                                />
+                            </div>
+
+                            <div className="modal-body px-4">
+                                <div className="row g-3">
+                                    <div className="col-md-6">
+                                        <InfoBox
+                                            label="Kode Pengajuan"
+                                            value={selectedProps.service_code}
+                                        />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <InfoBox
+                                            label="Status"
+                                            value={STATUS[selectedProps.status] || selectedProps.status}
+                                        />
+                                    </div>
+
+                                    <div className="col-md-6">
+                                        <InfoBox
+                                            label={
+                                                ['merchandise', 'asset_request', 'borrowing'].includes(selectedSource)
+                                                    ? 'Tanggal Pengambilan'
+                                                    : 'Tanggal Kegiatan'
+                                            }
+                                            value={formatDate(
+                                                selectedProps.pickup_date ||
+                                                selectedProps.event_date
+                                            )}
+                                        />
+                                    </div>
+
+                                    {selectedSource === 'borrowing' && (
+                                        <div className="col-md-6">
+                                            <InfoBox
+                                                label="Tanggal Pengembalian"
+                                                value={formatDate(selectedProps.return_date)}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {selectedSource === 'merchandise' && selectedProps.activity_date && (
+                                        <div className="col-md-6">
+                                            <InfoBox
+                                                label="Tanggal Acara"
+                                                value={formatDate(selectedProps.activity_date)}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {[
+                                        ['Unit / Instansi', selectedProps.requester_unit],
+                                        ['Nama PIC', selectedProps.pic_name],
+                                        ['Telepon PIC', selectedProps.pic_phone || selectedProps.pic_whatsapp],
+                                        ['Lokasi', selectedProps.location],
+                                        ['Jenis Liputan', selectedProps.coverage_type],
+                                        ['Kategori Agenda', selectedProps.agenda_type],
+                                    ].filter(([, value]) => value).map(([label, value]) => (
+                                        <div className="col-md-6" key={label}>
+                                            <InfoBox label={label} value={value} />
+                                        </div>
+                                    ))}
+
+                                    {selectedProps.description && (
+                                        <div className="col-12">
+                                            <InfoBox
+                                                label="Deskripsi / Keperluan"
+                                                value={selectedProps.description}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="alert alert-info rounded-4 mt-4 mb-0">
+                                    <i className="bi bi-info-circle me-2" />
+                                    Agenda ini berasal dari data pengajuan layanan.
+                                    Perubahan dilakukan melalui modul layanan terkait,
+                                    bukan form agenda Direktorat.
+                                </div>
+                            </div>
+
+                            <div className="modal-footer border-0 px-4 pb-4">
+                                {detailUrl && (
+                                    <Link
+                                        to={detailUrl}
+                                        className="btn btn-danger rounded-pill"
+                                        onClick={() => setSelectedIntegrated(null)}
+                                    >
+                                        <i className="bi bi-box-arrow-up-right me-2" />
+                                        Buka Detail Pengajuan
+                                    </Link>
+                                )}
+
+                                <button
+                                    type="button"
+                                    className="btn btn-light border rounded-pill"
+                                    onClick={() => setSelectedIntegrated(null)}
+                                >
+                                    Tutup
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL AGENDA DIREKTORAT */}
             {modalOpen && (
-                <div
-                    className="modal fade show d-block director-modal-backdrop"
-                    role="dialog"
-                    aria-modal="true"
-                    tabIndex={-1}
-                >
+                <div className="modal fade show d-block director-modal-backdrop" role="dialog" aria-modal="true">
                     <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
                         <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
                             <div
                                 className="director-modal-accent"
-                                style={{
-                                    background:
-                                        colorOf(
-                                            form.agenda_type
-                                        ),
-                                }}
+                                style={{ background: agendaColor(form.agenda_type) }}
                             />
 
-                            {/* MODAL HEADER */}
-
-                            <div className="modal-header border-0 pb-1 px-4 pt-4">
+                            <div className="modal-header border-0 px-4 pt-4">
                                 <div>
-                                    <span className="badge bg-danger-subtle text-danger rounded-pill mb-2">
-                                        {form.id
+                                    <span className="small fw-bold text-danger">
+                                        {detailMode
                                             ? 'DETAIL AGENDA'
-                                            : 'AGENDA BARU'}
+                                            : form.id
+                                              ? 'EDIT AGENDA'
+                                              : 'AGENDA BARU'}
                                     </span>
 
-                                    <h4 className="fw-black mb-0">
-                                        {form.id
-                                            ? form.title
-                                            : 'Tambah Agenda Direktorat'}
+                                    <h4 className="fw-black mt-2 mb-0">
+                                        {form.title || 'Tambah Agenda Direktorat'}
                                     </h4>
                                 </div>
 
                                 <button
-                                    type="button"
                                     className="btn-close"
-                                    onClick={
-                                        closeModal
-                                    }
-                                    disabled={
-                                        saving
-                                    }
-                                    aria-label="Tutup"
+                                    type="button"
+                                    onClick={closeModal}
+                                    disabled={saving}
                                 />
                             </div>
-
-                            {/* MODAL BODY */}
 
                             <div className="modal-body px-4 py-3">
                                 {detailMode ? (
                                     <div className="row g-3">
                                         {detailLoading && (
-                                            <div className="col-12 small text-danger">
-                                                <span className="spinner-border spinner-border-sm me-2" />
-                                                Memuat detail
-                                                terbaru...
+                                            <div className="col-12 text-muted small">
+                                                Memuat detail terbaru...
                                             </div>
                                         )}
 
-                                        {/* PEMILIK AGENDA */}
-
                                         <div className="col-12">
-                                            <div className="agenda-owner-detail">
-                                                <span className="director-owner-icon">
-                                                    <i
-                                                        className={`bi ${
-                                                            owner(
-                                                                form.directorate
-                                                            )
-                                                                ?.icon ||
-                                                            'bi-people-fill'
-                                                        }`}
-                                                    />
-                                                </span>
-
-                                                <div>
-                                                    <small className="text-muted fw-bold">
-                                                        AGENDA UNTUK
-                                                    </small>
-
-                                                    <div className="fs-5 fw-black text-danger">
-                                                        {ownerLabel(
-                                                            form.directorate
-                                                        )}
-                                                    </div>
-
-                                                    <div className="small text-muted">
-                                                        {owner(
-                                                            form.directorate
-                                                        )
-                                                            ?.description ||
-                                                            ''}
-                                                    </div>
-                                                </div>
-                                            </div>
+                                            <InfoBox label="Judul Agenda" value={form.title} />
                                         </div>
-
-                                        {/* JUDUL */}
-
-                                        <div className="col-12">
-                                            <div className="agenda-detail-box">
-                                                <small>
-                                                    Judul Agenda
-                                                </small>
-
-                                                <div className="fs-4 fw-black">
-                                                    {
-                                                        form.title
-                                                    }
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* DETAIL AGENDA */}
 
                                         {[
-                                            [
-                                                'Tanggal',
-                                                dateText(
-                                                    form.event_date
-                                                ),
-                                            ],
-                                            [
-                                                'Waktu',
-                                                timeText(
-                                                    form
-                                                ),
-                                            ],
-                                            [
-                                                'Kategori',
-                                                form.agenda_type,
-                                            ],
-                                            [
-                                                'Lokasi',
-                                                form.location ||
-                                                    '-',
-                                            ],
-                                        ].map(
-                                            ([
-                                                label,
-                                                value,
-                                            ]) => (
-                                                <div
-                                                    className="col-md-6"
-                                                    key={
-                                                        label
-                                                    }
-                                                >
-                                                    <div className="agenda-detail-box h-100">
-                                                        <small>
-                                                            {
-                                                                label
-                                                            }
-                                                        </small>
-
-                                                        <strong>
-                                                            {
-                                                                value
-                                                            }
-                                                        </strong>
-                                                    </div>
-                                                </div>
-                                            )
-                                        )}
-
-                                        {/* DESKRIPSI */}
-
-                                        <div className="col-12">
-                                            <div className="agenda-detail-box">
-                                                <small>
-                                                    Deskripsi
-                                                </small>
-
-                                                <div
-                                                    style={{
-                                                        whiteSpace:
-                                                            'pre-line',
-                                                    }}
-                                                >
-                                                    {form.description ||
-                                                        '-'}
-                                                </div>
+                                            ['Agenda Untuk', ownerLabel(form.directorate)],
+                                            ['Tanggal', formatDate(form.event_date)],
+                                            ['Waktu', form.all_day ? 'Sepanjang Hari' : `${form.start_time} - ${form.end_time}`],
+                                            ['Kategori', form.agenda_type],
+                                            ['Lokasi', form.location],
+                                            ['Visibilitas', form.is_public ? 'Publik' : 'Internal'],
+                                        ].map(([label, value]) => (
+                                            <div className="col-md-6" key={label}>
+                                                <InfoBox label={label} value={value} />
                                             </div>
-                                        </div>
-
-                                        {/* VISIBILITAS */}
+                                        ))}
 
                                         <div className="col-12">
-                                            <span
-                                                className={`badge rounded-pill px-3 py-2 ${
-                                                    form.is_public
-                                                        ? 'bg-success-subtle text-success'
-                                                        : 'bg-secondary-subtle text-secondary'
-                                                }`}
-                                            >
-                                                <i
-                                                    className={`bi ${
-                                                        form.is_public
-                                                            ? 'bi-globe2'
-                                                            : 'bi-lock-fill'
-                                                    } me-2`}
-                                                />
-
-                                                {form.is_public
-                                                    ? 'Tampil di Kalender Publik'
-                                                    : 'Internal'}
-                                            </span>
+                                            <InfoBox label="Deskripsi" value={form.description} />
                                         </div>
-
-                                        {/* AUDIT TRAIL */}
 
                                         {canManage && (
                                             <div className="col-12">
-                                                <div className="audit-section">
-                                                    <div className="d-flex justify-content-between align-items-center gap-3 mb-3">
-                                                        <div>
-                                                            <small className="text-muted fw-bold">
-                                                                ACTIVITY
-                                                                LOG
-                                                            </small>
-
-                                                            <h5 className="fw-black mb-1">
-                                                                <i className="bi bi-clock-history me-2 text-danger" />
-                                                                Riwayat
-                                                                Perubahan
-                                                            </h5>
-
-                                                            <div className="small text-muted">
-                                                                Perubahan
-                                                                agenda yang
-                                                                dilakukan
-                                                                oleh admin.
-                                                            </div>
-                                                        </div>
-
-                                                        <span className="badge bg-danger-subtle text-danger">
-                                                            {
-                                                                histories.length
-                                                            }
-                                                        </span>
-                                                    </div>
+                                                <div className="border rounded-4 p-4">
+                                                    <h5 className="fw-black">
+                                                        <i className="bi bi-clock-history me-2" />
+                                                        Riwayat Perubahan
+                                                    </h5>
 
                                                     {historyError && (
                                                         <div className="alert alert-warning">
-                                                            Riwayat perubahan
-                                                            belum dapat dimuat.
+                                                            Riwayat belum dapat dimuat.
                                                         </div>
                                                     )}
 
-                                                    {!detailLoading &&
-                                                        !historyError &&
-                                                        histories.length ===
-                                                            0 && (
-                                                            <p className="text-muted small mb-0">
-                                                                Belum ada
-                                                                riwayat
-                                                                perubahan.
-                                                            </p>
-                                                        )}
+                                                    {histories.length === 0 && !detailLoading && (
+                                                        <p className="text-muted small mb-0">
+                                                            Belum ada riwayat perubahan.
+                                                        </p>
+                                                    )}
 
-                                                    <div className="audit-timeline">
-                                                        {histories.map(
-                                                            (item) => (
+                                                    <div className="d-flex flex-column gap-3 mt-3">
+                                                        {histories.map((entry) => {
+                                                            const changedFields = [
+                                                                ...new Set([
+                                                                    ...Object.keys(entry.old_values || {}),
+                                                                    ...Object.keys(entry.new_values || {}),
+                                                                ]),
+                                                            ].filter((key) =>
+                                                                String(entry.old_values?.[key] ?? '') !==
+                                                                String(entry.new_values?.[key] ?? '')
+                                                            );
+
+                                                            return (
                                                                 <div
-                                                                    key={
-                                                                        item.id
-                                                                    }
-                                                                    className="audit-item"
+                                                                    className="bg-light rounded-4 p-3"
+                                                                    key={entry.id}
                                                                 >
-                                                                    <span
-                                                                        className={`audit-marker audit-${item.action}`}
-                                                                    >
-                                                                        <i
-                                                                            className={`bi ${
-                                                                                item.action ===
-                                                                                'created'
-                                                                                    ? 'bi-plus-lg'
-                                                                                    : item.action ===
-                                                                                      'deleted'
-                                                                                    ? 'bi-trash-fill'
-                                                                                    : 'bi-pencil-fill'
-                                                                            }`}
-                                                                        />
-                                                                    </span>
+                                                                    <div className="fw-bold">
+                                                                        {entry.action === 'created'
+                                                                            ? 'Agenda Dibuat'
+                                                                            : entry.action === 'deleted'
+                                                                              ? 'Agenda Dihapus'
+                                                                              : 'Agenda Diperbarui'}
+                                                                    </div>
 
-                                                                    <div className="audit-content">
-                                                                        <div className="d-flex justify-content-between flex-wrap gap-2">
-                                                                            <div>
-                                                                                <strong>
-                                                                                    {item.action ===
-                                                                                    'created'
-                                                                                        ? 'Agenda Dibuat'
-                                                                                        : item.action ===
-                                                                                          'deleted'
-                                                                                        ? 'Agenda Dihapus'
-                                                                                        : 'Agenda Diperbarui'}
-                                                                                </strong>
+                                                                    <div className="small text-muted mb-2">
+                                                                        {entry.user_name || 'Admin'} •{' '}
+                                                                        {formatDateTime(entry.created_at)}
+                                                                    </div>
 
-                                                                                <div className="small text-muted">
-                                                                                    {item.user_name ||
-                                                                                        'User tidak tersedia'}
+                                                                    {entry.action === 'updated' &&
+                                                                        changedFields.map((field) => (
+                                                                            <div
+                                                                                className="border-top py-2 small"
+                                                                                key={field}
+                                                                            >
+                                                                                <div className="fw-bold">
+                                                                                    {AUDIT_LABELS[field] || field}
+                                                                                </div>
+                                                                                <div>
+                                                                                    {String(entry.old_values?.[field] ?? '-')}
+                                                                                    {' → '}
+                                                                                    {String(entry.new_values?.[field] ?? '-')}
                                                                                 </div>
                                                                             </div>
-
-                                                                            <small className="text-muted">
-                                                                                {dateTimeText(
-                                                                                    item.created_at
-                                                                                )}
-                                                                            </small>
-                                                                        </div>
-
-                                                                        {item.action ===
-                                                                            'updated' &&
-                                                                            auditChanges(
-                                                                                item
-                                                                            ).map(
-                                                                                (
-                                                                                    change
-                                                                                ) => (
-                                                                                    <div
-                                                                                        className="audit-change"
-                                                                                        key={
-                                                                                            change.field
-                                                                                        }
-                                                                                    >
-                                                                                        <small className="fw-bold d-block text-muted mb-1">
-                                                                                            {
-                                                                                                change.label
-                                                                                            }
-                                                                                        </small>
-
-                                                                                        <div className="audit-change-values">
-                                                                                            <span className="audit-old">
-                                                                                                {
-                                                                                                    change.old
-                                                                                                }
-                                                                                            </span>
-
-                                                                                            <i className="bi bi-arrow-right" />
-
-                                                                                            <span className="audit-new">
-                                                                                                {
-                                                                                                    change.next
-                                                                                                }
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                )
-                                                                            )}
-
-                                                                        {item.action ===
-                                                                            'created' && (
-                                                                            <div className="small mt-2 text-success">
-                                                                                Agenda
-                                                                                ini
-                                                                                dibuat.
-                                                                            </div>
-                                                                        )}
-
-                                                                        {item.action ===
-                                                                            'deleted' && (
-                                                                            <div className="small mt-2 text-danger">
-                                                                                Agenda
-                                                                                ini
-                                                                                dihapus.
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
+                                                                        ))}
                                                                 </div>
-                                                            )
-                                                        )}
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
                                 ) : (
-                                    /* FORM TAMBAH / EDIT */
-
                                     <div className="row g-3">
-                                        {/* AGENDA UNTUK */}
-
                                         <div className="col-12">
-                                            <Field
-                                                label="Agenda Untuk"
-                                                required
-                                            />
-
-                                            <div className="agenda-owner-options">
-                                                {DIRECTORATES.map(
-                                                    (item) => (
-                                                        <button
-                                                            type="button"
-                                                            key={
-                                                                item.value
-                                                            }
-                                                            className={`agenda-owner-option ${
-                                                                form.directorate ===
-                                                                item.value
-                                                                    ? 'active'
-                                                                    : ''
-                                                            }`}
-                                                            onClick={() =>
-                                                                setField(
-                                                                    'directorate',
-                                                                    item.value
-                                                                )
-                                                            }
-                                                        >
-                                                            <span className="director-owner-icon">
-                                                                <i
-                                                                    className={`bi ${item.icon}`}
-                                                                />
-                                                            </span>
-
-                                                            <span className="flex-grow-1">
-                                                                <strong className="d-block">
-                                                                    {
-                                                                        item.label
-                                                                    }
-                                                                </strong>
-
-                                                                <small>
-                                                                    {
-                                                                        item.description
-                                                                    }
-                                                                </small>
-                                                            </span>
-
-                                                            {form.directorate ===
-                                                                item.value && (
-                                                                <i className="bi bi-check-circle-fill" />
-                                                            )}
-                                                        </button>
-                                                    )
-                                                )}
-                                            </div>
+                                            <FormField label="Agenda Untuk" required>
+                                                <div className="row g-2">
+                                                    {DIRECTORATES.map((item) => (
+                                                        <div className="col-sm-6" key={item.value}>
+                                                            <button
+                                                                type="button"
+                                                                className={`director-owner-choice ${
+                                                                    form.directorate === item.value ? 'active' : ''
+                                                                }`}
+                                                                onClick={() => updateField('directorate', item.value)}
+                                                            >
+                                                                <i className={`bi ${item.icon} me-2`} />
+                                                                {item.label}
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </FormField>
                                         </div>
 
-                                        {/* JUDUL */}
-
                                         <div className="col-12">
-                                            <Field
-                                                label="Judul Agenda"
-                                                required
-                                            >
+                                            <FormField label="Judul Agenda" required>
                                                 <input
-                                                    type="text"
                                                     className="form-control form-control-lg"
-                                                    maxLength={
-                                                        255
-                                                    }
+                                                    maxLength={255}
+                                                    value={form.title}
                                                     placeholder="Contoh: Rapat Koordinasi Pimpinan"
-                                                    value={
-                                                        form.title
-                                                    }
-                                                    onChange={(
-                                                        event
-                                                    ) =>
-                                                        setField(
-                                                            'title',
-                                                            event
-                                                                .target
-                                                                .value
-                                                        )
+                                                    onChange={(event) =>
+                                                        updateField('title', event.target.value)
                                                     }
                                                 />
-                                            </Field>
+                                            </FormField>
                                         </div>
 
-                                        {/* TANGGAL */}
-
                                         <div className="col-md-6">
-                                            <Field
-                                                label="Tanggal"
-                                                required
-                                            >
+                                            <FormField label="Tanggal" required>
                                                 <input
                                                     type="date"
                                                     className="form-control form-control-lg"
-                                                    value={
-                                                        form.event_date
-                                                    }
-                                                    onChange={(
-                                                        event
-                                                    ) =>
-                                                        setField(
-                                                            'event_date',
-                                                            event
-                                                                .target
-                                                                .value
-                                                        )
+                                                    value={form.event_date}
+                                                    onChange={(event) =>
+                                                        updateField('event_date', event.target.value)
                                                     }
                                                 />
-                                            </Field>
+                                            </FormField>
                                         </div>
-
-                                        {/* KATEGORI */}
 
                                         <div className="col-md-6">
-                                            <Field label="Kategori">
+                                            <FormField label="Kategori">
                                                 <select
                                                     className="form-select form-select-lg"
-                                                    value={
-                                                        form.agenda_type
-                                                    }
-                                                    onChange={(
-                                                        event
-                                                    ) =>
-                                                        setField(
-                                                            'agenda_type',
-                                                            event
-                                                                .target
-                                                                .value
-                                                        )
+                                                    value={form.agenda_type}
+                                                    onChange={(event) =>
+                                                        updateField('agenda_type', event.target.value)
                                                     }
                                                 >
-                                                    {TYPES.map(
-                                                        (
-                                                            type
-                                                        ) => (
-                                                            <option
-                                                                key={
-                                                                    type
-                                                                }
-                                                                value={
-                                                                    type
-                                                                }
-                                                            >
-                                                                {
-                                                                    type
-                                                                }
-                                                            </option>
-                                                        )
-                                                    )}
+                                                    {AGENDA_TYPES.map((type) => (
+                                                        <option value={type} key={type}>
+                                                            {type}
+                                                        </option>
+                                                    ))}
                                                 </select>
-                                            </Field>
+                                            </FormField>
                                         </div>
-
-                                        {/* PREVIEW KATEGORI */}
-
-                                        <div className="col-12">
-                                            <div
-                                                className="agenda-category-preview"
-                                                style={{
-                                                    background: `${colorOf(
-                                                        form.agenda_type
-                                                    )}10`,
-                                                    color: colorOf(
-                                                        form.agenda_type
-                                                    ),
-                                                    borderColor: `${colorOf(
-                                                        form.agenda_type
-                                                    )}40`,
-                                                }}
-                                            >
-                                                <span
-                                                    className="agenda-preview-icon"
-                                                    style={{
-                                                        background:
-                                                            colorOf(
-                                                                form.agenda_type
-                                                            ),
-                                                    }}
-                                                >
-                                                    <i
-                                                        className={`bi ${
-                                                            ICONS[
-                                                                form.agenda_type
-                                                            ]
-                                                        }`}
-                                                    />
-                                                </span>
-
-                                                <div>
-                                                    <strong>
-                                                        {
-                                                            form.agenda_type
-                                                        }
-                                                    </strong>
-
-                                                    <div className="small">
-                                                        Warna agenda ditentukan
-                                                        otomatis berdasarkan
-                                                        kategori.
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* SEPANJANG HARI */}
 
                                         <div className="col-12">
                                             <div className="form-check form-switch">
                                                 <input
-                                                    className="form-check-input"
                                                     type="checkbox"
+                                                    className="form-check-input"
                                                     id="directorAllDay"
-                                                    checked={
-                                                        form.all_day
-                                                    }
-                                                    onChange={(
-                                                        event
-                                                    ) =>
-                                                        setField(
-                                                            'all_day',
-                                                            event
-                                                                .target
-                                                                .checked
-                                                        )
+                                                    checked={form.all_day}
+                                                    onChange={(event) =>
+                                                        updateField('all_day', event.target.checked)
                                                     }
                                                 />
-
                                                 <label
-                                                    className="form-check-label fw-bold"
                                                     htmlFor="directorAllDay"
+                                                    className="form-check-label fw-bold"
                                                 >
                                                     Sepanjang Hari
                                                 </label>
                                             </div>
                                         </div>
 
-                                        {/* JAM */}
-
                                         {!form.all_day && (
                                             <>
                                                 <div className="col-md-6">
-                                                    <Field
-                                                        label="Jam Mulai"
-                                                        required
-                                                    >
+                                                    <FormField label="Jam Mulai" required>
                                                         <input
                                                             type="time"
                                                             className="form-control form-control-lg"
-                                                            value={
-                                                                form.start_time
-                                                            }
-                                                            onChange={(
-                                                                event
-                                                            ) =>
-                                                                setField(
-                                                                    'start_time',
-                                                                    event
-                                                                        .target
-                                                                        .value
-                                                                )
+                                                            value={form.start_time}
+                                                            onChange={(event) =>
+                                                                updateField('start_time', event.target.value)
                                                             }
                                                         />
-                                                    </Field>
+                                                    </FormField>
                                                 </div>
 
                                                 <div className="col-md-6">
-                                                    <Field
-                                                        label="Jam Selesai"
-                                                        required
-                                                    >
+                                                    <FormField label="Jam Selesai" required>
                                                         <input
                                                             type="time"
                                                             className="form-control form-control-lg"
-                                                            value={
-                                                                form.end_time
-                                                            }
-                                                            onChange={(
-                                                                event
-                                                            ) =>
-                                                                setField(
-                                                                    'end_time',
-                                                                    event
-                                                                        .target
-                                                                        .value
-                                                                )
+                                                            value={form.end_time}
+                                                            onChange={(event) =>
+                                                                updateField('end_time', event.target.value)
                                                             }
                                                         />
-                                                    </Field>
+                                                    </FormField>
                                                 </div>
                                             </>
                                         )}
 
-                                        {/* INFORMASI KETERSEDIAAN */}
-
-                                        {availability && (
+                                        {form.directorate && form.event_date && (
                                             <div className="col-12">
                                                 <div
-                                                    className={`availability-box ${availability}`}
+                                                    className={`alert rounded-4 ${
+                                                        invalidTime
+                                                            ? 'alert-warning'
+                                                            : conflict
+                                                              ? 'alert-danger'
+                                                              : 'alert-success'
+                                                    }`}
                                                 >
-                                                    <span className="availability-icon">
-                                                        <i
-                                                            className={`bi ${
-                                                                availability ===
-                                                                'available'
-                                                                    ? 'bi-check-lg'
-                                                                    : availability ===
-                                                                      'invalid'
-                                                                    ? 'bi-exclamation-lg'
-                                                                    : 'bi-calendar-x-fill'
-                                                            }`}
-                                                        />
-                                                    </span>
+                                                    <div className="fw-bold">
+                                                        <i className={`bi ${
+                                                            conflict
+                                                                ? 'bi-calendar-x-fill'
+                                                                : 'bi-calendar-check-fill'
+                                                        } me-2`} />
 
-                                                    <div className="flex-grow-1">
-                                                        <strong>
-                                                            {availability ===
-                                                            'available'
-                                                                ? 'Jadwal Tersedia'
-                                                                : availability ===
-                                                                  'invalid'
-                                                                ? 'Jam Tidak Valid'
-                                                                : 'Jadwal Bentrok'}
-                                                        </strong>
-
-                                                        <div className="small">
-                                                            {availability ===
-                                                            'available'
-                                                                ? `Agenda dapat digunakan untuk ${ownerLabel(
-                                                                      form.directorate
-                                                                  )}.`
-                                                                : availability ===
-                                                                  'invalid'
-                                                                ? 'Jam selesai harus setelah jam mulai.'
-                                                                : `Bertabrakan dengan agenda "${conflict?.title}" milik ${ownerLabel(
-                                                                      conflict?.directorate
-                                                                  )} (${timeText(
-                                                                      conflict
-                                                                  )}).`}
-                                                        </div>
-
-                                                        {availability ===
-                                                            'conflict' &&
-                                                            suggestions.length >
-                                                                0 && (
-                                                                <div className="mt-2">
-                                                                    <strong className="small">
-                                                                        Saran
-                                                                        waktu
-                                                                        tersedia:
-                                                                    </strong>
-
-                                                                    <div className="d-flex flex-wrap gap-2 mt-2">
-                                                                        {suggestions.map(
-                                                                            (
-                                                                                slot
-                                                                            ) => (
-                                                                                <button
-                                                                                    key={
-                                                                                        slot.start
-                                                                                    }
-                                                                                    type="button"
-                                                                                    className="btn btn-sm btn-light border rounded-pill"
-                                                                                    onClick={() =>
-                                                                                        setForm(
-                                                                                            (
-                                                                                                old
-                                                                                            ) => ({
-                                                                                                ...old,
-                                                                                                start_time:
-                                                                                                    slot.start,
-                                                                                                end_time:
-                                                                                                    slot.end,
-                                                                                                all_day:
-                                                                                                    false,
-                                                                                            })
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    {
-                                                                                        slot.start
-                                                                                    }{' '}
-                                                                                    -{' '}
-                                                                                    {
-                                                                                        slot.end
-                                                                                    }
-                                                                                </button>
-                                                                            )
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            )}
+                                                        {invalidTime
+                                                            ? 'Jam Tidak Valid'
+                                                            : conflict
+                                                              ? 'Jadwal Bentrok'
+                                                              : 'Jadwal Tersedia'}
                                                     </div>
+
+                                                    {conflict && (
+                                                        <div className="small mt-2">
+                                                            Bentrok dengan "{conflict.title}"
+                                                            milik {ownerLabel(conflict.directorate)}.
+                                                        </div>
+                                                    )}
+
+                                                    {conflict && suggestions.length > 0 && (
+                                                        <div className="mt-3">
+                                                            <div className="small fw-bold mb-2">
+                                                                Saran Waktu Tersedia
+                                                            </div>
+                                                            <div className="d-flex gap-2 flex-wrap">
+                                                                {suggestions.map((slot) => (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn btn-sm btn-light border rounded-pill"
+                                                                        key={slot.start}
+                                                                        onClick={() =>
+                                                                            setForm((previous) => ({
+                                                                                ...previous,
+                                                                                start_time: slot.start,
+                                                                                end_time: slot.end,
+                                                                            }))
+                                                                        }
+                                                                    >
+                                                                        {slot.start} - {slot.end}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* LOKASI */}
-
                                         <div className="col-12">
-                                            <Field label="Lokasi">
+                                            <FormField label="Lokasi">
                                                 <input
-                                                    type="text"
                                                     className="form-control form-control-lg"
-                                                    value={
-                                                        form.location
-                                                    }
+                                                    value={form.location}
                                                     placeholder="Contoh: Ruang Rapat Pimpinan"
-                                                    onChange={(
-                                                        event
-                                                    ) =>
-                                                        setField(
-                                                            'location',
-                                                            event
-                                                                .target
-                                                                .value
-                                                        )
+                                                    onChange={(event) =>
+                                                        updateField('location', event.target.value)
                                                     }
                                                 />
-                                            </Field>
+                                            </FormField>
                                         </div>
 
-                                        {/* DESKRIPSI */}
-
                                         <div className="col-12">
-                                            <Field label="Deskripsi">
+                                            <FormField label="Deskripsi">
                                                 <textarea
                                                     className="form-control"
-                                                    rows={
-                                                        4
-                                                    }
-                                                    value={
-                                                        form.description
-                                                    }
+                                                    rows={4}
+                                                    value={form.description}
                                                     placeholder="Informasi tambahan agenda..."
-                                                    onChange={(
-                                                        event
-                                                    ) =>
-                                                        setField(
-                                                            'description',
-                                                            event
-                                                                .target
-                                                                .value
-                                                        )
+                                                    onChange={(event) =>
+                                                        updateField('description', event.target.value)
                                                     }
                                                 />
-                                            </Field>
+                                            </FormField>
                                         </div>
-
-                                        {/* VISIBILITAS PUBLIK */}
 
                                         <div className="col-12">
                                             <div className="form-check form-switch">
@@ -2775,42 +1620,24 @@ ${item?.time_text || ''}`
                                                     className="form-check-input"
                                                     type="checkbox"
                                                     id="directorPublic"
-                                                    checked={
-                                                        form.is_public
-                                                    }
-                                                    onChange={(
-                                                        event
-                                                    ) =>
-                                                        setField(
-                                                            'is_public',
-                                                            event
-                                                                .target
-                                                                .checked
-                                                        )
+                                                    checked={form.is_public}
+                                                    onChange={(event) =>
+                                                        updateField('is_public', event.target.checked)
                                                     }
                                                 />
-
                                                 <label
                                                     className="form-check-label fw-bold"
                                                     htmlFor="directorPublic"
                                                 >
-                                                    Tampilkan di halaman
-                                                    Login
+                                                    Tampilkan di Kalender Publik
                                                 </label>
-                                            </div>
-
-                                            <div className="form-text">
-                                                Agenda publik dapat dilihat
-                                                sebelum pengguna login.
                                             </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
 
-                            {/* MODAL FOOTER */}
-
-                            <div className="modal-footer border-0 px-4 pb-4 pt-2">
+                            <div className="modal-footer border-0 px-4 pb-4">
                                 {detailMode ? (
                                     <>
                                         {canManage && (
@@ -2818,12 +1645,8 @@ ${item?.time_text || ''}`
                                                 <button
                                                     type="button"
                                                     className="btn btn-outline-danger rounded-pill"
-                                                    disabled={
-                                                        saving
-                                                    }
-                                                    onClick={
-                                                        handleDelete
-                                                    }
+                                                    disabled={saving}
+                                                    onClick={handleDelete}
                                                 >
                                                     <i className="bi bi-trash-fill me-2" />
                                                     Hapus
@@ -2832,14 +1655,8 @@ ${item?.time_text || ''}`
                                                 <button
                                                     type="button"
                                                     className="btn btn-danger rounded-pill"
-                                                    disabled={
-                                                        saving
-                                                    }
-                                                    onClick={() =>
-                                                        setDetailMode(
-                                                            false
-                                                        )
-                                                    }
+                                                    disabled={saving}
+                                                    onClick={() => setDetailMode(false)}
                                                 >
                                                     <i className="bi bi-pencil-fill me-2" />
                                                     Edit Agenda
@@ -2850,9 +1667,7 @@ ${item?.time_text || ''}`
                                         <button
                                             type="button"
                                             className="btn btn-light border rounded-pill"
-                                            onClick={
-                                                closeModal
-                                            }
+                                            onClick={closeModal}
                                         >
                                             Tutup
                                         </button>
@@ -2862,12 +1677,8 @@ ${item?.time_text || ''}`
                                         <button
                                             type="button"
                                             className="btn btn-light border rounded-pill"
-                                            disabled={
-                                                saving
-                                            }
-                                            onClick={
-                                                closeModal
-                                            }
+                                            disabled={saving}
+                                            onClick={closeModal}
                                         >
                                             Batal
                                         </button>
@@ -2875,27 +1686,13 @@ ${item?.time_text || ''}`
                                         <button
                                             type="button"
                                             className="btn btn-danger rounded-pill px-4"
-                                            disabled={
-                                                saving ||
-                                                Boolean(
-                                                    conflict
-                                                ) ||
-                                                availability ===
-                                                    'invalid'
-                                            }
-                                            onClick={
-                                                handleSave
-                                            }
+                                            disabled={saving || Boolean(conflict) || invalidTime}
+                                            onClick={handleSave}
                                         >
                                             {saving ? (
                                                 <>
                                                     <span className="spinner-border spinner-border-sm me-2" />
-                                                    Memeriksa...
-                                                </>
-                                            ) : conflict ? (
-                                                <>
-                                                    <i className="bi bi-calendar-x-fill me-2" />
-                                                    Jadwal Bentrok
+                                                    Menyimpan...
                                                 </>
                                             ) : (
                                                 <>
@@ -2912,386 +1709,63 @@ ${item?.time_text || ''}`
                 </div>
             )}
 
-            {/* STYLING */}
-
-            <style>
-                {`
+            <style>{`
                 .director-schedule-page {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 14px;
                     min-width: 0;
+                    padding-bottom: 24px;
                 }
 
                 .director-schedule-page .fw-black {
                     font-weight: 900 !important;
                 }
 
-                .director-schedule-header {
+                .director-owner-button {
                     display: flex;
                     align-items: center;
-                    justify-content: space-between;
-                    flex-wrap: wrap;
-                    gap: 16px;
-                }
-
-                .director-schedule-header h2 {
-                    font-size: 2rem;
-                }
-
-                .directorate-filter-grid {
-                    display: grid;
-                    grid-template-columns: repeat(5, minmax(0, 1fr));
-                    gap: 9px;
-                }
-
-                .directorate-filter-card {
-                    display: flex;
-                    align-items: center;
-                    gap: 9px;
-                    min-width: 0;
-                    padding: 11px;
+                    gap: 12px;
+                    width: 100%;
+                    min-height: 78px;
+                    padding: 13px;
                     border: 1px solid #e2e8f0;
                     border-radius: 17px;
                     background: #fff;
                     text-align: left;
                     color: #475569;
-                    box-shadow: 0 4px 15px #0f172a0a;
                 }
 
-                .directorate-filter-card:hover {
-                    border-color: #cbd5e1;
-                    transform: translateY(-1px);
-                }
-
-                .directorate-filter-card.active {
+                .director-owner-button.active {
                     border-color: #7f1d1d;
+                    background: #fff1f2;
                     color: #7f1d1d;
-                    background: #fff7f7;
                 }
 
-                .directorate-filter-icon {
-                    display: grid;
-                    place-items: center;
-                    flex: 0 0 38px;
-                    width: 38px;
-                    height: 38px;
-                    border-radius: 12px;
-                    background: #f1f5f9;
-                    color: #64748b;
-                }
-
-                .directorate-filter-card.active
-                .directorate-filter-icon {
-                    background: #7f1d1d;
-                    color: #fff;
-                }
-
-                .directorate-filter-content {
-                    display: flex;
-                    flex: 1;
-                    min-width: 0;
-                    flex-direction: column;
-                }
-
-                .directorate-filter-content strong {
-                    font-size: .81rem;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
-
-                .directorate-filter-content small {
-                    font-size: .62rem;
-                    color: #94a3b8;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
-
-                .directorate-filter-count {
-                    display: grid;
-                    place-items: center;
-                    min-width: 27px;
-                    height: 27px;
-                    padding: 0 6px;
-                    border-radius: 999px;
-                    background: #f1f5f9;
-                    color: #64748b;
-                    font-size: .68rem;
-                    font-weight: 900;
-                }
-
-                .directorate-filter-card.active
-                .directorate-filter-count {
-                    background: #7f1d1d;
-                    color: #fff;
-                }
-
-                .schedule-control-panel {
-                    display: grid;
-                    grid-template-columns:
-                        minmax(0, 1.7fr)
-                        minmax(330px, .8fr);
-                    gap: 10px;
-                }
-
-                .schedule-control-main,
-                .schedule-summary-card {
-                    border: 1px solid #e5e7eb;
-                    border-radius: 18px;
-                    background: #fff;
-                    box-shadow: 0 4px 18px #0f172a0a;
-                }
-
-                .schedule-control-main {
-                    padding: 12px 14px;
-                    min-width: 0;
-                }
-
-                .schedule-control-heading,
-                .schedule-control-tools {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    gap: 10px;
-                }
-
-                .schedule-control-heading {
-                    margin-bottom: 10px;
-                }
-
-                .schedule-control-tools {
-                    gap: 7px;
-                }
-
-                .schedule-search {
-                    position: relative;
-                    display: flex;
-                    align-items: center;
-                    width: 215px;
-                    min-width: 0;
-                }
-
-                .schedule-search > i {
-                    position: absolute;
-                    left: 11px;
-                    color: #94a3b8;
-                    font-size: .76rem;
-                }
-
-                .schedule-search input {
-                    width: 100%;
-                    height: 35px;
-                    padding: 0 32px 0 31px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 99px;
-                    background: #f8fafc;
-                    outline: none;
-                    font-size: .75rem;
-                }
-
-                .schedule-search input:focus {
-                    border-color: #7f1d1d;
-                    background: #fff;
-                }
-
-                .schedule-search button {
-                    position: absolute;
-                    right: 8px;
-                    border: 0;
-                    background: none;
-                    color: #64748b;
-                }
-
-                .schedule-today {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 6px;
-                    min-height: 35px;
-                    padding: 0 12px;
-                    border: 1px solid #fecaca;
-                    border-radius: 99px;
-                    background: #fff7f7;
-                    color: #7f1d1d;
-                    font-size: .74rem;
-                    font-weight: 900;
-                    white-space: nowrap;
-                }
-
-                .schedule-category-list {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 6px;
-                }
-
-                .schedule-category-button {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    min-height: 31px;
-                    padding: 3px 8px 3px 4px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 99px;
-                    background: #fff;
-                    color: #475569;
-                    font-size: .7rem;
-                    font-weight: 800;
-                    white-space: nowrap;
-                }
-
-                .schedule-category-button.active {
-                    background: #fff7f7;
-                    border-color: #7f1d1d;
-                }
-
-                .agenda-dot {
-                    display: grid;
-                    place-items: center;
-                    width: 23px;
-                    height: 23px;
-                    border-radius: 50%;
-                    color: #fff;
-                    font-size: .6rem;
-                }
-
-                .agenda-count {
-                    display: grid;
-                    place-items: center;
-                    min-width: 19px;
-                    height: 19px;
-                    border-radius: 99px;
-                    background: #f1f5f9;
-                    color: #64748b;
-                    font-size: .61rem;
-                }
-
-                .schedule-summary-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 1.3fr;
-                    gap: 8px;
-                    min-width: 0;
-                }
-
-                .schedule-summary-card {
-                    width: 100%;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    padding: 12px;
-                    color: inherit;
-                    text-align: left;
-                    min-width: 0;
-                }
-
-                button.schedule-summary-card:disabled {
-                    opacity: 1;
-                }
-
-                .schedule-summary-icon {
-                    flex: 0 0 40px;
-                    display: grid;
-                    place-items: center;
-                    width: 40px;
-                    height: 40px;
-                    border-radius: 12px;
-                    color: #fff;
-                }
-
-                .schedule-summary-icon.today {
-                    background: #7f1d1d;
-                }
-
-                .schedule-summary-icon.next {
-                    background: #334155;
-                }
-
-                .schedule-summary-label {
-                    font-size: .63rem;
-                    font-weight: 800;
-                    color: #94a3b8;
-                    text-transform: uppercase;
-                }
-
-                .schedule-summary-title {
+                .director-owner-button strong,
+                .director-owner-button small {
                     display: block;
-                    max-width: 210px;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
                 }
 
-                .schedule-summary-description {
-                    max-width: 215px;
-                    margin-top: 2px;
-                    color: #64748b;
-                    font-size: .65rem;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
+                .director-owner-button strong {
+                    font-size: .8rem;
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | KALENDER PC
-                |--------------------------------------------------------------------------
-                */
-
-                .director-calendar-card {
-                    border-radius: 24px !important;
-                    overflow: hidden;
-                    min-width: 0;
-                    min-height: 0;
+                .director-owner-button small {
+                    font-size: .7rem;
+                    color: #94a3b8;
                 }
 
-                .calendar-active-banner {
+                .director-calendar-banner {
                     display: flex;
                     align-items: center;
-                    gap: 10px;
-                    min-height: 55px;
-                    padding: 9px 15px;
-                    background: linear-gradient(
-                        90deg,
-                        #7f1d1d,
-                        #991b1b
-                    );
-                    color: #fff;
-                }
-
-                .calendar-active-icon {
-                    display: grid;
-                    place-items: center;
-                    flex: 0 0 37px;
-                    width: 37px;
-                    height: 37px;
-                    border-radius: 11px;
-                    background: #ffffff2a;
-                }
-
-                .calendar-active-label {
-                    font-size: .62rem;
-                    font-weight: 800;
-                    opacity: .8;
-                    text-transform: uppercase;
-                }
-
-                .calendar-all-info {
-                    font-size: .69rem;
-                    font-weight: 700;
-                    opacity: .86;
-                }
-
-                .director-calendar-body {
-                    padding: 14px !important;
-                    min-width: 0;
+                    gap: 14px;
+                    padding: 13px 18px;
+                    background: linear-gradient(90deg, #7f1d1d, #991b1b);
+                    color: white;
                 }
 
                 .director-calendar-viewport {
-                    height: calc(100vh - 475px);
-                    min-height: 440px;
-                    max-height: 720px;
-                    min-width: 0;
+                    height: calc(100vh - 480px);
+                    min-height: 460px;
+                    max-height: 760px;
                 }
 
                 .director-calendar-viewport > div,
@@ -3299,45 +1773,20 @@ ${item?.time_text || ''}`
                     height: 100%;
                 }
 
-                .director-calendar-card .fc {
-                    font-size: 1rem;
-                    min-width: 0;
-                }
-
-                .director-calendar-card .fc-toolbar {
-                    margin-bottom: 10px !important;
-                }
-
-                .director-calendar-card .fc-toolbar-title {
-                    font-size: 1.7rem !important;
-                    font-weight: 900 !important;
+                .director-schedule-page .fc-toolbar-title {
+                    font-size: 1.6rem !important;
+                    font-weight: 900;
                     text-transform: capitalize;
                 }
 
-                .director-calendar-card .fc-button {
+                .director-schedule-page .fc-button {
                     min-height: 37px;
-                    border-radius: 99px !important;
+                    border-radius: 999px !important;
                     font-size: .82rem !important;
                     font-weight: 800 !important;
                 }
 
-                .director-calendar-card .fc-col-header-cell {
-                    background: #f8fafc;
-                }
-
-                .director-calendar-card
-                .fc-col-header-cell-cushion,
-                .director-calendar-card
-                .fc-daygrid-day-number {
-                    font-weight: 900;
-                    text-decoration: none;
-                }
-
-                .director-calendar-card .fc-day-today {
-                    background: #fff7f7 !important;
-                }
-
-                .director-calendar-card .fc-event {
+                .director-schedule-page .fc-event {
                     margin: 2px 3px !important;
                     padding: 3px 5px !important;
                     border-radius: 7px !important;
@@ -3345,11 +1794,9 @@ ${item?.time_text || ''}`
                     cursor: pointer;
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | MODAL
-                |--------------------------------------------------------------------------
-                */
+                .director-schedule-page .fc-day-today {
+                    background: #fff7f7 !important;
+                }
 
                 .director-modal-backdrop {
                     background: #0f172a9e;
@@ -3360,412 +1807,57 @@ ${item?.time_text || ''}`
                     height: 7px;
                 }
 
-                .agenda-owner-options {
-                    display: grid;
-                    grid-template-columns:
-                        repeat(2, minmax(0, 1fr));
-                    gap: 8px;
-                }
-
-                .agenda-owner-option {
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    min-width: 0;
-                    min-height: 65px;
-                    padding: 9px 11px;
+                .director-owner-choice {
+                    width: 100%;
+                    min-height: 54px;
+                    padding: 12px;
                     border: 1px solid #e2e8f0;
-                    border-radius: 15px;
-                    background: #fff;
+                    border-radius: 13px;
+                    background: white;
+                    font-weight: 700;
                     text-align: left;
-                    color: #475569;
                 }
 
-                .agenda-owner-option.active {
+                .director-owner-choice.active {
                     border-color: #7f1d1d;
-                    background: #fff7f7;
+                    background: #fff1f2;
                     color: #7f1d1d;
                 }
 
-                .agenda-owner-option small {
-                    display: block;
-                    color: #94a3b8;
-                    font-size: .65rem;
-                }
-
-                .director-owner-icon {
-                    display: grid;
-                    place-items: center;
-                    flex: 0 0 39px;
-                    width: 39px;
-                    height: 39px;
-                    border-radius: 12px;
-                    background: #7f1d1d;
-                    color: #fff;
-                }
-
-                .agenda-owner-detail {
-                    display: flex;
-                    align-items: center;
-                    gap: 13px;
-                    padding: 13px 15px;
-                    border: 1px solid #fecaca;
-                    border-radius: 16px;
-                    background: #fff7f7;
-                }
-
-                .agenda-detail-box {
-                    height: 100%;
-                    padding: 14px 16px;
-                    border-radius: 15px;
-                    background: #f8fafc;
-                }
-
-                .agenda-detail-box small {
-                    display: block;
-                    margin-bottom: 5px;
-                    color: #64748b;
-                }
-
-                .agenda-detail-box strong {
-                    display: block;
-                    word-break: break-word;
-                }
-
-                .agenda-category-preview {
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    padding: 10px 12px;
-                    border: 1px solid;
-                    border-radius: 15px;
-                }
-
-                .agenda-preview-icon {
-                    display: grid;
-                    place-items: center;
-                    flex: 0 0 38px;
-                    width: 38px;
-                    height: 38px;
-                    border-radius: 11px;
-                    color: #fff;
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | KETERSEDIAAN JADWAL
-                |--------------------------------------------------------------------------
-                */
-
-                .availability-box {
-                    display: flex;
-                    align-items: flex-start;
-                    gap: 12px;
-                    padding: 13px 15px;
-                    border: 1px solid;
-                    border-radius: 15px;
-                }
-
-                .availability-box.available {
-                    background: #ecfdf5;
-                    border-color: #a7f3d0;
-                    color: #065f46;
-                }
-
-                .availability-box.invalid {
-                    background: #fffbeb;
-                    border-color: #fde68a;
-                    color: #92400e;
-                }
-
-                .availability-box.conflict {
-                    background: #fef2f2;
-                    border-color: #fecaca;
-                    color: #991b1b;
-                }
-
-                .availability-icon {
-                    display: grid;
-                    place-items: center;
-                    flex: 0 0 38px;
-                    width: 38px;
-                    height: 38px;
-                    border-radius: 11px;
-                    background: #ffffffbf;
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | AUDIT TRAIL
-                |--------------------------------------------------------------------------
-                */
-
-                .audit-section {
-                    padding: 18px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 20px;
-                    background: #fff;
-                }
-
-                .audit-timeline {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 11px;
-                }
-
-                .audit-item {
-                    display: grid;
-                    grid-template-columns:
-                        38px minmax(0, 1fr);
-                    gap: 10px;
-                }
-
-                .audit-marker {
-                    display: grid;
-                    place-items: center;
-                    width: 37px;
-                    height: 37px;
-                    border: 3px solid #fff;
-                    border-radius: 12px;
-                    background: #f1f5f9;
-                }
-
-                .audit-marker.audit-created {
-                    background: #ecfdf5;
-                    color: #047857;
-                }
-
-                .audit-marker.audit-updated {
-                    background: #eff6ff;
-                    color: #1d4ed8;
-                }
-
-                .audit-marker.audit-deleted {
-                    background: #fef2f2;
-                    color: #dc2626;
-                }
-
-                .audit-content {
-                    min-width: 0;
-                    padding: 11px 13px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 15px;
-                    background: #f8fafc;
-                }
-
-                .audit-change {
-                    margin-top: 10px;
-                    padding: 9px 10px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 11px;
-                    background: #fff;
-                }
-
-                .audit-change-values {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    font-size: .73rem;
-                    font-weight: 800;
-                }
-
-                .audit-old,
-                .audit-new {
-                    flex: 1;
-                    min-width: 0;
-                    padding: 6px 8px;
-                    border-radius: 8px;
-                    word-break: break-word;
-                }
-
-                .audit-old {
-                    background: #fef2f2;
-                    color: #991b1b;
-                    text-decoration: line-through;
-                }
-
-                .audit-new {
-                    background: #ecfdf5;
-                    color: #047857;
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | RESPONSIVE TABLET
-                |--------------------------------------------------------------------------
-                */
-
-                @media (max-width: 1400px) {
-                    .directorate-filter-grid {
-                        grid-template-columns:
-                            repeat(3, minmax(0, 1fr));
-                    }
-                }
-
                 @media (max-width: 1250px) {
-                    .schedule-control-panel {
-                        grid-template-columns: 1fr;
-                    }
-
-                    /*
-                     * PERBAIKAN:
-                     * Tidak lagi memakai fixed height
-                     * ketika tampilan tablet / HP.
-                     */
-
                     .director-calendar-viewport {
                         height: auto;
                         max-height: none;
                         min-height: 0;
-                        overflow: visible;
                     }
 
                     .director-calendar-viewport > div,
                     .director-calendar-viewport .fc {
                         height: auto !important;
-                        min-height: 0;
                     }
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | RESPONSIVE TABLET KECIL
-                |--------------------------------------------------------------------------
-                */
-
-                @media (max-width: 992px) {
-                    .directorate-filter-grid {
-                        grid-template-columns:
-                            repeat(2, minmax(0, 1fr));
-                    }
-
-                    .schedule-control-heading {
-                        flex-direction: column;
-                        align-items: stretch;
-                    }
-
-                    .schedule-control-tools {
-                        width: 100%;
-                    }
-
-                    .schedule-search {
-                        width: auto;
-                        flex: 1;
-                    }
-
-                    .calendar-all-info {
-                        display: none;
-                    }
-
-                    .director-calendar-card .fc-toolbar {
+                @media (max-width: 768px) {
+                    .director-schedule-page .fc-toolbar {
                         flex-direction: column;
                         gap: 9px;
                     }
 
-                    .director-calendar-card
-                    .fc-toolbar-chunk {
-                        display: flex;
-                        justify-content: center;
-                    }
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | RESPONSIVE HP
-                |--------------------------------------------------------------------------
-                */
-
-                @media (max-width: 768px) {
-                    .director-schedule-header h2 {
-                        font-size: 1.5rem;
+                    .director-schedule-page .fc-toolbar-title {
+                        font-size: 1.25rem !important;
                     }
 
-                    .directorate-filter-grid {
-                        grid-template-columns: 1fr;
-                    }
-
-                    .schedule-control-tools {
-                        flex-direction: column;
-                        align-items: stretch;
-                    }
-
-                    .schedule-search,
-                    .schedule-today {
-                        width: 100%;
-                    }
-
-                    .schedule-category-list {
-                        flex-wrap: nowrap;
-                        overflow-x: auto;
-                        scrollbar-width: none;
-                    }
-
-                    .schedule-category-list::-webkit-scrollbar {
-                        display: none;
-                    }
-
-                    .schedule-category-button {
-                        flex-shrink: 0;
-                    }
-
-                    .schedule-summary-grid,
-                    .agenda-owner-options {
-                        grid-template-columns: 1fr;
-                    }
-
-                    .director-calendar-body {
-                        padding: 8px !important;
-                    }
-
-                    .director-calendar-card .fc {
-                        width: 100%;
+                    .director-schedule-page .fc {
                         font-size: .78rem;
-                        min-width: 0;
                     }
 
-                    .director-calendar-card .fc-toolbar-title {
-                        font-size: 1.28rem !important;
-                    }
-
-                    /*
-                     * Memastikan setiap kotak tanggal
-                     * tetap memiliki tinggi minimum.
-                     */
-
-                    .director-calendar-card
-                    .fc-daygrid-day-frame {
-                        min-height: 54px;
-                    }
-
-                    .director-calendar-card
-                    .fc-daygrid-day-number {
-                        font-size: .73rem;
-                        padding: 4px;
-                    }
-
-                    .director-calendar-card .fc-event {
+                    .director-schedule-page .fc-event {
                         margin: 1px !important;
                         padding: 1px 2px !important;
                         font-size: .62rem;
                     }
-
-                    .director-calendar-card
-                    .fc-daygrid-more-link {
-                        font-size: .62rem;
-                    }
-
-                    .audit-change-values {
-                        flex-direction: column;
-                        align-items: stretch;
-                    }
-
-                    .audit-change-values > i {
-                        align-self: center;
-                        transform: rotate(90deg);
-                    }
                 }
-                `}
-            </style>
+            `}</style>
         </div>
     );
 }
