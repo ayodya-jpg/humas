@@ -7,9 +7,9 @@ use App\Models\BorrowRequest;
 use App\Models\EventSchedule;
 use App\Models\EventScheduleRequest;
 use App\Models\HumasServiceRequest;
+use App\Models\Order;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 
 class IntegratedCalendarController extends Controller
 {
@@ -23,94 +23,91 @@ class IntegratedCalendarController extends Controller
     private const COLORS = [
         'directorate' => '#7F1D1D',
         'humas' => '#2563EB',
+        'merchandise' => '#9333EA',
+        'asset_request' => '#0891B2',
         'borrowing' => '#047857',
     ];
 
-    private function isAdmin(Request $request): bool
+    private function date($value): ?string
     {
-        return in_array(
-            $request->user()?->role,
-            self::ADMIN_ROLES,
-            true
-        );
+        return $value
+            ? Carbon::parse($value)->toDateString()
+            : null;
     }
 
-    private function permitted(Request $request): void
-    {
-        abort_unless(
-            $request->user() && $this->isAdmin($request),
-            403,
-            'Kalender terintegrasi hanya dapat diakses admin.'
-        );
-    }
-
-    private function formatDate($value): ?string
-    {
-        if (!$value) {
-            return null;
-        }
-
-        return Carbon::parse($value)->toDateString();
-    }
-
-    private function formatTime($value): ?string
+    private function clock($value): ?string
     {
         return $value
             ? substr((string) $value, 0, 5)
             : null;
     }
 
-    private function normalizedStatus(?string $status): string
+    private function status(?string $value): string
     {
-        return match ($status) {
-            'approved', 'completed', 'borrowed', 'returned'
-                => $status,
+        return match ($value) {
+            'approved',
+            'completed',
+            'borrowed',
+            'returned',
+            'revision' => $value,
 
-            'rejected', 'cancelled', 'canceled'
-                => 'rejected',
+            'rejected',
+            'canceled',
+            'cancelled' => 'rejected',
 
             default => 'pending',
         };
     }
 
-    private function buildEvent(
+    private function event(
         string $source,
-        int $sourceId,
+        int $id,
         string $title,
         ?string $date,
         ?string $startTime,
         ?string $endTime,
         bool $allDay,
-        string $status,
-        array $props = []
+        ?string $status,
+        array $properties = []
     ): ?array {
         if (!$date) {
             return null;
         }
 
-        $color = self::COLORS[$source];
-
-        if (!$allDay && (!$startTime || !$endTime)) {
+        if (
+            !$allDay &&
+            (
+                !$startTime ||
+                !$endTime ||
+                $endTime <= $startTime
+            )
+        ) {
             $allDay = true;
         }
 
+        $color = self::COLORS[$source];
+
         return [
-            'id' => "{$source}-{$sourceId}",
+            'id' => "{$source}-{$id}",
             'title' => $title,
+
             'start' => $allDay
                 ? $date
                 : "{$date}T{$startTime}:00",
+
             'end' => $allDay
                 ? null
                 : "{$date}T{$endTime}:00",
+
             'allDay' => $allDay,
             'backgroundColor' => $color,
             'borderColor' => $color,
             'textColor' => '#ffffff',
+
             'extendedProps' => array_merge([
                 'source_type' => $source,
-                'source_id' => $sourceId,
-                'status' => $this->normalizedStatus($status),
+                'source_id' => $id,
+                'status' => $this->status($status),
                 'event_date' => $date,
                 'start_time' => $startTime,
                 'end_time' => $endTime,
@@ -118,23 +115,22 @@ class IntegratedCalendarController extends Controller
                 'pic_name' => null,
                 'location' => null,
                 'description' => null,
-            ], $props),
+            ], $properties),
         ];
-    }
-
-    private function includeDate(
-        ?string $date,
-        string $start,
-        string $end
-    ): bool {
-        return $date !== null
-            && $date >= $start
-            && $date <= $end;
     }
 
     public function index(Request $request)
     {
-        $this->permitted($request);
+        abort_unless(
+            $request->user() &&
+            in_array(
+                $request->user()->role,
+                self::ADMIN_ROLES,
+                true
+            ),
+            403,
+            'Kalender terintegrasi hanya dapat diakses admin.'
+        );
 
         $validated = $request->validate([
             'start' => ['nullable', 'date'],
@@ -149,43 +145,45 @@ class IntegratedCalendarController extends Controller
             $validated['end'] ?? now()->endOfMonth()
         )->toDateString();
 
-        if ($end < $start) {
+        if (
+            $end < $start ||
+            Carbon::parse($start)
+                ->diffInDays(Carbon::parse($end)) > 370
+        ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Tanggal akhir tidak boleh sebelum tanggal awal.',
-            ], 422);
-        }
-
-        if (Carbon::parse($start)->diffInDays(Carbon::parse($end)) > 370) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Rentang kalender maksimal 370 hari.',
+                'message' =>
+                    'Rentang tanggal tidak valid atau melebihi 370 hari.',
             ], 422);
         }
 
         $events = collect();
 
+        $skipStatuses = [
+            'rejected',
+            'cancelled',
+            'canceled',
+        ];
+
         /*
         |--------------------------------------------------------------------------
-        | 1. KALENDER DIREKTORAT RESMI
+        | 1. JADWAL RESMI DIREKTORAT
         |--------------------------------------------------------------------------
         */
 
-        $directorateEvents = EventSchedule::query()
+        $scheduleItems = EventSchedule::query()
             ->whereDate('event_date', '>=', $start)
             ->whereDate('event_date', '<=', $end)
             ->get();
 
-        foreach ($directorateEvents as $item) {
-            $date = $this->formatDate($item->event_date);
-
-            $event = $this->buildEvent(
+        foreach ($scheduleItems as $item) {
+            $event = $this->event(
                 'directorate',
                 (int) $item->id,
                 $item->title,
-                $date,
-                $this->formatTime($item->start_time),
-                $this->formatTime($item->end_time),
+                $this->date($item->event_date),
+                $this->clock($item->start_time),
+                $this->clock($item->end_time),
                 (bool) $item->all_day,
                 'approved',
                 [
@@ -207,28 +205,24 @@ class IntegratedCalendarController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 2. REQUEST JADWAL DIREKTORAT YANG MASIH PENDING
+        | 2. PENGAJUAN JADWAL DIREKTORAT
         |--------------------------------------------------------------------------
-        |
-        | Approved sudah diwakili event resmi.
-        | Rejected tidak masuk kalender utama.
-        |
         */
 
-        $pendingRequests = EventScheduleRequest::query()
+        $scheduleRequests = EventScheduleRequest::query()
             ->where('status', 'pending')
             ->whereDate('event_date', '>=', $start)
             ->whereDate('event_date', '<=', $end)
             ->get();
 
-        foreach ($pendingRequests as $item) {
-            $event = $this->buildEvent(
+        foreach ($scheduleRequests as $item) {
+            $event = $this->event(
                 'directorate',
                 (int) $item->id,
                 '[Pengajuan] ' . $item->title,
-                $this->formatDate($item->event_date),
-                $this->formatTime($item->start_time),
-                $this->formatTime($item->end_time),
+                $this->date($item->event_date),
+                $this->clock($item->start_time),
+                $this->clock($item->end_time),
                 (bool) $item->all_day,
                 'pending',
                 [
@@ -243,41 +237,41 @@ class IntegratedCalendarController extends Controller
             );
 
             if ($event) {
-                $event['id'] = 'directorate-request-' . $item->id;
+                $event['id'] =
+                    'directorate-request-' . $item->id;
+
                 $events->push($event);
             }
         }
 
         /*
         |--------------------------------------------------------------------------
-        | 3. PENGAJUAN HUMAS
+        | 3. LIPUTAN HUMAS
         |--------------------------------------------------------------------------
+        | Berdasarkan tanggal pelaksanaan kegiatan.
         */
 
-        $humasRequests = HumasServiceRequest::query()
+        $humasItems = HumasServiceRequest::query()
             ->whereDate('event_date', '>=', $start)
             ->whereDate('event_date', '<=', $end)
-            ->whereNotIn('status', [
-                'rejected',
-                'cancelled',
-                'canceled',
-            ])
+            ->whereNotIn('status', $skipStatuses)
             ->get();
 
-        foreach ($humasRequests as $item) {
+        foreach ($humasItems as $item) {
             $unit = $item->unit_name === 'Lainnya'
                 ? $item->other_unit_name
                 : $item->unit_name;
 
-            $event = $this->buildEvent(
+            $event = $this->event(
                 'humas',
                 (int) $item->id,
-                'HUMAS: ' . ($item->coverage_type ?: 'Kegiatan'),
-                $this->formatDate($item->event_date),
+                'HUMAS: ' .
+                    ($item->coverage_type ?: 'Liputan'),
+                $this->date($item->event_date),
                 null,
                 null,
                 true,
-                $item->status ?? 'pending',
+                $item->status,
                 [
                     'record_type' => 'service_request',
                     'service_code' => $item->service_code,
@@ -297,97 +291,218 @@ class IntegratedCalendarController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 4. PENGAJUAN PEMINJAMAN
+        | 4. PENGAMBILAN MERCHANDISE
+        |--------------------------------------------------------------------------
+        | Hanya pada pickup_date.
+        | Tidak menggunakan activity_date.
+        */
+
+        $orders = Order::query()
+            ->with('user')
+            ->whereNotNull('pickup_date')
+            ->whereDate('pickup_date', '>=', $start)
+            ->whereDate('pickup_date', '<=', $end)
+            ->whereNotIn('status', $skipStatuses)
+            ->get();
+
+        foreach ($orders as $item) {
+            $event = $this->event(
+                'merchandise',
+                (int) $item->id,
+                'Ambil Merchandise: ' .
+                    ($item->event_name ?: $item->order_code),
+                $this->date($item->pickup_date),
+                null,
+                null,
+                true,
+                $item->status,
+                [
+                    'record_type' => 'pickup',
+                    'service_code' => $item->order_code,
+                    'requester_unit' => $item->institution_name,
+                    'pic_name' =>
+                        $item->pic_name ?: $item->user?->name,
+                    'pic_phone' => $item->pic_phone,
+                    'description' => $item->user_note,
+                    'activity_date' =>
+                        $this->date($item->activity_date),
+                    'pickup_date' =>
+                        $this->date($item->pickup_date),
+                ]
+            );
+
+            if ($event) {
+                $events->push($event);
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 5. PEMINJAMAN DAN REQUEST BARANG SEKPiM
         |--------------------------------------------------------------------------
         |
-        | Jadwal ditampilkan sebagai periode penggunaan barang.
-        | Tidak dianggap bentrok dengan jadwal pimpinan.
+        | asset_request = hanya pada tanggal pengambilan
+        | borrow = dari pengambilan sampai pengembalian
         |
         */
 
-        $borrowRequests = BorrowRequest::query()
+        $borrowItems = BorrowRequest::query()
+            ->with('user')
             ->whereDate('borrow_date', '<=', $end)
             ->where(function ($query) use ($start) {
-                $query->whereDate('return_date', '>=', $start)
+                $query
+                    ->whereDate('return_date', '>=', $start)
                     ->orWhereNull('return_date');
             })
-            ->whereNotIn('status', [
-                'rejected',
-                'cancelled',
-                'canceled',
-            ])
+            ->whereNotIn('status', $skipStatuses)
             ->get();
 
-        foreach ($borrowRequests as $item) {
-            $borrowDate = $this->formatDate($item->borrow_date);
+        foreach ($borrowItems as $item) {
+            $pickup = $this->date($item->borrow_date);
 
-            $returnDate = $this->formatDate(
-                $item->return_date ?: $item->borrow_date
-            );
-
-            if (!$borrowDate) {
+            if (!$pickup) {
                 continue;
             }
 
-            if ($returnDate < $borrowDate) {
-                $returnDate = $borrowDate;
+            $isAssetRequest =
+                $item->request_type === 'asset_request';
+
+            $source = $isAssetRequest
+                ? 'asset_request'
+                : 'borrowing';
+
+            $return = $isAssetRequest
+                ? $pickup
+                : (
+                    $this->date($item->return_date)
+                    ?: $pickup
+                );
+
+            if ($return < $pickup) {
+                $return = $pickup;
             }
 
-            $exclusiveEnd = Carbon::parse($returnDate)
-                ->addDay()
-                ->toDateString();
+            if ($return < $start || $pickup > $end) {
+                continue;
+            }
+
+            $color = self::COLORS[$source];
 
             $events->push([
-                'id' => 'borrowing-' . $item->id,
-                'title' => 'Peminjaman: ' .
-                    ($item->purpose ?: $item->borrow_code ?: 'Barang'),
-                'start' => $borrowDate,
-                'end' => $exclusiveEnd,
+                'id' => $source . '-' . $item->id,
+
+                'title' => (
+                    $isAssetRequest
+                        ? 'Ambil Request Barang: '
+                        : 'Peminjaman: '
+                ) . (
+                    $item->purpose
+                    ?: $item->borrow_code
+                    ?: 'Barang'
+                ),
+
+                'start' => $pickup,
+
+                // FullCalendar menggunakan tanggal akhir eksklusif.
+                // +1 hari agar tanggal pengembalian tetap terlihat.
+                'end' => Carbon::parse($return)
+                    ->addDay()
+                    ->toDateString(),
+
                 'allDay' => true,
-                'backgroundColor' => self::COLORS['borrowing'],
-                'borderColor' => self::COLORS['borrowing'],
+                'backgroundColor' => $color,
+                'borderColor' => $color,
                 'textColor' => '#ffffff',
+
                 'extendedProps' => [
-                    'source_type' => 'borrowing',
+                    'source_type' => $source,
                     'source_id' => (int) $item->id,
-                    'record_type' => 'service_request',
-                    'status' => $this->normalizedStatus($item->status),
+
+                    'record_type' => $isAssetRequest
+                        ? 'pickup'
+                        : 'borrowing_period',
+
+                    'status' =>
+                        $this->status($item->status),
+
                     'service_code' => $item->borrow_code,
-                    'event_date' => $borrowDate,
-                    'return_date' => $returnDate,
+                    'event_date' => $pickup,
+                    'pickup_date' => $pickup,
+
+                    'return_date' => $isAssetRequest
+                        ? null
+                        : $return,
+
                     'start_time' => null,
                     'end_time' => null,
-                    'requester_unit' => null,
-                    'pic_name' => null,
+
+                    'requester_unit' =>
+                        $item->user?->unit_name,
+
+                    'pic_name' => $item->pic_name,
+                    'pic_phone' => $item->pic_phone,
                     'location' => null,
                     'description' => $item->purpose,
+                    'request_type' => $item->request_type,
                 ],
             ]);
         }
 
-        $results = $events
+        /*
+        |--------------------------------------------------------------------------
+        | 6. RESPONSE
+        |--------------------------------------------------------------------------
+        */
+
+        $result = $events
             ->sortBy('start')
             ->values();
 
         return response()->json([
             'success' => true,
-            'message' => 'Kalender terintegrasi berhasil dimuat.',
+            'message' =>
+                'Kalender terintegrasi berhasil dimuat.',
+
             'data' => [
-                'events' => $results,
+                'events' => $result,
+
                 'summary' => [
-                    'total' => $results->count(),
-                    'directorate' => $results->where(
-                        'extendedProps.source_type',
-                        'directorate'
-                    )->count(),
-                    'humas' => $results->where(
-                        'extendedProps.source_type',
-                        'humas'
-                    )->count(),
-                    'borrowing' => $results->where(
-                        'extendedProps.source_type',
-                        'borrowing'
-                    )->count(),
+                    'total' => $result->count(),
+
+                    'directorate' => $result
+                        ->where(
+                            'extendedProps.source_type',
+                            'directorate'
+                        )
+                        ->count(),
+
+                    'humas' => $result
+                        ->where(
+                            'extendedProps.source_type',
+                            'humas'
+                        )
+                        ->count(),
+
+                    'merchandise' => $result
+                        ->where(
+                            'extendedProps.source_type',
+                            'merchandise'
+                        )
+                        ->count(),
+
+                    'asset_request' => $result
+                        ->where(
+                            'extendedProps.source_type',
+                            'asset_request'
+                        )
+                        ->count(),
+
+                    'borrowing' => $result
+                        ->where(
+                            'extendedProps.source_type',
+                            'borrowing'
+                        )
+                        ->count(),
                 ],
             ],
         ]);

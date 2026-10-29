@@ -75,7 +75,7 @@ const createMenuGroups = (basePath, isSuperadmin) => [
                 badgeKey: null,
             },
             {
-                label: 'Jadwal Direktorat',
+                label: 'Kalender Jadwal',
                 icon: 'bi-calendar3',
                 path: `${basePath}/director-schedule`,
                 permission: null,
