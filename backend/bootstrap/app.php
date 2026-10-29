@@ -1,5 +1,7 @@
+
 <?php
 
+use App\Http\Controllers\Api\NotificationReadController;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\PermissionMiddleware;
 use App\Http\Middleware\RoleMiddleware;
@@ -8,6 +10,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(
@@ -18,6 +21,27 @@ return Application::configure(
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+
+        // Endpoint notifikasi tambahan.
+        // Seluruh route tetap memakai middleware API dan Sanctum.
+        then: function (): void {
+            Route::middleware([
+                'api',
+                'auth:sanctum',
+            ])
+                ->prefix('api')
+                ->group(function (): void {
+                    Route::get('/notification-reads', [
+                        NotificationReadController::class,
+                        'index',
+                    ]);
+
+                    Route::post('/notification-reads', [
+                        NotificationReadController::class,
+                        'store',
+                    ]);
+                });
+        }
     )
     ->withMiddleware(
         function (Middleware $middleware): void {
@@ -59,9 +83,7 @@ return Application::configure(
                     AuthenticationException $exception,
                     Request $request
                 ) {
-                    if (
-                        !$request->is('api/*')
-                    ) {
+                    if (!$request->is('api/*')) {
                         return null;
                     }
 
@@ -77,12 +99,6 @@ return Application::configure(
             |--------------------------------------------------------------------------
             | HTTP Exception untuk API
             |--------------------------------------------------------------------------
-            |
-            | Contoh:
-            | - 403 Forbidden
-            | - 404 Not Found
-            | - 405 Method Not Allowed
-            |
             */
 
             $exceptions->render(
@@ -90,37 +106,24 @@ return Application::configure(
                     HttpExceptionInterface $exception,
                     Request $request
                 ) {
-                    if (
-                        !$request->is('api/*')
-                    ) {
+                    if (!$request->is('api/*')) {
                         return null;
                     }
 
                     $statusCode =
                         $exception->getStatusCode();
 
-                    $message =
-                        match ($statusCode) {
-                            403 =>
-                                'Akun tidak memiliki izin untuk mengakses fitur ini.',
-
-                            404 =>
-                                'Endpoint API tidak ditemukan.',
-
-                            405 =>
-                                'Method request tidak diizinkan untuk endpoint ini.',
-
-                            419 =>
-                                'Sesi telah kedaluwarsa.',
-
-                            429 =>
-                                'Terlalu banyak request. Silakan coba kembali.',
-
-                            default =>
-                                $exception->getMessage() !== ''
-                                    ? $exception->getMessage()
-                                    : 'Terjadi kesalahan pada request.',
-                        };
+                    $message = match ($statusCode) {
+                        403 => 'Akun tidak memiliki izin untuk mengakses fitur ini.',
+                        404 => 'Endpoint API tidak ditemukan.',
+                        405 => 'Method request tidak diizinkan untuk endpoint ini.',
+                        419 => 'Sesi telah kedaluwarsa.',
+                        429 => 'Terlalu banyak request. Silakan coba kembali.',
+                        default =>
+                            $exception->getMessage() !== ''
+                                ? $exception->getMessage()
+                                : 'Terjadi kesalahan pada request.',
+                    };
 
                     return response()->json([
                         'success' => false,
@@ -134,9 +137,6 @@ return Application::configure(
             |--------------------------------------------------------------------------
             | Server Error API
             |--------------------------------------------------------------------------
-            |
-            | Detail error hanya ditampilkan ketika APP_DEBUG=true.
-            |
             */
 
             $exceptions->render(
@@ -144,35 +144,23 @@ return Application::configure(
                     \Throwable $exception,
                     Request $request
                 ) {
-                    if (
-                        !$request->is('api/*')
-                    ) {
+                    if (!$request->is('api/*')) {
                         return null;
                     }
 
-                    /*
-                     * AuthenticationException dan HttpExceptionInterface
-                     * telah ditangani oleh renderer sebelumnya.
-                     */
                     if (
-                        $exception instanceof
-                            AuthenticationException ||
-                        $exception instanceof
-                            HttpExceptionInterface
+                        $exception instanceof AuthenticationException ||
+                        $exception instanceof HttpExceptionInterface
                     ) {
                         return null;
                     }
 
                     $data = null;
 
-                    if (
-                        config('app.debug')
-                    ) {
+                    if (config('app.debug')) {
                         $data = [
                             'exception' =>
-                                class_basename(
-                                    $exception
-                                ),
+                                class_basename($exception),
 
                             'error' =>
                                 $exception->getMessage(),
