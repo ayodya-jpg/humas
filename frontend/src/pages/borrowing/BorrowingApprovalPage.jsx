@@ -1,206 +1,134 @@
-import { useEffect, useMemo, useState } from 'react';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { showErrorAlert } from '../../utils/sweetAlert';
 
-const statusOptions = [
-    { key: 'all', label: 'Semua', icon: 'bi-collection-fill' },
-    { key: 'pending', label: 'Pending', icon: 'bi-hourglass-split' },
-    { key: 'approved', label: 'Approved', icon: 'bi-check-circle-fill' },
-    { key: 'borrowed', label: 'Dipinjam', icon: 'bi-box-arrow-up' },
-    { key: 'returned', label: 'Dikembalikan', icon: 'bi-box-arrow-in-down' },
-    { key: 'revision', label: 'Revisi', icon: 'bi-pencil-square' },
-    { key: 'rejected', label: 'Ditolak', icon: 'bi-x-circle-fill' },
+const STATUS_OPTIONS = [
+    { value: 'all', label: 'Semua' },
+    { value: 'pending', label: 'Menunggu' },
+    { value: 'approved', label: 'Disetujui' },
+    { value: 'borrowed', label: 'Dipinjam' },
+    { value: 'returned', label: 'Dikembalikan' },
+    { value: 'completed', label: 'Selesai' },
+    { value: 'revision', label: 'Revisi' },
+    { value: 'rejected', label: 'Ditolak' },
 ];
 
-const formatDate = (date) => {
-    if (!date) return '-';
-
-    return new Date(date).toLocaleDateString('id-ID', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    });
+const extractRows = (response) => {
+    const data = response?.data?.data;
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
 };
 
-const formatDateTime = (date) => {
-    if (!date) return '-';
-
-    return new Date(date).toLocaleString('id-ID', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
+const dateLabel = (value) => {
+    if (!value) return '-';
+    const text = String(value).slice(0, 10);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(text)
+        ? new Date(`${text}T12:00:00`)
+        : new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('id-ID', {
+        day: '2-digit', month: 'short', year: 'numeric',
     });
 };
 
 export default function BorrowingApprovalPage() {
-    const [borrowRequests, setBorrowRequests] = useState([]);
-    const [selectedStatus, setSelectedStatus] = useState('all');
-    const [search, setSearch] = useState('');
+    const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [status, setStatus] = useState('all');
+    const [search, setSearch] = useState('');
 
-    const fetchBorrowRequests = async () => {
+    const loadRequests = useCallback(async () => {
         try {
             setLoading(true);
-
             const response = await api.get('/borrow-requests');
-            setBorrowRequests(response.data.data || []);
+            setRequests(extractRows(response));
         } catch (error) {
-            console.error('Fetch borrowing approval error:', error.response?.data || error);
-
-            showErrorAlert(
-                'Gagal Memuat Data',
-                error.response?.data?.message || 'Data approval peminjaman gagal dimuat.'
+            await showErrorAlert(
+                'Gagal Memuat Pengajuan',
+                error?.response?.data?.message || 'Tidak dapat memuat pengajuan SEKPiM.'
             );
         } finally {
             setLoading(false);
         }
-    };
-
-    useEffect(() => {
-        fetchBorrowRequests();
     }, []);
 
-    const filteredBorrowRequests = useMemo(() => {
-        return borrowRequests.filter((request) => {
-            const searchValue = search.toLowerCase();
+    useEffect(() => {
+        loadRequests();
+    }, [loadRequests]);
 
-            const matchStatus =
-                selectedStatus === 'all' || request.status === selectedStatus;
-
-            const matchSearch =
-                request.borrow_code?.toLowerCase().includes(searchValue) ||
-                request.purpose?.toLowerCase().includes(searchValue) ||
-                request.user?.name?.toLowerCase().includes(searchValue) ||
-                request.admin_note?.toLowerCase().includes(searchValue) ||
-                request.items?.some((item) =>
-                    item.product?.name?.toLowerCase().includes(searchValue)
-                );
-
-            return matchStatus && matchSearch;
-        });
-    }, [borrowRequests, selectedStatus, search]);
-
-    const summary = useMemo(() => {
-        return statusOptions.reduce((result, status) => {
-            if (status.key === 'all') {
-                result[status.key] = borrowRequests.length;
-                return result;
+    const counts = useMemo(() => {
+        const result = { all: requests.length };
+        STATUS_OPTIONS.forEach(({ value }) => {
+            if (value !== 'all') {
+                result[value] = requests.filter((item) => item.status === value).length;
             }
+        });
+        return result;
+    }, [requests]);
 
-            result[status.key] = borrowRequests.filter(
-                (request) => request.status === status.key
-            ).length;
-
-            return result;
-        }, {});
-    }, [borrowRequests]);
+    const filteredRequests = useMemo(() => {
+        const term = search.trim().toLowerCase();
+        return requests.filter((request) => {
+            if (status !== 'all' && request.status !== status) return false;
+            if (!term) return true;
+            return [
+                request.borrow_code,
+                request.purpose,
+                request.pic_name,
+                request.user?.name,
+                ...(request.items || []).map((item) => item.product?.name),
+            ].filter(Boolean).join(' ').toLowerCase().includes(term);
+        });
+    }, [requests, search, status]);
 
     return (
         <div className="container-fluid px-0">
-            <section
-                className="card border-0 shadow-sm rounded-5 overflow-hidden mb-4"
-                style={{
-                    background:
-                        'linear-gradient(135deg, rgba(15,118,110,0.96), rgba(15,23,42,0.98))',
-                }}
-            >
-                <div className="card-body p-4 p-lg-5 text-white">
-                    <div className="row align-items-center g-4">
-                        <div className="col-lg-8">
-                            <span className="badge rounded-pill text-bg-light text-success px-3 py-2 mb-3">
-                                Approval Peminjaman
-                            </span>
-
-                            <h1 className="display-6 fw-black mb-3">
-                                Daftar pengajuan peminjaman.
-                            </h1>
-
-                            <p
-                                className="mb-0 text-white-50"
-                                style={{ maxWidth: 760, lineHeight: 1.8 }}
-                            >
-                                Halaman ini dibuat ringkas. Untuk melihat detail barang,
-                                tanggal, keperluan, dan memproses approval peminjaman,
-                                buka halaman detail pengajuan.
-                            </p>
-                        </div>
-
-                        <div className="col-lg-4">
-                            <div className="row g-3">
-                                <div className="col-6">
-                                    <div className="bg-white bg-opacity-10 rounded-5 p-3 h-100">
-                                        <div className="fs-3 fw-black">{summary.all || 0}</div>
-                                        <div className="small text-white-50">Total</div>
-                                    </div>
-                                </div>
-
-                                <div className="col-6">
-                                    <div className="bg-white bg-opacity-10 rounded-5 p-3 h-100">
-                                        <div className="fs-3 fw-black">{summary.pending || 0}</div>
-                                        <div className="small text-white-50">Pending</div>
-                                    </div>
-                                </div>
-
-                                <div className="col-6">
-                                    <div className="bg-white bg-opacity-10 rounded-5 p-3 h-100">
-                                        <div className="fs-3 fw-black">{summary.borrowed || 0}</div>
-                                        <div className="small text-white-50">Dipinjam</div>
-                                    </div>
-                                </div>
-
-                                <div className="col-6">
-                                    <div className="bg-white bg-opacity-10 rounded-5 p-3 h-100">
-                                        <div className="fs-3 fw-black">{summary.returned || 0}</div>
-                                        <div className="small text-white-50">Kembali</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+            <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-3">
+                <div
+                    className="card-body text-white p-4"
+                    style={{ background: 'linear-gradient(115deg,#047857,#0f172a)' }}
+                >
+                    <span className="badge bg-white text-success rounded-pill mb-2">ADMIN SEKPiM</span>
+                    <h2 className="fw-bold mb-1">Peminjaman &amp; Request Aset</h2>
+                    <p className="mb-0 opacity-75 small">
+                        Tinjau pengajuan, proses persetujuan, dan catat serah terima barang.
+                    </p>
+                    <div className="d-flex flex-wrap gap-2 mt-3">
+                        <span className="badge bg-white bg-opacity-25 p-2">Total: {counts.all}</span>
+                        <span className="badge bg-white bg-opacity-25 p-2">Menunggu: {counts.pending || 0}</span>
+                        <span className="badge bg-white bg-opacity-25 p-2">Disetujui: {counts.approved || 0}</span>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <section className="card border-0 shadow-sm rounded-5 mb-4">
-                <div className="card-body p-4">
-                    <div className="row g-3 align-items-end">
-                        <div className="col-lg-5">
-                            <label className="form-label fw-bold">Cari pengajuan</label>
-                            <div className="input-group">
-                                <span className="input-group-text">
-                                    <i className="bi bi-search"></i>
-                                </span>
-
-                                <input
-                                    type="text"
-                                    className="form-control"
-                                    placeholder="Kode, pemohon, keperluan, barang..."
-                                    value={search}
-                                    onChange={(event) => setSearch(event.target.value)}
-                                />
-                            </div>
+            <div className="card border-0 shadow-sm rounded-4 mb-3">
+                <div className="card-body p-3 p-lg-4">
+                    <div className="row g-3">
+                        <div className="col-lg-4">
+                            <label className="form-label fw-semibold small">Cari pengajuan</label>
+                            <input
+                                type="search" className="form-control"
+                                placeholder="Kode, nama pemohon, barang..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
                         </div>
-
-                        <div className="col-lg-7">
-                            <label className="form-label fw-bold">Filter status</label>
+                        <div className="col-lg-8">
+                            <label className="form-label fw-semibold small">Filter status</label>
                             <div className="d-flex flex-wrap gap-2">
-                                {statusOptions.map((status) => (
+                                {STATUS_OPTIONS.map((item) => (
                                     <button
-                                        key={status.key}
-                                        type="button"
-                                        className={`btn rounded-pill ${
-                                            selectedStatus === status.key
-                                                ? 'btn-success ring-active-success'
-                                                : 'btn-outline-success'
+                                        key={item.value} type="button"
+                                        className={`btn btn-sm rounded-pill ${
+                                            status === item.value ? 'btn-success' : 'btn-outline-success'
                                         }`}
-                                        onClick={() => setSelectedStatus(status.key)}
+                                        onClick={() => setStatus(item.value)}
                                     >
-                                        <i className={`bi ${status.icon} me-2`}></i>
-                                        {status.label}
-                                        <span className="ms-2 badge rounded-pill text-bg-light text-success">
-                                            {summary[status.key] || 0}
+                                        {item.label} <span className="badge bg-white text-dark ms-1">
+                                            {counts[item.value] || 0}
                                         </span>
                                     </button>
                                 ))}
@@ -208,103 +136,63 @@ export default function BorrowingApprovalPage() {
                         </div>
                     </div>
                 </div>
-            </section>
+            </div>
 
             {loading ? (
-                <div className="card border-0 shadow-sm rounded-5">
-                    <div className="card-body p-5 text-center">
-                        <div className="spinner-border text-success mb-3" />
-                        <p className="text-muted mb-0">Memuat data approval peminjaman...</p>
-                    </div>
-                </div>
-            ) : filteredBorrowRequests.length === 0 ? (
-                <div className="card border-0 shadow-sm rounded-5">
-                    <div className="card-body p-5 text-center">
-                        <div
-                            className="mx-auto mb-3 d-flex align-items-center justify-content-center rounded-5 bg-light text-secondary"
-                            style={{ width: 76, height: 76 }}
-                        >
-                            <i className="bi bi-inbox fs-1"></i>
-                        </div>
-
-                        <h5 className="fw-black mb-2">Data tidak ditemukan</h5>
-
-                        <p className="text-muted mb-0">
-                            Tidak ada pengajuan peminjaman berdasarkan filter yang dipilih.
-                        </p>
-                    </div>
+                <div className="text-center p-5"><span className="spinner-border text-success" /></div>
+            ) : filteredRequests.length === 0 ? (
+                <div className="card border-0 shadow-sm rounded-4 p-5 text-center">
+                    <i className="bi bi-inbox fs-1 text-muted" />
+                    <h5 className="mt-3">Tidak ada pengajuan</h5>
+                    <p className="text-muted mb-0">Coba gunakan pencarian atau status lainnya.</p>
                 </div>
             ) : (
-                <div className="row g-4">
-                    {filteredBorrowRequests.map((request) => (
-                        <div className="col-12" key={request.id}>
-                            <div className="card border-0 shadow-sm rounded-5 overflow-hidden">
-                                <div className="card-body p-4">
-                                    <div className="row g-4 align-items-center">
-                                        <div className="col-lg-6">
-                                            <div className="d-flex gap-3">
-                                                <div className="icon-box bg-success-subtle text-success">
-                                                    <i className="bi bi-box-seam-fill fs-4"></i>
-                                                </div>
-
-                                                <div>
-                                                    <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
-                                                        <span className="badge rounded-pill text-bg-success">
-                                                            {request.borrow_code}
-                                                        </span>
-
-                                                        <span className={`status status-${request.status}`}>
-                                                            {request.status}
-                                                        </span>
-                                                    </div>
-
-                                                    <h5 className="fw-black mb-1">
-                                                        {request.purpose || 'Pengajuan Peminjaman'}
-                                                    </h5>
-
-                                                    <p className="text-muted mb-0">
-                                                        Pemohon: <strong>{request.user?.name || '-'}</strong>
-                                                    </p>
-                                                </div>
+                <div className="d-flex flex-column gap-3">
+                    {filteredRequests.map((request) => (
+                        <div key={request.id} className="card border-0 shadow-sm rounded-4">
+                            <div className="card-body p-3 p-lg-4">
+                                <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                                    <div className="d-flex gap-3 align-items-start">
+                                        <div className="rounded-3 bg-success-subtle text-success p-3">
+                                            <i className="bi bi-box-seam-fill fs-5" />
+                                        </div>
+                                        <div>
+                                            <div className="d-flex flex-wrap gap-2 mb-2">
+                                                <span className="badge text-bg-success">
+                                                    {request.borrow_code || `BRW-${request.id}`}
+                                                </span>
+                                                <span className="badge bg-light border text-dark">
+                                                    {STATUS_OPTIONS.find((x) => x.value === request.status)?.label || request.status}
+                                                </span>
+                                                <span className="badge bg-primary-subtle text-primary">
+                                                    {request.request_type === 'asset_request' ? 'Request Aset' : 'Peminjaman'}
+                                                </span>
                                             </div>
-                                        </div>
-
-                                        <div className="col-md-6 col-lg-2">
-                                            <div className="small text-muted">Tanggal pinjam</div>
-                                            <div className="fw-bold">{formatDate(request.borrow_date)}</div>
-                                        </div>
-
-                                        <div className="col-md-6 col-lg-2">
-                                            <div className="small text-muted">Tanggal kembali</div>
-                                            <div className="fw-bold">{formatDate(request.return_date)}</div>
-                                        </div>
-
-                                        <div className="col-lg-2 text-lg-end">
-                                            <div className="small text-muted mb-1">
-                                                {formatDateTime(request.submitted_at || request.created_at)}
+                                            <h5 className="fw-bold mb-1">
+                                                {request.purpose || 'Pengajuan Barang SEKPiM'}
+                                            </h5>
+                                            <div className="small text-muted">
+                                                Pemohon: {request.user?.name || request.pic_name || '-'}
                                             </div>
-
-                                            <Link
-                                                to={`/admin/borrow-requests/${request.id}`}
-                                                className="btn btn-success rounded-pill"
-                                            >
-                                                <i className="bi bi-eye-fill me-2"></i>
-                                                Detail
-                                            </Link>
+                                            <div className="small text-muted mt-1">
+                                                Pengambilan: {dateLabel(request.borrow_date)}
+                                                {request.request_type !== 'asset_request' &&
+                                                    ` • Pengembalian: ${dateLabel(request.return_date)}`}
+                                            </div>
                                         </div>
                                     </div>
-
-                                    {request.admin_note && (
-                                        <div className="mt-3 p-3 rounded-4 bg-light border">
-                                            <div className="small fw-bold text-muted mb-1">
-                                                Catatan admin terakhir
-                                            </div>
-                                            <p className="mb-0 text-muted">
-                                                {request.admin_note}
-                                            </p>
-                                        </div>
-                                    )}
+                                    <Link
+                                        className="btn btn-success rounded-pill px-4"
+                                        to={`/admin/borrow-requests/${request.id}`}
+                                    >
+                                        <i className="bi bi-eye me-2" />Detail
+                                    </Link>
                                 </div>
+                                {request.admin_note && (
+                                    <div className="bg-light p-3 rounded-3 small mt-3">
+                                        Catatan admin: {request.admin_note}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}

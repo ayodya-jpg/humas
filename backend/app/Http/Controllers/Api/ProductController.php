@@ -15,356 +15,28 @@ class ProductController extends Controller
 {
     public function index(): JsonResponse
     {
-        $products =
-            Product::query()
-                ->with([
-                    'category:id,name,slug,status',
-                ])
-                ->latest(
-                    'created_at'
-                )
-                ->get();
-
         return response()->json([
-            'success' =>
-                true,
-
-            'message' =>
-                'Daftar produk berhasil diambil.',
-
-            'data' =>
-                $products,
+            'success' => true,
+            'message' => 'Daftar produk berhasil diambil.',
+            'data' => Product::with('category:id,name,slug,status')
+                ->latest('created_at')
+                ->get(),
         ]);
     }
 
-    public function show(
-        Product $product
-    ): JsonResponse {
-        $product->load([
-            'category:id,name,slug,status',
-        ]);
-
+    public function show(Product $product): JsonResponse
+    {
         return response()->json([
-            'success' =>
-                true,
-
-            'message' =>
-                'Detail produk berhasil diambil.',
-
-            'data' =>
-                $product,
+            'success' => true,
+            'message' => 'Detail produk berhasil diambil.',
+            'data' => $product->load(
+                'category:id,name,slug,status'
+            ),
         ]);
     }
 
-    public function store(
-        Request $request
-    ): JsonResponse {
-        $validated =
-            $request->validate(
-                $this->validationRules(),
-                $this->validationMessages()
-            );
-
-        $slug =
-            $this->generateUniqueSlug(
-                $validated['slug']
-                    ?? $validated['name']
-            );
-
-        try {
-            $product =
-                DB::transaction(
-                    function () use (
-                        $validated,
-                        $slug
-                    ): Product {
-                        return Product::query()
-                            ->create([
-                                'category_id' =>
-                                    $validated[
-                                        'category_id'
-                                    ],
-
-                                'name' =>
-                                    trim(
-                                        $validated[
-                                            'name'
-                                        ]
-                                    ),
-
-                                'slug' =>
-                                    $slug,
-
-                                'description' =>
-                                    !empty(
-                                        $validated[
-                                            'description'
-                                        ] ?? null
-                                    )
-                                        ? trim(
-                                            $validated[
-                                                'description'
-                                            ]
-                                        )
-                                        : null,
-
-                                'stock' =>
-                                    $validated[
-                                        'stock'
-                                    ],
-
-                                'type' =>
-                                    $validated[
-                                        'type'
-                                    ],
-
-                                'sekpim_item_type' =>
-                                    $validated[
-                                        'sekpim_item_type'
-                                    ] ?? null,
-
-                                'image' =>
-                                    !empty(
-                                        $validated[
-                                            'image'
-                                        ] ?? null
-                                    )
-                                        ? trim(
-                                            $validated[
-                                                'image'
-                                            ]
-                                        )
-                                        : null,
-
-                                'status' =>
-                                    $validated[
-                                        'status'
-                                    ],
-                            ]);
-                    }
-                );
-
-            $product->load([
-                'category:id,name,slug,status',
-            ]);
-
-            return response()->json([
-                'success' =>
-                    true,
-
-                'message' =>
-                    'Produk berhasil ditambahkan.',
-
-                'data' =>
-                    $product,
-            ], 201);
-        } catch (
-            Throwable $error
-        ) {
-            report(
-                $error
-            );
-
-            return response()->json([
-                'success' =>
-                    false,
-
-                'message' =>
-                    app()->isLocal()
-                        ? $error->getMessage()
-                        : 'Produk gagal ditambahkan.',
-
-                'data' =>
-                    null,
-            ], 500);
-        }
-    }
-
-    public function update(
-        Request $request,
-        Product $product
-    ): JsonResponse {
-        $rules =
-            $this->validationRules(
-                $product
-            );
-
-        $validated =
-            $request->validate(
-                $rules,
-                $this->validationMessages()
-            );
-
-        $requestedSlug =
-            $validated['slug']
-                ?? $validated['name'];
-
-        $slug =
-            Str::slug(
-                $requestedSlug
-            );
-
-        if (
-            $slug ===
-            ''
-        ) {
-            $slug =
-                Str::slug(
-                    $validated[
-                        'name'
-                    ]
-                );
-        }
-
-        try {
-            DB::transaction(
-                function () use (
-                    $product,
-                    $validated,
-                    $slug
-                ): void {
-                    $product->update([
-                        'category_id' =>
-                            $validated[
-                                'category_id'
-                            ],
-
-                        'name' =>
-                            trim(
-                                $validated[
-                                    'name'
-                                ]
-                            ),
-
-                        'slug' =>
-                            $slug,
-
-                        'description' =>
-                            !empty(
-                                $validated[
-                                    'description'
-                                ] ?? null
-                            )
-                                ? trim(
-                                    $validated[
-                                        'description'
-                                    ]
-                                )
-                                : null,
-
-                        'stock' =>
-                            $validated[
-                                'stock'
-                            ],
-
-                        'type' =>
-                            $validated[
-                                'type'
-                            ],
-
-                        'sekpim_item_type' =>
-                            $validated[
-                                'sekpim_item_type'
-                            ] ?? null,
-
-                        'image' =>
-                            !empty(
-                                $validated[
-                                    'image'
-                                ] ?? null
-                            )
-                                ? trim(
-                                    $validated[
-                                        'image'
-                                    ]
-                                )
-                                : null,
-
-                        'status' =>
-                            $validated[
-                                'status'
-                            ],
-                    ]);
-                }
-            );
-
-            $product->refresh();
-
-            $product->load([
-                'category:id,name,slug,status',
-            ]);
-
-            return response()->json([
-                'success' =>
-                    true,
-
-                'message' =>
-                    'Produk berhasil diperbarui.',
-
-                'data' =>
-                    $product,
-            ]);
-        } catch (
-            Throwable $error
-        ) {
-            report(
-                $error
-            );
-
-            return response()->json([
-                'success' =>
-                    false,
-
-                'message' =>
-                    app()->isLocal()
-                        ? $error->getMessage()
-                        : 'Produk gagal diperbarui.',
-
-                'data' =>
-                    null,
-            ], 500);
-        }
-    }
-
-    public function destroy(
-        Product $product
-    ): JsonResponse {
-        try {
-            $product->delete();
-
-            return response()->json([
-                'success' =>
-                    true,
-
-                'message' =>
-                    'Produk berhasil dihapus.',
-
-                'data' =>
-                    null,
-            ]);
-        } catch (
-            Throwable $error
-        ) {
-            report(
-                $error
-            );
-
-            return response()->json([
-                'success' =>
-                    false,
-
-                'message' =>
-                    'Produk gagal dihapus karena masih terhubung dengan data pengajuan.',
-
-                'data' =>
-                    null,
-            ], 422);
-        }
-    }
-
-    private function validationRules(
-        ?Product $product = null
-    ): array {
+    private function rules(?Product $product = null): array
+    {
         return [
             'category_id' => [
                 'required',
@@ -384,18 +56,10 @@ class ProductController extends Controller
                 'string',
                 'max:255',
                 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
-
                 $product
-                    ? Rule::unique(
-                        'products',
-                        'slug'
-                    )->ignore(
-                        $product->id
-                    )
-                    : Rule::unique(
-                        'products',
-                        'slug'
-                    ),
+                    ? Rule::unique('products', 'slug')
+                        ->ignore($product->id)
+                    : Rule::unique('products', 'slug'),
             ],
 
             'description' => [
@@ -412,7 +76,6 @@ class ProductController extends Controller
 
             'type' => [
                 'required',
-
                 Rule::in([
                     'checkout',
                     'borrow',
@@ -421,12 +84,12 @@ class ProductController extends Controller
             ],
 
             'sekpim_item_type' => [
+                'sometimes',
                 'nullable',
-
                 Rule::in([
-                    Product::SEKPIM_TYPE_BORROW,
-                    Product::SEKPIM_TYPE_ASSET_REQUEST,
-                    Product::SEKPIM_TYPE_BOTH,
+                    'borrow',
+                    'asset_request',
+                    'both',
                 ]),
             ],
 
@@ -438,7 +101,6 @@ class ProductController extends Controller
 
             'status' => [
                 'required',
-
                 Rule::in([
                     'active',
                     'inactive',
@@ -447,106 +109,165 @@ class ProductController extends Controller
         ];
     }
 
-    private function validationMessages(): array
-    {
+    private function productData(
+        array $data,
+        ?Product $product = null
+    ): array {
+        $type = $data['type'];
+
+        $sekpimType = array_key_exists(
+            'sekpim_item_type',
+            $data
+        )
+            ? $data['sekpim_item_type']
+            : $product?->sekpim_item_type;
+
+        if ($type === 'checkout') {
+            $sekpimType = null;
+        } elseif (!$product && !$sekpimType) {
+            // Produk lama bertipe borrow/both
+            // dianggap sebagai barang peminjaman.
+            $sekpimType = 'borrow';
+        }
+
         return [
-            'category_id.required' =>
-                'Kategori produk wajib dipilih.',
+            'category_id' => (int) $data['category_id'],
 
-            'category_id.integer' =>
-                'Kategori produk tidak valid.',
+            'name' => trim($data['name']),
 
-            'category_id.exists' =>
-                'Kategori produk tidak ditemukan.',
+            'description' => isset($data['description'])
+                ? trim($data['description'])
+                : null,
 
-            'name.required' =>
-                'Nama produk wajib diisi.',
+            'stock' => (int) $data['stock'],
 
-            'name.min' =>
-                'Nama produk minimal tiga karakter.',
+            'type' => $type,
 
-            'name.max' =>
-                'Nama produk maksimal 255 karakter.',
+            'sekpim_item_type' => $sekpimType,
 
-            'slug.regex' =>
-                'Slug hanya boleh berisi huruf kecil, angka, dan tanda hubung.',
+            'image' => isset($data['image'])
+                ? trim($data['image'])
+                : null,
 
-            'slug.unique' =>
-                'Slug produk sudah digunakan.',
-
-            'slug.max' =>
-                'Slug maksimal 255 karakter.',
-
-            'description.max' =>
-                'Deskripsi maksimal 5.000 karakter.',
-
-            'stock.required' =>
-                'Stok produk wajib diisi.',
-
-            'stock.integer' =>
-                'Stok harus berupa bilangan bulat.',
-
-            'stock.min' =>
-                'Stok tidak boleh kurang dari nol.',
-
-            'type.required' =>
-                'Jenis produk wajib dipilih.',
-
-            'type.in' =>
-                'Jenis produk tidak valid.',
-
-            'sekpim_item_type.in' =>
-                'Jenis penggunaan barang SEKPiM tidak valid.',
-
-            'image.max' =>
-                'URL gambar maksimal 2.000 karakter.',
-
-            'status.required' =>
-                'Status produk wajib dipilih.',
-
-            'status.in' =>
-                'Status produk tidak valid.',
+            'status' => $data['status'],
         ];
     }
 
-    private function generateUniqueSlug(
-        string $value
-    ): string {
-        $baseSlug =
-            Str::slug(
-                trim(
-                    $value
-                )
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate(
+            $this->rules()
+        );
+
+        $slug = $this->uniqueSlug(
+            $validated['slug'] ?? $validated['name']
+        );
+
+        try {
+            $product = DB::transaction(
+                fn () => Product::create([
+                    ...$this->productData($validated),
+                    'slug' => $slug,
+                ])
             );
 
-        if (
-            $baseSlug ===
-            ''
-        ) {
-            $baseSlug =
-                'produk';
+            return response()->json([
+                'success' => true,
+                'message' => 'Produk berhasil ditambahkan.',
+                'data' => $product->load(
+                    'category:id,name,slug,status'
+                ),
+            ], 201);
+        } catch (Throwable $error) {
+            report($error);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Produk gagal ditambahkan.',
+                'data' => null,
+            ], 500);
         }
+    }
 
-        $slug =
-            $baseSlug;
+    public function update(
+        Request $request,
+        Product $product
+    ): JsonResponse {
+        $validated = $request->validate(
+            $this->rules($product)
+        );
 
-        $counter =
-            2;
+        $slug = array_key_exists('slug', $validated)
+            && $validated['slug']
+                ? Str::slug($validated['slug'])
+                : $product->slug;
+
+        try {
+            DB::transaction(
+                function () use (
+                    $product,
+                    $validated,
+                    $slug
+                ): void {
+                    $product->update([
+                        ...$this->productData(
+                            $validated,
+                            $product
+                        ),
+                        'slug' => $slug,
+                    ]);
+                }
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Produk berhasil diperbarui.',
+                'data' => $product->refresh()->load(
+                    'category:id,name,slug,status'
+                ),
+            ]);
+        } catch (Throwable $error) {
+            report($error);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Produk gagal diperbarui.',
+                'data' => null,
+            ], 500);
+        }
+    }
+
+    public function destroy(Product $product): JsonResponse
+    {
+        try {
+            $product->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Produk berhasil dihapus.',
+                'data' => null,
+            ]);
+        } catch (Throwable $error) {
+            report($error);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Produk gagal dihapus karena masih digunakan dalam pengajuan.',
+                'data' => null,
+            ], 422);
+        }
+    }
+
+    private function uniqueSlug(string $name): string
+    {
+        $base = Str::slug($name) ?: 'produk';
+        $slug = $base;
+        $counter = 2;
 
         while (
-            Product::query()
-                ->where(
-                    'slug',
-                    $slug
-                )
-                ->exists()
+            Product::where('slug', $slug)->exists()
         ) {
-            $slug =
-                $baseSlug .
-                '-' .
-                $counter;
-
-            $counter++;
+            $slug = $base . '-' . $counter++;
         }
 
         return $slug;

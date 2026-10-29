@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Http\Controllers\Api;
@@ -11,65 +12,51 @@ use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
-    /**
-     * Login menggunakan username dan password.
-     */
-    public function login(
-        Request $request
-    ): JsonResponse {
-        $validated =
-            $request->validate([
-                'username' => [
-                    'required',
-                    'string',
-                    'max:100',
-                ],
+    /*
+    |--------------------------------------------------------------------------
+    | BATAS SESI AKTIF
+    |--------------------------------------------------------------------------
+    |
+    | Satu akun dapat digunakan di beberapa perangkat.
+    | Maksimal 5 sesi/token aktif.
+    | Jika melebihi batas, sesi paling lama dihapus.
+    |
+    */
 
-                'password' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-            ], [
-                'username.required' =>
-                    'Username wajib diisi.',
+    private const MAX_ACTIVE_SESSIONS = 5;
 
-                'username.string' =>
-                    'Format username tidak valid.',
+    /*
+    |--------------------------------------------------------------------------
+    | LOGIN
+    |--------------------------------------------------------------------------
+    */
 
-                'username.max' =>
-                    'Username maksimal 100 karakter.',
+    public function login(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'username' => [
+                'required',
+                'string',
+                'max:100',
+            ],
+            'password' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+        ], [
+            'username.required' => 'Username wajib diisi.',
+            'username.string' => 'Format username tidak valid.',
+            'username.max' => 'Username maksimal 100 karakter.',
+            'password.required' => 'Password wajib diisi.',
+            'password.string' => 'Format password tidak valid.',
+            'password.max' => 'Password maksimal 255 karakter.',
+        ]);
 
-                'password.required' =>
-                    'Password wajib diisi.',
-
-                'password.string' =>
-                    'Format password tidak valid.',
-
-                'password.max' =>
-                    'Password maksimal 255 karakter.',
-            ]);
-
-        $username =
-            trim(
-                $validated['username']
-            );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Proses autentikasi
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            !Auth::attempt([
-                'username' =>
-                    $username,
-
-                'password' =>
-                    $validated['password'],
-            ])
-        ) {
+        if (!Auth::attempt([
+            'username' => trim($validated['username']),
+            'password' => $validated['password'],
+        ])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Username atau password salah.',
@@ -78,8 +65,7 @@ class AuthController extends Controller
         }
 
         /** @var User|null $user */
-        $user =
-            Auth::user();
+        $user = Auth::user();
 
         if (!$user) {
             Auth::logout();
@@ -93,38 +79,47 @@ class AuthController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Hapus token lama
+        | TOKEN MULTI-DEVICE
         |--------------------------------------------------------------------------
         |
-        | Satu akun hanya mempunyai satu sesi token aktif.
+        | Jangan hapus seluruh token lama ketika login.
+        | Dengan begitu PC dan laptop tetap bisa login
+        | pada akun yang sama.
         |
         */
 
-        $user->tokens()
-            ->delete();
+        $tokenName = sprintf(
+            '%s-%s-%s',
+            $user->role,
+            $user->id,
+            Str::lower(Str::random(8))
+        );
+
+        $token = $user
+            ->createToken($tokenName)
+            ->plainTextToken;
 
         /*
         |--------------------------------------------------------------------------
-        | Buat token baru
+        | BATASI JUMLAH TOKEN
         |--------------------------------------------------------------------------
         */
 
-        $tokenName =
-            sprintf(
-                '%s-%s-%s',
-                $user->role,
-                $user->id,
-                Str::lower(
-                    Str::random(8)
-                )
-            );
+        $tokenIds = $user->tokens()
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->pluck('id');
 
-        $token =
-            $user
-                ->createToken(
-                    $tokenName
+        $excess = $tokenIds->count() - self::MAX_ACTIVE_SESSIONS;
+
+        if ($excess > 0) {
+            $user->tokens()
+                ->whereIn(
+                    'id',
+                    $tokenIds->take($excess)->all()
                 )
-                ->plainTextToken;
+                ->delete();
+        }
 
         $user->refresh();
 
@@ -132,29 +127,23 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Login berhasil.',
             'data' => [
-                'user' =>
-                    $this->transformUser(
-                        $user
-                    ),
-
-                'token' =>
-                    $token,
-
-                'token_type' =>
-                    'Bearer',
+                'user' => $this->transformUser($user),
+                'token' => $token,
+                'token_type' => 'Bearer',
             ],
         ]);
     }
 
-    /**
-     * Mengambil data user terbaru yang sedang login.
-     */
-    public function me(
-        Request $request
-    ): JsonResponse {
+    /*
+    |--------------------------------------------------------------------------
+    | CURRENT USER
+    |--------------------------------------------------------------------------
+    */
+
+    public function me(Request $request): JsonResponse
+    {
         /** @var User|null $user */
-        $user =
-            $request->user();
+        $user = $request->user();
 
         if (!$user) {
             return response()->json([
@@ -169,22 +158,24 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data user berhasil diambil.',
-            'data' =>
-                $this->transformUser(
-                    $user
-                ),
+            'data' => $this->transformUser($user),
         ]);
     }
 
-    /**
-     * Logout user.
-     */
-    public function logout(
-        Request $request
-    ): JsonResponse {
+    /*
+    |--------------------------------------------------------------------------
+    | LOGOUT
+    |--------------------------------------------------------------------------
+    |
+    | Hanya token perangkat yang logout dihapus.
+    | Token perangkat lain tidak ikut terhapus.
+    |
+    */
+
+    public function logout(Request $request): JsonResponse
+    {
         /** @var User|null $user */
-        $user =
-            $request->user();
+        $user = $request->user();
 
         if (!$user) {
             return response()->json([
@@ -194,15 +185,13 @@ class AuthController extends Controller
             ]);
         }
 
-        $currentToken =
-            $user->currentAccessToken();
+        $currentToken = $user->currentAccessToken();
 
         if ($currentToken) {
             $currentToken->delete();
         }
 
-        Auth::guard('web')
-            ->logout();
+        Auth::guard('web')->logout();
 
         return response()->json([
             'success' => true,
@@ -211,48 +200,32 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Format data user untuk response authentication.
-     */
-    private function transformUser(
-        User $user
-    ): array {
+    /*
+    |--------------------------------------------------------------------------
+    | FORMAT RESPONSE USER
+    |--------------------------------------------------------------------------
+    */
+
+    private function transformUser(User $user): array
+    {
         return [
-            'id' =>
-                $user->id,
+            'id' => $user->id,
+            'name' => $user->name,
+            'username' => $user->username,
+            'email' => $user->email,
+            'role' => $user->role,
 
-            'name' =>
-                $user->name,
-
-            'username' =>
-                $user->username,
-
-            'email' =>
-                $user->email,
-
-            'role' =>
-                $user->role,
-
-            /*
-             * Permission yang benar-benar tersimpan.
-             */
             'stored_permissions' =>
                 $user->getStoredPermissionList(),
 
-            /*
-             * Permission efektif setelah aturan turunan diterapkan.
-             */
             'permissions' =>
                 $user->getPermissionList(),
 
             'is_superadmin' =>
                 $user->isSuperadmin(),
 
-            'created_at' =>
-                $user->created_at,
-
-            'updated_at' =>
-                $user->updated_at,
+            'created_at' => $user->created_at,
+            'updated_at' => $user->updated_at,
         ];
     }
 }
