@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from 'react';
+
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
+
+import DirectorateDocuments from '../../components/DirectorateDocuments';
 
 import {
     showConfirmAlert,
@@ -44,8 +53,25 @@ const STATUS = {
     },
 };
 
+const ACCEPTED_EXTENSIONS = [
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+];
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
 const getDirectorateLabel = (value) =>
     DIRECTORATES.find((item) => item.value === value)?.label || '-';
+
+const getError = (error) =>
+    Object.values(error?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean) ||
+    error?.response?.data?.message ||
+    'Terjadi kesalahan saat memproses pengajuan.';
 
 const formatDate = (value) => {
     if (!value) return '-';
@@ -55,11 +81,15 @@ const formatDate = (value) => {
         .split('-')
         .map(Number);
 
-    return new Date(year, month - 1, day).toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-    });
+    const date = new Date(year, month - 1, day);
+
+    return Number.isNaN(date.getTime())
+        ? '-'
+        : date.toLocaleDateString('id-ID', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+          });
 };
 
 const formatDateTime = (value) => {
@@ -81,12 +111,8 @@ const formatDateTime = (value) => {
 const formatTime = (value) =>
     value ? String(value).slice(0, 5) : '';
 
-const getError = (error) =>
-    Object.values(error?.response?.data?.errors || {})
-        .flat()
-        .find(Boolean) ||
-    error?.response?.data?.message ||
-    'Terjadi kesalahan saat memproses pengajuan.';
+const formatFileSize = (size) =>
+    `${(size / 1024 / 1024).toFixed(2)} MB`;
 
 const toForm = (item) => ({
     requester_unit: item.requester_unit || '',
@@ -118,9 +144,16 @@ function StatusBadge({ status }) {
 
 function DetailItem({ label, value }) {
     return (
-        <div className="dsap-detail-item">
-            <small>{label}</small>
-            <strong>{value || '-'}</strong>
+        <div className="col-12 col-md-6">
+            <div className="bg-light rounded-4 p-3 h-100">
+                <div className="small text-muted mb-1">
+                    {label}
+                </div>
+
+                <div className="fw-semibold text-break">
+                    {value || '-'}
+                </div>
+            </div>
         </div>
     );
 }
@@ -128,22 +161,144 @@ function DetailItem({ label, value }) {
 function EditField({
     label,
     children,
-    span = 'col-md-6',
     required = false,
+    span = 'col-md-6',
 }) {
     return (
         <div className={span}>
             <label className="form-label fw-bold">
                 {label}
-                {required && <span className="text-danger ms-1">*</span>}
+                {required && (
+                    <span className="text-danger ms-1">*</span>
+                )}
             </label>
+
             {children}
+        </div>
+    );
+}
+
+function EditDocument({
+    id,
+    title,
+    existingName,
+    file,
+    required,
+    disabled,
+    onChange,
+    onRemove,
+}) {
+    return (
+        <div className="col-12 col-md-6">
+            <div className="border rounded-4 p-3 h-100">
+                <div className="d-flex align-items-center justify-content-between gap-2 mb-3">
+                    <strong className="small">
+                        {title}
+                    </strong>
+
+                    <span
+                        className={
+                            required
+                                ? 'badge bg-danger-subtle text-danger rounded-pill'
+                                : 'badge bg-light text-secondary rounded-pill'
+                        }
+                    >
+                        {required ? 'Wajib' : 'Opsional'}
+                    </span>
+                </div>
+
+                <div className="small text-muted mb-3">
+                    <div className="fw-semibold mb-1">
+                        Dokumen saat ini:
+                    </div>
+
+                    {existingName ? (
+                        <div className="d-flex align-items-start gap-2">
+                            <i className="bi bi-file-earmark-check text-success" />
+                            <span className="text-break">
+                                {existingName}
+                            </span>
+                        </div>
+                    ) : (
+                        <span>
+                            Belum ada dokumen.
+                        </span>
+                    )}
+                </div>
+
+                <label
+                    htmlFor={id}
+                    className="d-flex align-items-center justify-content-center gap-2 border border-2 border-dashed rounded-4 bg-light p-3 w-100"
+                    style={{
+                        minHeight: 64,
+                        cursor: disabled
+                            ? 'not-allowed'
+                            : 'pointer',
+                    }}
+                >
+                    <i className="bi bi-cloud-arrow-up text-danger fs-5" />
+
+                    <span className="small fw-semibold">
+                        {file
+                            ? 'Ganti File Pilihan'
+                            : 'Pilih File Pengganti'}
+                    </span>
+                </label>
+
+                <input
+                    id={id}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx"
+                    className="d-none"
+                    disabled={disabled}
+                    onChange={onChange}
+                />
+
+                {file ? (
+                    <div className="d-flex align-items-center gap-2 mt-3">
+                        <i className="bi bi-file-earmark-arrow-up-fill text-success" />
+
+                        <div className="flex-grow-1 min-w-0">
+                            <div
+                                className="small fw-bold text-truncate"
+                                title={file.name}
+                            >
+                                {file.name}
+                            </div>
+
+                            <div className="small text-muted">
+                                {formatFileSize(file.size)}
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger rounded-circle"
+                            disabled={disabled}
+                            title="Batalkan penggantian"
+                            onClick={onRemove}
+                        >
+                            <i className="bi bi-x-lg" />
+                        </button>
+                    </div>
+                ) : (
+                    <div className="small text-muted mt-2">
+                        PDF, Word, Excel · Maksimal 5 MB
+                    </div>
+                )}
+
+                <div className="small text-muted mt-2">
+                    Jika tidak memilih file baru,
+                    dokumen lama tetap digunakan.
+                </div>
+            </div>
         </div>
     );
 }
 
 export default function DirectorateScheduleApprovalPage() {
     const [requests, setRequests] = useState([]);
+
     const [summary, setSummary] = useState({
         total: 0,
         pending: 0,
@@ -162,6 +317,9 @@ export default function DirectorateScheduleApprovalPage() {
     const [editing, setEditing] = useState(false);
     const [form, setForm] = useState(null);
 
+    const [newRundown, setNewRundown] = useState(null);
+    const [newTor, setNewTor] = useState(null);
+
     const [rejectOpen, setRejectOpen] = useState(false);
     const [rejectionReason, setRejectionReason] = useState('');
 
@@ -169,7 +327,10 @@ export default function DirectorateScheduleApprovalPage() {
         try {
             setLoading(true);
 
-            const response = await api.get('/event-schedule-requests');
+            const response = await api.get(
+                '/event-schedule-requests'
+            );
+
             const data = response?.data?.data || {};
 
             setRequests(
@@ -187,7 +348,10 @@ export default function DirectorateScheduleApprovalPage() {
                 }
             );
         } catch (error) {
-            console.error('Load schedule approvals:', error);
+            console.error(
+                'Load Directorate Requests:',
+                error?.response?.data || error
+            );
 
             await showErrorAlert(
                 'Gagal Memuat Pengajuan',
@@ -220,15 +384,17 @@ export default function DirectorateScheduleApprovalPage() {
                 return false;
             }
 
-            if (!keyword) return true;
+            if (!keyword) {
+                return true;
+            }
 
             return [
                 item.title,
                 item.requester_name,
                 item.requester_unit,
                 item.pic_name,
-                item.description,
                 item.location,
+                item.description,
                 getDirectorateLabel(item.directorate),
             ]
                 .filter(Boolean)
@@ -236,7 +402,25 @@ export default function DirectorateScheduleApprovalPage() {
                 .toLowerCase()
                 .includes(keyword);
         });
-    }, [requests, statusFilter, directorateFilter, search]);
+    }, [
+        requests,
+        statusFilter,
+        directorateFilter,
+        search,
+    ]);
+
+    const resetReplacementFiles = () => {
+        setNewRundown(null);
+        setNewTor(null);
+
+        ['edit_rundown', 'edit_tor'].forEach((id) => {
+            const input = document.getElementById(id);
+
+            if (input) {
+                input.value = '';
+            }
+        });
+    };
 
     const openDetail = (item) => {
         setSelected(item);
@@ -244,16 +428,47 @@ export default function DirectorateScheduleApprovalPage() {
         setEditing(false);
         setRejectOpen(false);
         setRejectionReason('');
+        setNewRundown(null);
+        setNewTor(null);
     };
 
     const closeDetail = () => {
-        if (processing) return;
+        if (processing) {
+            return;
+        }
 
         setSelected(null);
         setForm(null);
         setEditing(false);
         setRejectOpen(false);
         setRejectionReason('');
+        resetReplacementFiles();
+    };
+
+    const closeAfterAction = () => {
+        setSelected(null);
+        setForm(null);
+        setEditing(false);
+        setRejectOpen(false);
+        setRejectionReason('');
+        resetReplacementFiles();
+    };
+
+    const startEdit = () => {
+        if (!selected || selected.status !== 'pending') {
+            return;
+        }
+
+        setForm(toForm(selected));
+        resetReplacementFiles();
+        setRejectOpen(false);
+        setEditing(true);
+    };
+
+    const cancelEdit = () => {
+        setEditing(false);
+        setForm(toForm(selected));
+        resetReplacementFiles();
     };
 
     const updateField = (field, value) => {
@@ -263,20 +478,68 @@ export default function DirectorateScheduleApprovalPage() {
         }));
     };
 
-    const validateForm = async () => {
-        if (!form.requester_unit.trim()) {
-            await showWarningAlert(
-                'Unit Pengaju Belum Diisi',
-                'Unit pengaju wajib diisi.'
-            );
-            return false;
+    const handleAttachmentChange = async (
+        event,
+        setter,
+        label
+    ) => {
+        const file = event.target.files?.[0];
+
+        if (!file) {
+            setter(null);
+            return;
         }
 
-        if (!form.pic_name.trim()) {
+        const extension = file.name
+            .split('.')
+            .pop()
+            ?.toLowerCase();
+
+        if (!ACCEPTED_EXTENSIONS.includes(extension)) {
+            event.target.value = '';
+            setter(null);
+
             await showWarningAlert(
-                'Nama PIC Belum Diisi',
-                'Nama penanggung jawab kegiatan wajib diisi.'
+                'Format File Tidak Didukung',
+                `${label} harus berformat PDF, DOC, DOCX, XLS, atau XLSX.`
             );
+            return;
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+            event.target.value = '';
+            setter(null);
+
+            await showWarningAlert(
+                'Ukuran File Terlalu Besar',
+                `${label} maksimal 5 MB.`
+            );
+            return;
+        }
+
+        setter(file);
+    };
+
+    const removeAttachment = (id, setter) => {
+        setter(null);
+
+        const input = document.getElementById(id);
+
+        if (input) {
+            input.value = '';
+        }
+    };
+
+    const validateEdit = async () => {
+        if (
+            !form.requester_unit.trim() ||
+            !form.pic_name.trim()
+        ) {
+            await showWarningAlert(
+                'Informasi Pengaju Belum Lengkap',
+                'Unit pengaju dan nama PIC wajib diisi.'
+            );
+
             return false;
         }
 
@@ -286,22 +549,45 @@ export default function DirectorateScheduleApprovalPage() {
             !form.event_date
         ) {
             await showWarningAlert(
-                'Data Belum Lengkap',
-                'Pemilik jadwal, judul, dan tanggal wajib diisi.'
+                'Informasi Agenda Belum Lengkap',
+                'Pimpinan, judul, dan tanggal kegiatan wajib diisi.'
             );
+
             return false;
         }
 
         if (
             !form.all_day &&
-            (!form.start_time ||
+            (
+                !form.start_time ||
                 !form.end_time ||
-                form.end_time <= form.start_time)
+                form.end_time <= form.start_time
+            )
         ) {
             await showWarningAlert(
                 'Jam Tidak Valid',
-                'Jam selesai harus lebih besar dari jam mulai.'
+                'Jam selesai harus setelah jam mulai.'
             );
+
+            return false;
+        }
+
+        // Data lama bisa belum punya Rundown.
+        // Untuk data lama, admin boleh melengkapinya
+        // dengan file pengganti.
+        // Untuk data baru, Rundown sudah divalidasi
+        // wajib ketika pengajuan dibuat.
+
+        if (
+            !selected?.rundown_name &&
+            !selected?.rundown_path &&
+            !newRundown
+        ) {
+            await showWarningAlert(
+                'Rundown Belum Tersedia',
+                'Pengajuan ini belum memiliki Rundown. Unggah Rundown terlebih dahulu.'
+            );
+
             return false;
         }
 
@@ -312,41 +598,123 @@ export default function DirectorateScheduleApprovalPage() {
         if (
             !selected ||
             processing ||
-            !(await validateForm())
+            !(await validateEdit())
         ) {
             return;
         }
 
+        const fileChanges = [
+            newRundown ? 'Rundown' : null,
+            newTor ? 'TOR' : null,
+        ].filter(Boolean);
+
         const confirmation = await showConfirmAlert({
             title: 'Simpan Perubahan?',
-            text: 'Perubahan disimpan dan status tetap pending.',
-            confirmButtonText: 'Ya, simpan',
-            cancelButtonText: 'Batal',
+            text:
+                fileChanges.length > 0
+                    ? `Data jadwal dan dokumen ${fileChanges.join(' serta ')} akan diperbarui. Status pengajuan tetap pending.`
+                    : 'Perubahan jadwal akan disimpan. Dokumen lama tetap digunakan dan status tetap pending.',
             icon: 'question',
+            confirmButtonText: 'Ya, Simpan',
+            cancelButtonText: 'Batal',
         });
 
-        if (!confirmation?.isConfirmed) return;
+        if (!confirmation?.isConfirmed) {
+            return;
+        }
 
         try {
             setProcessing(true);
 
-            const response = await api.put(
+            const payload = new FormData();
+
+            // Laravel menangani update multipart
+            // menggunakan method spoofing.
+            payload.append('_method', 'PUT');
+
+            payload.append(
+                'requester_unit',
+                form.requester_unit.trim()
+            );
+
+            payload.append(
+                'pic_name',
+                form.pic_name.trim()
+            );
+
+            payload.append(
+                'directorate',
+                form.directorate
+            );
+
+            payload.append(
+                'title',
+                form.title.trim()
+            );
+
+            payload.append(
+                'event_date',
+                form.event_date
+            );
+
+            payload.append(
+                'agenda_type',
+                form.agenda_type
+            );
+
+            payload.append(
+                'all_day',
+                form.all_day ? '1' : '0'
+            );
+
+            payload.append(
+                'is_public',
+                form.is_public ? '1' : '0'
+            );
+
+            if (form.description.trim()) {
+                payload.append(
+                    'description',
+                    form.description.trim()
+                );
+            }
+
+            if (form.location.trim()) {
+                payload.append(
+                    'location',
+                    form.location.trim()
+                );
+            }
+
+            if (!form.all_day) {
+                payload.append(
+                    'start_time',
+                    form.start_time
+                );
+
+                payload.append(
+                    'end_time',
+                    form.end_time
+                );
+            }
+
+            if (newRundown) {
+                payload.append(
+                    'rundown',
+                    newRundown
+                );
+            }
+
+            if (newTor) {
+                payload.append(
+                    'tor',
+                    newTor
+                );
+            }
+
+            const response = await api.post(
                 `/event-schedule-requests/${selected.id}`,
-                {
-                    ...form,
-                    requester_unit: form.requester_unit.trim(),
-                    pic_name: form.pic_name.trim(),
-                    title: form.title.trim(),
-                    description:
-                        form.description.trim() || null,
-                    location: form.location.trim() || null,
-                    start_time: form.all_day
-                        ? null
-                        : form.start_time,
-                    end_time: form.all_day
-                        ? null
-                        : form.end_time,
-                }
+                payload
             );
 
             const updated = response?.data?.data;
@@ -357,13 +725,20 @@ export default function DirectorateScheduleApprovalPage() {
             }
 
             setEditing(false);
+            resetReplacementFiles();
+
             await loadRequests();
 
             await showSuccessAlert(
                 'Pengajuan Diperbarui',
-                'Data berhasil disimpan. Pengajuan masih menunggu keputusan.'
+                'Jadwal dan lampiran berhasil disimpan. Status pengajuan tetap menunggu persetujuan.'
             );
         } catch (error) {
+            console.error(
+                'Update Directorate Request:',
+                error?.response?.data || error
+            );
+
             await showErrorAlert(
                 'Gagal Menyimpan Perubahan',
                 getError(error)
@@ -373,30 +748,26 @@ export default function DirectorateScheduleApprovalPage() {
         }
     };
 
-    const closeDetailAfterAction = () => {
-        setSelected(null);
-        setForm(null);
-        setEditing(false);
-        setRejectOpen(false);
-        setRejectionReason('');
-    };
-
     const approve = async () => {
-        if (!selected || processing) return;
+        if (!selected || processing) {
+            return;
+        }
 
         if (editing) {
             await showWarningAlert(
                 'Selesaikan Edit',
-                'Simpan perubahan terlebih dahulu.'
+                'Simpan atau batalkan perubahan terlebih dahulu.'
             );
             return;
         }
 
-        // Data lama bisa saja belum memiliki unit/PIC.
-        if (!selected.requester_unit || !selected.pic_name) {
+        if (
+            !selected.requester_unit ||
+            !selected.pic_name
+        ) {
             await showWarningAlert(
                 'Informasi Pengaju Belum Lengkap',
-                'Isi Unit Pengaju dan Nama PIC melalui tombol Edit sebelum menyetujui.'
+                'Isi Unit Pengaju dan Nama PIC melalui Edit terlebih dahulu.'
             );
             return;
         }
@@ -404,12 +775,14 @@ export default function DirectorateScheduleApprovalPage() {
         const confirmation = await showConfirmAlert({
             title: 'Setujui Pengajuan Jadwal?',
             text: `Agenda "${selected.title}" akan dimasukkan ke kalender Direktorat.`,
-            confirmButtonText: 'Ya, setujui',
+            confirmButtonText: 'Ya, Setujui',
             cancelButtonText: 'Batal',
             icon: 'question',
         });
 
-        if (!confirmation?.isConfirmed) return;
+        if (!confirmation?.isConfirmed) {
+            return;
+        }
 
         try {
             setProcessing(true);
@@ -418,7 +791,7 @@ export default function DirectorateScheduleApprovalPage() {
                 `/event-schedule-requests/${selected.id}/approve`
             );
 
-            closeDetailAfterAction();
+            closeAfterAction();
             await loadRequests();
 
             await showSuccessAlert(
@@ -436,18 +809,16 @@ export default function DirectorateScheduleApprovalPage() {
 
                 await showWarningAlert(
                     'Jadwal Bentrok',
-                    `${data.message || 'Jadwal tidak dapat disetujui.'}
+                    `Pengajuan tidak dapat disetujui karena berbenturan dengan "${conflict.title || '-'}" pada ${formatDate(conflict.event_date)}.
 
-Bentrok dengan: ${conflict.title || '-'}
 Pemilik: ${getDirectorateLabel(conflict.directorate)}
-Tanggal: ${formatDate(conflict.event_date)}
 Waktu: ${
                         conflict.all_day
-                            ? 'Sepanjang hari'
+                            ? 'Sepanjang Hari'
                             : `${formatTime(conflict.start_time)} - ${formatTime(conflict.end_time)}`
                     }
 
-Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
+Silakan edit jadwal pengajuan terlebih dahulu.`
                 );
             } else {
                 await showErrorAlert(
@@ -461,7 +832,9 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
     };
 
     const reject = async () => {
-        if (!selected || processing) return;
+        if (!selected || processing) {
+            return;
+        }
 
         if (!rejectionReason.trim()) {
             await showWarningAlert(
@@ -474,12 +847,14 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
         const confirmation = await showConfirmAlert({
             title: 'Tolak Pengajuan Jadwal?',
             text: 'Pengajuan akan ditolak tanpa proses revisi.',
-            confirmButtonText: 'Ya, tolak',
+            confirmButtonText: 'Ya, Tolak',
             cancelButtonText: 'Batal',
             icon: 'warning',
         });
 
-        if (!confirmation?.isConfirmed) return;
+        if (!confirmation?.isConfirmed) {
+            return;
+        }
 
         try {
             setProcessing(true);
@@ -487,11 +862,12 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
             await api.put(
                 `/event-schedule-requests/${selected.id}/reject`,
                 {
-                    rejection_reason: rejectionReason.trim(),
+                    rejection_reason:
+                        rejectionReason.trim(),
                 }
             );
 
-            closeDetailAfterAction();
+            closeAfterAction();
             await loadRequests();
 
             await showSuccessAlert(
@@ -509,312 +885,278 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
     };
 
     return (
-        <div className="dsap-page">
-            {/* HEADER */}
-
-            <header className="dsap-header">
+        <div className="container-fluid px-0">
+            <header className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
                 <div>
-                    <span className="badge bg-danger-subtle text-danger rounded-pill px-3 py-2 mb-2">
+                    <span className="badge bg-danger-subtle text-danger rounded-pill px-3 py-2 mb-3">
                         SEKRETARIAT PIMPINAN
                     </span>
 
-                    <h2 className="fw-black mb-1">
+                    <h2 className="fw-bold mb-2">
                         Approval Jadwal Direktorat
                     </h2>
 
                     <p className="text-muted mb-0">
-                        Periksa unit pengaju, PIC, jadwal,
-                        dan putuskan pengajuan agenda pimpinan.
+                        Periksa informasi agenda, lampiran,
+                        dan proses persetujuan jadwal pimpinan.
                     </p>
                 </div>
 
                 <Link
                     to="/admin/director-schedule"
-                    className="btn btn-outline-danger rounded-pill px-4 fw-bold"
+                    className="btn btn-outline-danger rounded-pill px-4"
                 >
                     <i className="bi bi-calendar3 me-2" />
                     Lihat Kalender
                 </Link>
             </header>
 
-            {/* STATISTIK */}
-
-            <section className="dsap-statistics">
+            <div className="row g-3 mb-4">
                 {[
                     ['total', 'Semua Pengajuan', 'bi-grid-fill'],
                     ['pending', 'Menunggu Approval', 'bi-hourglass-split'],
                     ['approved', 'Disetujui', 'bi-check-circle'],
                     ['rejected', 'Ditolak', 'bi-x-circle'],
                 ].map(([key, label, icon]) => (
-                    <button
+                    <div
+                        className="col-12 col-sm-6 col-xl-3"
                         key={key}
-                        type="button"
-                        className={`dsap-stat ${
-                            statusFilter ===
-                            (key === 'total' ? 'all' : key)
-                                ? 'active'
-                                : ''
-                        }`}
-                        onClick={() =>
-                            setStatusFilter(
-                                key === 'total' ? 'all' : key
-                            )
-                        }
                     >
-                        <span className={`dsap-stat-icon ${key}`}>
-                            <i className={`bi ${icon}`} />
-                        </span>
-
-                        <span className="dsap-stat-text">
-                            <small>{label}</small>
-                            <strong>{summary[key] || 0}</strong>
-                        </span>
-                    </button>
-                ))}
-            </section>
-
-            {/* TABEL */}
-
-            <section className="dsap-card">
-                <div className="dsap-card-heading">
-                    <div>
-                        <h5 className="fw-black mb-1">
-                            Daftar Pengajuan Jadwal
-                        </h5>
-
-                        <p className="small text-muted mb-0">
-                            Klik Detail untuk memeriksa
-                            dan memproses pengajuan.
-                        </p>
-                    </div>
-
-                    <button
-                        type="button"
-                        className="btn btn-light border rounded-pill px-3"
-                        onClick={loadRequests}
-                        disabled={loading}
-                    >
-                        <i className="bi bi-arrow-clockwise me-2" />
-                        Refresh
-                    </button>
-                </div>
-
-                <div className="row g-3 mb-3">
-                    <div className="col-lg-5">
-                        <label className="form-label small fw-bold">
-                            Cari Pengajuan
-                        </label>
-
-                        <input
-                            type="search"
-                            className="form-control"
-                            placeholder="Judul, unit, PIC, pengaju, lokasi..."
-                            value={search}
-                            onChange={(event) =>
-                                setSearch(event.target.value)
-                            }
-                        />
-                    </div>
-
-                    <div className="col-md-6 col-lg-4">
-                        <label className="form-label small fw-bold">
-                            Direktorat
-                        </label>
-
-                        <select
-                            className="form-select"
-                            value={directorateFilter}
-                            onChange={(event) =>
-                                setDirectorateFilter(
-                                    event.target.value
+                        <button
+                            type="button"
+                            className="card border-0 shadow-sm rounded-4 w-100 text-start h-100"
+                            onClick={() =>
+                                setStatusFilter(
+                                    key === 'total' ? 'all' : key
                                 )
                             }
                         >
-                            <option value="all">
-                                Semua Direktorat
-                            </option>
+                            <span className="card-body d-flex align-items-center gap-3">
+                                <i className={`bi ${icon} fs-3 text-danger`} />
 
-                            {DIRECTORATES.map((item) => (
-                                <option
-                                    key={item.value}
-                                    value={item.value}
-                                >
-                                    {item.label}
-                                </option>
-                            ))}
-                        </select>
+                                <span>
+                                    <span className="small text-muted d-block mb-1">
+                                        {label}
+                                    </span>
+
+                                    <strong className="fs-3">
+                                        {summary[key] || 0}
+                                    </strong>
+                                </span>
+                            </span>
+                        </button>
                     </div>
+                ))}
+            </div>
 
-                    <div className="col-md-6 col-lg-3">
-                        <label className="form-label small fw-bold">
-                            Status
-                        </label>
-
-                        <select
-                            className="form-select"
-                            value={statusFilter}
-                            onChange={(event) =>
-                                setStatusFilter(event.target.value)
-                            }
-                        >
-                            <option value="all">
-                                Semua Status
-                            </option>
-                            <option value="pending">
-                                Pending
-                            </option>
-                            <option value="approved">
-                                Approved
-                            </option>
-                            <option value="rejected">
-                                Rejected
-                            </option>
-                        </select>
-                    </div>
-                </div>
-
-                {loading ? (
-                    <div className="dsap-empty">
-                        <div className="spinner-border text-danger mb-3" />
-                        <p>Memuat pengajuan jadwal...</p>
-                    </div>
-                ) : filteredRequests.length === 0 ? (
-                    <div className="dsap-empty">
-                        <i className="bi bi-inbox" />
-                        <h5 className="fw-bold">
-                            Tidak ada pengajuan
+            <section className="card border-0 shadow-sm rounded-5 mb-4">
+                <div className="card-body p-4">
+                    <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <h5 className="fw-bold mb-0">
+                            Daftar Pengajuan Jadwal
                         </h5>
-                        <p className="text-muted">
-                            Belum ada pengajuan sesuai filter.
-                        </p>
+
+                        <button
+                            type="button"
+                            className="btn btn-light border rounded-pill"
+                            disabled={loading}
+                            onClick={loadRequests}
+                        >
+                            <i className="bi bi-arrow-clockwise me-2" />
+                            Refresh
+                        </button>
                     </div>
-                ) : (
-                    <div className="dsap-table-wrapper">
-                        <table className="table align-middle dsap-table">
-                            <thead>
-                                <tr>
-                                    <th>Pengajuan</th>
-                                    <th>Unit / PIC</th>
-                                    <th>Pengaju Akun</th>
-                                    <th>Agenda Untuk</th>
-                                    <th>Jadwal</th>
-                                    <th>Status</th>
-                                    <th className="text-end">Aksi</th>
-                                </tr>
-                            </thead>
 
-                            <tbody>
-                                {filteredRequests.map((item) => (
-                                    <tr key={item.id}>
-                                        <td>
-                                            <strong className="d-block">
-                                                {item.title}
-                                            </strong>
-                                            <small className="text-muted">
-                                                #{item.id} •{' '}
-                                                {formatDateTime(
-                                                    item.created_at
-                                                )}
-                                            </small>
-                                        </td>
+                    <div className="row g-3 mb-4">
+                        <div className="col-12 col-lg-5">
+                            <input
+                                type="search"
+                                className="form-control"
+                                placeholder="Cari judul, unit, PIC, lokasi..."
+                                value={search}
+                                onChange={(event) =>
+                                    setSearch(event.target.value)
+                                }
+                            />
+                        </div>
 
-                                        <td>
-                                            <strong className="d-block">
-                                                {item.requester_unit || '-'}
-                                            </strong>
-                                            <small className="text-muted">
-                                                PIC: {item.pic_name || '-'}
-                                            </small>
-                                        </td>
+                        <div className="col-12 col-md-6 col-lg-4">
+                            <select
+                                className="form-select"
+                                value={directorateFilter}
+                                onChange={(event) =>
+                                    setDirectorateFilter(event.target.value)
+                                }
+                            >
+                                <option value="all">
+                                    Semua Direktorat
+                                </option>
 
-                                        <td>
-                                            {item.requester_name || '-'}
-                                        </td>
-
-                                        <td>
-                                            {getDirectorateLabel(
-                                                item.directorate
-                                            )}
-                                        </td>
-
-                                        <td>
-                                            <strong className="d-block">
-                                                {formatDate(item.event_date)}
-                                            </strong>
-                                            <small className="text-muted">
-                                                {item.all_day
-                                                    ? 'Sepanjang hari'
-                                                    : `${formatTime(item.start_time)} - ${formatTime(item.end_time)}`}
-                                            </small>
-                                        </td>
-
-                                        <td>
-                                            <StatusBadge status={item.status} />
-                                        </td>
-
-                                        <td className="text-end">
-                                            <button
-                                                type="button"
-                                                className="btn btn-sm btn-outline-danger rounded-pill px-3"
-                                                onClick={() => openDetail(item)}
-                                            >
-                                                <i className="bi bi-eye me-1" />
-                                                Detail
-                                            </button>
-                                        </td>
-                                    </tr>
+                                {DIRECTORATES.map((item) => (
+                                    <option
+                                        key={item.value}
+                                        value={item.value}
+                                    >
+                                        {item.label}
+                                    </option>
                                 ))}
-                            </tbody>
-                        </table>
+                            </select>
+                        </div>
+
+                        <div className="col-12 col-md-6 col-lg-3">
+                            <select
+                                className="form-select"
+                                value={statusFilter}
+                                onChange={(event) =>
+                                    setStatusFilter(event.target.value)
+                                }
+                            >
+                                <option value="all">
+                                    Semua Status
+                                </option>
+                                <option value="pending">
+                                    Menunggu
+                                </option>
+                                <option value="approved">
+                                    Disetujui
+                                </option>
+                                <option value="rejected">
+                                    Ditolak
+                                </option>
+                            </select>
+                        </div>
                     </div>
-                )}
+
+                    {loading ? (
+                        <div className="text-center py-5">
+                            <div className="spinner-border text-danger" />
+                            <p className="text-muted mt-3 mb-0">
+                                Memuat pengajuan...
+                            </p>
+                        </div>
+                    ) : filteredRequests.length === 0 ? (
+                        <div className="text-center py-5 text-muted">
+                            <i className="bi bi-inbox fs-1 d-block mb-3" />
+                            Tidak ada pengajuan yang sesuai filter.
+                        </div>
+                    ) : (
+                        <div className="table-responsive">
+                            <table className="table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Pengajuan</th>
+                                        <th>Unit / PIC</th>
+                                        <th>Direktorat</th>
+                                        <th>Tanggal</th>
+                                        <th>Status</th>
+                                        <th className="text-end">
+                                            Aksi
+                                        </th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {filteredRequests.map((item) => (
+                                        <tr key={item.id}>
+                                            <td>
+                                                <strong>
+                                                    {item.title}
+                                                </strong>
+
+                                                <div className="small text-muted mt-1">
+                                                    {item.requester_name || '-'}
+                                                </div>
+                                            </td>
+
+                                            <td>
+                                                {item.requester_unit || '-'}
+
+                                                <div className="small text-muted">
+                                                    {item.pic_name || '-'}
+                                                </div>
+                                            </td>
+
+                                            <td>
+                                                {getDirectorateLabel(
+                                                    item.directorate
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                {formatDate(
+                                                    item.event_date
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                <StatusBadge
+                                                    status={item.status}
+                                                />
+                                            </td>
+
+                                            <td className="text-end">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-outline-danger rounded-pill"
+                                                    onClick={() =>
+                                                        openDetail(item)
+                                                    }
+                                                >
+                                                    <i className="bi bi-eye me-1" />
+                                                    Detail
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </section>
 
-            {/* MODAL DETAIL */}
-
-            {selected && form && (
+            {selected && (
                 <div
-                    className="modal fade show d-block dsap-modal-backdrop"
+                    className="modal d-block"
+                    tabIndex={-1}
                     role="dialog"
                     aria-modal="true"
-                    tabIndex={-1}
+                    style={{
+                        background: 'rgba(15,23,42,.65)',
+                    }}
                 >
-                    <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
-                        <div className="modal-content border-0 rounded-4 shadow-lg">
-                            <div className="modal-header border-0 px-4 pt-4 pb-2">
-                                <div>
-                                    <StatusBadge status={selected.status} />
-
-                                    <h4 className="fw-black mt-2 mb-1">
+                    <div className="modal-dialog modal-xl modal-dialog-scrollable">
+                        <div className="modal-content border-0 rounded-4">
+                            <div className="modal-header p-4">
+                                <div className="min-w-0">
+                                    <h5 className="modal-title fw-bold text-break">
                                         {selected.title}
-                                    </h4>
+                                    </h5>
 
-                                    <div className="small text-muted">
-                                        Pengajuan #{selected.id} oleh{' '}
-                                        {selected.requester_name || '-'}
+                                    <div className="mt-2">
+                                        <StatusBadge
+                                            status={selected.status}
+                                        />
                                     </div>
                                 </div>
 
                                 <button
                                     type="button"
                                     className="btn-close"
-                                    onClick={closeDetail}
                                     disabled={processing}
-                                    aria-label="Tutup detail"
+                                    onClick={closeDetail}
+                                    aria-label="Tutup"
                                 />
                             </div>
 
-                            <div className="modal-body px-4 pb-2">
-                                {editing ? (
+                            <div className="modal-body p-4">
+                                {editing && form ? (
                                     <div className="row g-3">
-                                        {/* UNIT PENGAJU BARU */}
-
                                         <EditField
                                             label="Unit Pengaju"
                                             required
                                         >
                                             <input
-                                                type="text"
                                                 className="form-control"
                                                 maxLength={255}
                                                 value={form.requester_unit}
@@ -824,18 +1166,14 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                                         event.target.value
                                                     )
                                                 }
-                                                placeholder="Contoh: Unit Sekretariat Pimpinan"
                                             />
                                         </EditField>
-
-                                        {/* NAMA PIC BARU */}
 
                                         <EditField
                                             label="Nama PIC"
                                             required
                                         >
                                             <input
-                                                type="text"
                                                 className="form-control"
                                                 maxLength={255}
                                                 value={form.pic_name}
@@ -845,13 +1183,11 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                                         event.target.value
                                                     )
                                                 }
-                                                placeholder="Nama penanggung jawab kegiatan"
                                             />
                                         </EditField>
 
                                         <EditField
                                             label="Agenda Untuk"
-                                            span="col-12"
                                             required
                                         >
                                             <select
@@ -876,42 +1212,8 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                         </EditField>
 
                                         <EditField
-                                            label="Judul Agenda"
-                                            span="col-12"
-                                            required
+                                            label="Kategori Agenda"
                                         >
-                                            <input
-                                                type="text"
-                                                className="form-control"
-                                                maxLength={255}
-                                                value={form.title}
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        'title',
-                                                        event.target.value
-                                                    )
-                                                }
-                                            />
-                                        </EditField>
-
-                                        <EditField
-                                            label="Tanggal"
-                                            required
-                                        >
-                                            <input
-                                                type="date"
-                                                className="form-control"
-                                                value={form.event_date}
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        'event_date',
-                                                        event.target.value
-                                                    )
-                                                }
-                                            />
-                                        </EditField>
-
-                                        <EditField label="Kategori">
                                             <select
                                                 className="form-select"
                                                 value={form.agenda_type}
@@ -933,11 +1235,61 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                             </select>
                                         </EditField>
 
+                                        <EditField
+                                            label="Judul Agenda"
+                                            required
+                                            span="col-12"
+                                        >
+                                            <input
+                                                className="form-control"
+                                                maxLength={255}
+                                                value={form.title}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        'title',
+                                                        event.target.value
+                                                    )
+                                                }
+                                            />
+                                        </EditField>
+
+                                        <EditField
+                                            label="Tanggal Kegiatan"
+                                            required
+                                        >
+                                            <input
+                                                type="date"
+                                                className="form-control"
+                                                value={form.event_date}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        'event_date',
+                                                        event.target.value
+                                                    )
+                                                }
+                                            />
+                                        </EditField>
+
+                                        <EditField
+                                            label="Lokasi"
+                                        >
+                                            <input
+                                                className="form-control"
+                                                maxLength={255}
+                                                value={form.location}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        'location',
+                                                        event.target.value
+                                                    )
+                                                }
+                                            />
+                                        </EditField>
+
                                         <div className="col-12">
                                             <div className="form-check form-switch">
                                                 <input
                                                     type="checkbox"
-                                                    id="approvalAllDay"
                                                     className="form-check-input"
                                                     checked={form.all_day}
                                                     onChange={(event) =>
@@ -948,10 +1300,7 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                                     }
                                                 />
 
-                                                <label
-                                                    htmlFor="approvalAllDay"
-                                                    className="form-check-label fw-bold"
-                                                >
+                                                <label className="form-check-label fw-bold">
                                                     Sepanjang Hari
                                                 </label>
                                             </div>
@@ -989,28 +1338,11 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                             </>
                                         )}
 
-                                        <EditField
-                                            label="Lokasi"
-                                            span="col-12"
-                                        >
-                                            <input
-                                                type="text"
-                                                className="form-control"
-                                                maxLength={255}
-                                                value={form.location}
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        'location',
-                                                        event.target.value
-                                                    )
-                                                }
-                                            />
-                                        </EditField>
+                                        <div className="col-12">
+                                            <label className="form-label fw-bold">
+                                                Deskripsi / Keperluan
+                                            </label>
 
-                                        <EditField
-                                            label="Deskripsi"
-                                            span="col-12"
-                                        >
                                             <textarea
                                                 rows={4}
                                                 className="form-control"
@@ -1023,14 +1355,13 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                                     )
                                                 }
                                             />
-                                        </EditField>
+                                        </div>
 
                                         <div className="col-12">
                                             <div className="form-check form-switch">
                                                 <input
                                                     type="checkbox"
                                                     className="form-check-input"
-                                                    id="approvalPublic"
                                                     checked={form.is_public}
                                                     onChange={(event) =>
                                                         updateField(
@@ -1040,20 +1371,78 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                                     }
                                                 />
 
-                                                <label
-                                                    htmlFor="approvalPublic"
-                                                    className="form-check-label fw-bold"
-                                                >
+                                                <label className="form-check-label fw-bold">
                                                     Tampilkan di Kalender Publik
                                                 </label>
                                             </div>
                                         </div>
+
+                                        <div className="col-12">
+                                            <hr className="my-2" />
+
+                                            <h6 className="fw-bold mb-1">
+                                                <i className="bi bi-paperclip text-danger me-2" />
+                                                Edit Lampiran Kegiatan
+                                            </h6>
+
+                                            <p className="small text-muted mb-3">
+                                                Unggah file baru hanya jika
+                                                ingin mengganti dokumen lama.
+                                            </p>
+                                        </div>
+
+                                        <EditDocument
+                                            id="edit_rundown"
+                                            title="Rundown Kegiatan"
+                                            existingName={
+                                                selected.rundown_name
+                                            }
+                                            file={newRundown}
+                                            required
+                                            disabled={processing}
+                                            onChange={(event) =>
+                                                handleAttachmentChange(
+                                                    event,
+                                                    setNewRundown,
+                                                    'Rundown'
+                                                )
+                                            }
+                                            onRemove={() =>
+                                                removeAttachment(
+                                                    'edit_rundown',
+                                                    setNewRundown
+                                                )
+                                            }
+                                        />
+
+                                        <EditDocument
+                                            id="edit_tor"
+                                            title="TOR (Term of Reference)"
+                                            existingName={
+                                                selected.tor_name
+                                            }
+                                            file={newTor}
+                                            disabled={processing}
+                                            onChange={(event) =>
+                                                handleAttachmentChange(
+                                                    event,
+                                                    setNewTor,
+                                                    'TOR'
+                                                )
+                                            }
+                                            onRemove={() =>
+                                                removeAttachment(
+                                                    'edit_tor',
+                                                    setNewTor
+                                                )
+                                            }
+                                        />
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="dsap-detail-grid">
+                                        <div className="row g-3 mb-4">
                                             <DetailItem
-                                                label="Pengaju Akun"
+                                                label="Pemohon"
                                                 value={selected.requester_name}
                                             />
 
@@ -1075,6 +1464,11 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                             />
 
                                             <DetailItem
+                                                label="Judul Agenda"
+                                                value={selected.title}
+                                            />
+
+                                            <DetailItem
                                                 label="Tanggal"
                                                 value={formatDate(
                                                     selected.event_date
@@ -1085,8 +1479,12 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                                 label="Waktu"
                                                 value={
                                                     selected.all_day
-                                                        ? 'Sepanjang hari'
-                                                        : `${formatTime(selected.start_time)} - ${formatTime(selected.end_time)}`
+                                                        ? 'Sepanjang Hari'
+                                                        : `${formatTime(
+                                                              selected.start_time
+                                                          )} - ${formatTime(
+                                                              selected.end_time
+                                                          )}`
                                                 }
                                             />
 
@@ -1117,10 +1515,10 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                             />
                                         </div>
 
-                                        <div className="dsap-description mt-3">
-                                            <small className="d-block text-muted fw-bold mb-2">
-                                                DESKRIPSI / KEPERLUAN
-                                            </small>
+                                        <div className="bg-light rounded-4 p-3 mb-4">
+                                            <strong className="d-block mb-2">
+                                                Deskripsi / Keperluan
+                                            </strong>
 
                                             <div
                                                 style={{
@@ -1130,6 +1528,11 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                                 {selected.description || '-'}
                                             </div>
                                         </div>
+
+                                        <DirectorateDocuments
+                                            request={selected}
+                                            compact
+                                        />
 
                                         {selected.edited_by && (
                                             <div className="small text-muted mt-3">
@@ -1164,392 +1567,129 @@ Silakan edit tanggal atau waktu pengajuan terlebih dahulu.`
                                                 <strong>
                                                     Alasan Penolakan
                                                 </strong>
-                                                <p className="mb-0 mt-1">
+
+                                                <p className="mb-0 mt-2">
                                                     {selected.rejection_reason || '-'}
                                                 </p>
-                                            </div>
-                                        )}
-
-                                        {selected.status === 'approved' && (
-                                            <div className="alert alert-success border-0 rounded-4 mt-3 mb-0">
-                                                <i className="bi bi-check-circle-fill me-2" />
-                                                Pengajuan sudah disetujui
-                                                dan masuk kalender.
-
-                                                {selected.approved_schedule_id && (
-                                                    <span className="ms-1">
-                                                        ID Agenda #
-                                                        {selected.approved_schedule_id}
-                                                    </span>
-                                                )}
                                             </div>
                                         )}
                                     </>
                                 )}
 
-                                {rejectOpen &&
-                                    selected.status === 'pending' &&
-                                    !editing && (
-                                        <div className="dsap-reject mt-3">
-                                            <h6 className="fw-black mb-2">
-                                                <i className="bi bi-exclamation-triangle-fill me-2" />
-                                                Alasan Penolakan
-                                            </h6>
+                                {rejectOpen && !editing && (
+                                    <div className="border rounded-4 p-3 mt-3">
+                                        <label className="form-label fw-bold">
+                                            Alasan Penolakan
+                                        </label>
 
-                                            <textarea
-                                                className="form-control"
-                                                rows={3}
-                                                maxLength={2000}
-                                                placeholder="Tuliskan alasan pengajuan tidak dapat disetujui..."
-                                                value={rejectionReason}
-                                                onChange={(event) =>
-                                                    setRejectionReason(
-                                                        event.target.value
-                                                    )
-                                                }
-                                            />
+                                        <textarea
+                                            className="form-control"
+                                            rows={3}
+                                            maxLength={2000}
+                                            value={rejectionReason}
+                                            onChange={(event) =>
+                                                setRejectionReason(
+                                                    event.target.value
+                                                )
+                                            }
+                                            placeholder="Masukkan alasan penolakan..."
+                                        />
+                                    </div>
+                                )}
+                            </div>
 
-                                            <div className="d-flex flex-wrap justify-content-end gap-2 mt-3">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-light border rounded-pill"
-                                                    onClick={() =>
-                                                        setRejectOpen(false)
-                                                    }
-                                                    disabled={processing}
-                                                >
-                                                    Batal
-                                                </button>
+                            <div className="modal-footer p-3">
+                                <button
+                                    type="button"
+                                    className="btn btn-light border rounded-pill"
+                                    disabled={processing}
+                                    onClick={closeDetail}
+                                >
+                                    Tutup
+                                </button>
 
+                                {selected.status === 'pending' && (
+                                    editing ? (
+                                        <>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-secondary rounded-pill"
+                                                disabled={processing}
+                                                onClick={cancelEdit}
+                                            >
+                                                Batal Edit
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary rounded-pill"
+                                                disabled={processing}
+                                                onClick={saveEdit}
+                                            >
+                                                {processing ? (
+                                                    <>
+                                                        <span className="spinner-border spinner-border-sm me-2" />
+                                                        Menyimpan...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <i className="bi bi-save me-2" />
+                                                        Simpan Perubahan
+                                                    </>
+                                                )}
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-secondary rounded-pill"
+                                                disabled={processing}
+                                                onClick={startEdit}
+                                            >
+                                                <i className="bi bi-pencil-square me-2" />
+                                                Edit
+                                            </button>
+
+                                            {rejectOpen ? (
                                                 <button
                                                     type="button"
                                                     className="btn btn-danger rounded-pill"
+                                                    disabled={processing}
                                                     onClick={reject}
-                                                    disabled={
-                                                        processing ||
-                                                        !rejectionReason.trim()
+                                                >
+                                                    Konfirmasi Tolak
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline-danger rounded-pill"
+                                                    disabled={processing}
+                                                    onClick={() =>
+                                                        setRejectOpen(true)
                                                     }
                                                 >
-                                                    <i className="bi bi-x-circle me-2" />
-                                                    Konfirmasi Penolakan
+                                                    Tolak
                                                 </button>
-                                            </div>
-                                        </div>
-                                    )}
-                            </div>
-
-                            {/* ACTION */}
-
-                            <div className="modal-footer border-0 px-4 py-3">
-                                {editing ? (
-                                    <>
-                                        <button
-                                            type="button"
-                                            className="btn btn-light border rounded-pill px-3"
-                                            disabled={processing}
-                                            onClick={() => {
-                                                setEditing(false);
-                                                setForm(toForm(selected));
-                                            }}
-                                        >
-                                            Batal Edit
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            className="btn btn-danger rounded-pill px-4"
-                                            disabled={processing}
-                                            onClick={saveEdit}
-                                        >
-                                            <i className="bi bi-floppy-fill me-2" />
-                                            Simpan Perubahan
-                                        </button>
-                                    </>
-                                ) : (
-                                    <>
-                                        {selected.status === 'pending' &&
-                                            !rejectOpen && (
-                                                <>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-outline-secondary rounded-pill"
-                                                        disabled={processing}
-                                                        onClick={() =>
-                                                            setEditing(true)
-                                                        }
-                                                    >
-                                                        <i className="bi bi-pencil-square me-2" />
-                                                        Edit
-                                                    </button>
-
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-outline-danger rounded-pill"
-                                                        disabled={processing}
-                                                        onClick={() =>
-                                                            setRejectOpen(true)
-                                                        }
-                                                    >
-                                                        <i className="bi bi-x-lg me-2" />
-                                                        Tolak
-                                                    </button>
-
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-success rounded-pill px-4"
-                                                        disabled={processing}
-                                                        onClick={approve}
-                                                    >
-                                                        {processing ? (
-                                                            <span className="spinner-border spinner-border-sm me-2" />
-                                                        ) : (
-                                                            <i className="bi bi-check-lg me-2" />
-                                                        )}
-                                                        Setujui
-                                                    </button>
-                                                </>
                                             )}
 
-                                        <button
-                                            type="button"
-                                            className="btn btn-light border rounded-pill"
-                                            onClick={closeDetail}
-                                            disabled={processing}
-                                        >
-                                            Tutup
-                                        </button>
-                                    </>
+                                            <button
+                                                type="button"
+                                                className="btn btn-success rounded-pill"
+                                                disabled={processing}
+                                                onClick={approve}
+                                            >
+                                                <i className="bi bi-check-circle me-2" />
+                                                Setujui
+                                            </button>
+                                        </>
+                                    )
                                 )}
                             </div>
                         </div>
                     </div>
                 </div>
             )}
-
-            <style>{`
-                .dsap-page {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 16px;
-                    min-width: 0;
-                }
-
-                .dsap-page .fw-black {
-                    font-weight: 900 !important;
-                }
-
-                .dsap-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    gap: 16px;
-                    flex-wrap: wrap;
-                }
-
-                .dsap-header h2 {
-                    font-size: 1.8rem;
-                }
-
-                .dsap-statistics {
-                    display: grid;
-                    grid-template-columns: repeat(4, minmax(0, 1fr));
-                    gap: 10px;
-                }
-
-                .dsap-stat {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    padding: 16px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 17px;
-                    background: #fff;
-                    text-align: left;
-                    color: #475569;
-                    min-width: 0;
-                }
-
-                .dsap-stat.active {
-                    background: #fff7f7;
-                    border-color: #7f1d1d;
-                }
-
-                .dsap-stat-icon {
-                    width: 42px;
-                    height: 42px;
-                    flex: 0 0 42px;
-                    display: grid;
-                    place-items: center;
-                    border-radius: 12px;
-                    background: #f1f5f9;
-                    color: #334155;
-                }
-
-                .dsap-stat-icon.pending {
-                    background: #fffbeb;
-                    color: #a16207;
-                }
-
-                .dsap-stat-icon.approved {
-                    background: #ecfdf5;
-                    color: #047857;
-                }
-
-                .dsap-stat-icon.rejected {
-                    background: #fef2f2;
-                    color: #b91c1c;
-                }
-
-                .dsap-stat-text {
-                    display: flex;
-                    flex-direction: column;
-                    min-width: 0;
-                }
-
-                .dsap-stat-text small {
-                    color: #64748b;
-                    font-weight: 800;
-                    font-size: .68rem;
-                }
-
-                .dsap-stat-text strong {
-                    font-size: 1.5rem;
-                    color: #0f172a;
-                }
-
-                .dsap-card {
-                    background: #fff;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 20px;
-                    padding: 20px;
-                    box-shadow: 0 5px 20px rgba(15, 23, 42, .04);
-                }
-
-                .dsap-card-heading {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    gap: 12px;
-                    flex-wrap: wrap;
-                    margin-bottom: 18px;
-                }
-
-                .dsap-table-wrapper {
-                    overflow-x: auto;
-                }
-
-                .dsap-table {
-                    min-width: 900px;
-                    margin-bottom: 0;
-                }
-
-                .dsap-table thead th {
-                    background: #f8fafc;
-                    color: #64748b;
-                    font-size: .69rem;
-                    text-transform: uppercase;
-                    letter-spacing: .04em;
-                    padding: 13px;
-                    white-space: nowrap;
-                }
-
-                .dsap-table td {
-                    padding: 14px 13px;
-                    font-size: .82rem;
-                    color: #334155;
-                }
-
-                .dsap-empty {
-                    text-align: center;
-                    padding: 65px 10px;
-                    color: #64748b;
-                }
-
-                .dsap-empty > i {
-                    display: block;
-                    color: #cbd5e1;
-                    font-size: 2.5rem;
-                    margin-bottom: 14px;
-                }
-
-                .dsap-modal-backdrop {
-                    background: rgba(15, 23, 42, .64);
-                    z-index: 1050;
-                }
-
-                .dsap-detail-grid {
-                    display: grid;
-                    grid-template-columns: repeat(2, minmax(0, 1fr));
-                    gap: 10px;
-                }
-
-                .dsap-detail-item {
-                    border-radius: 12px;
-                    padding: 12px 14px;
-                    background: #f8fafc;
-                    min-width: 0;
-                }
-
-                .dsap-detail-item small {
-                    display: block;
-                    color: #94a3b8;
-                    font-weight: 800;
-                    margin-bottom: 5px;
-                }
-
-                .dsap-detail-item strong {
-                    display: block;
-                    color: #334155;
-                    font-size: .84rem;
-                    word-break: break-word;
-                }
-
-                .dsap-description {
-                    padding: 14px;
-                    border-radius: 12px;
-                    background: #f8fafc;
-                    font-size: .84rem;
-                }
-
-                .dsap-reject {
-                    border: 1px solid #fecaca;
-                    background: #fff7f7;
-                    padding: 15px;
-                    border-radius: 15px;
-                }
-
-                @media (max-width: 1100px) {
-                    .dsap-statistics {
-                        grid-template-columns: repeat(2, minmax(0, 1fr));
-                    }
-                }
-
-                @media (max-width: 767px) {
-                    .dsap-header h2 {
-                        font-size: 1.5rem;
-                    }
-
-                    .dsap-stat {
-                        padding: 12px;
-                    }
-
-                    .dsap-card {
-                        padding: 12px;
-                    }
-
-                    .dsap-detail-grid {
-                        grid-template-columns: 1fr;
-                    }
-
-                    .dsap-modal-backdrop .modal-footer {
-                        justify-content: stretch;
-                    }
-
-                    .dsap-modal-backdrop .modal-footer button {
-                        flex: 1;
-                    }
-                }
-            `}</style>
         </div>
     );
 }

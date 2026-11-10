@@ -1,6 +1,6 @@
-
 <?php
 
+use App\Http\Controllers\Api\DashboardDirectorateController;
 use App\Http\Controllers\Api\NotificationReadController;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\PermissionMiddleware;
@@ -22,8 +22,6 @@ return Application::configure(
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
 
-        // Endpoint notifikasi tambahan.
-        // Seluruh route tetap memakai middleware API dan Sanctum.
         then: function (): void {
             Route::middleware([
                 'api',
@@ -31,6 +29,13 @@ return Application::configure(
             ])
                 ->prefix('api')
                 ->group(function (): void {
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | NOTIFIKASI
+                    |--------------------------------------------------------------------------
+                    */
+
                     Route::get('/notification-reads', [
                         NotificationReadController::class,
                         'index',
@@ -40,43 +45,34 @@ return Application::configure(
                         NotificationReadController::class,
                         'store',
                     ]);
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | REKAP DIREKTORAT DI DASHBOARD EXISTING
+                    |--------------------------------------------------------------------------
+                    */
+
+                    Route::get('/dashboard/directorate-summary', [
+                        DashboardDirectorateController::class,
+                        'index',
+                    ]);
                 });
         }
     )
     ->withMiddleware(
         function (Middleware $middleware): void {
-            /*
-            |--------------------------------------------------------------------------
-            | Paksa seluruh route API mengembalikan JSON
-            |--------------------------------------------------------------------------
-            */
-
             $middleware->prependToGroup('api', [
                 ForceJsonResponse::class,
             ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Alias Middleware
-            |--------------------------------------------------------------------------
-            */
-
             $middleware->alias([
-                'role' =>
-                    RoleMiddleware::class,
-
-                'permission' =>
-                    PermissionMiddleware::class,
+                'role' => RoleMiddleware::class,
+                'permission' => PermissionMiddleware::class,
             ]);
         }
     )
     ->withExceptions(
         function (Exceptions $exceptions): void {
-            /*
-            |--------------------------------------------------------------------------
-            | Authentication Exception
-            |--------------------------------------------------------------------------
-            */
 
             $exceptions->render(
                 function (
@@ -89,17 +85,12 @@ return Application::configure(
 
                     return response()->json([
                         'success' => false,
-                        'message' => 'Unauthenticated. Silakan login terlebih dahulu.',
+                        'message' =>
+                            'Unauthenticated. Silakan login terlebih dahulu.',
                         'data' => null,
                     ], 401);
                 }
             );
-
-            /*
-            |--------------------------------------------------------------------------
-            | HTTP Exception untuk API
-            |--------------------------------------------------------------------------
-            */
 
             $exceptions->render(
                 function (
@@ -110,15 +101,24 @@ return Application::configure(
                         return null;
                     }
 
-                    $statusCode =
-                        $exception->getStatusCode();
+                    $statusCode = $exception->getStatusCode();
 
                     $message = match ($statusCode) {
-                        403 => 'Akun tidak memiliki izin untuk mengakses fitur ini.',
-                        404 => 'Endpoint API tidak ditemukan.',
-                        405 => 'Method request tidak diizinkan untuk endpoint ini.',
-                        419 => 'Sesi telah kedaluwarsa.',
-                        429 => 'Terlalu banyak request. Silakan coba kembali.',
+                        403 =>
+                            'Akun tidak memiliki izin untuk mengakses fitur ini.',
+
+                        404 =>
+                            'Endpoint API tidak ditemukan.',
+
+                        405 =>
+                            'Method request tidak diizinkan untuk endpoint ini.',
+
+                        419 =>
+                            'Sesi telah kedaluwarsa.',
+
+                        429 =>
+                            'Terlalu banyak request. Silakan coba kembali.',
+
                         default =>
                             $exception->getMessage() !== ''
                                 ? $exception->getMessage()
@@ -132,12 +132,6 @@ return Application::configure(
                     ], $statusCode);
                 }
             );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Server Error API
-            |--------------------------------------------------------------------------
-            */
 
             $exceptions->render(
                 function (
@@ -175,7 +169,8 @@ return Application::configure(
 
                     return response()->json([
                         'success' => false,
-                        'message' => 'Terjadi kesalahan pada server.',
+                        'message' =>
+                            'Terjadi kesalahan pada server.',
                         'data' => $data,
                     ], 500);
                 }

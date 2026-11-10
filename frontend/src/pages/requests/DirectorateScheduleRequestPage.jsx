@@ -1,3 +1,4 @@
+
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
@@ -13,26 +14,26 @@ const DIRECTORATES = [
     {
         value: 'direktorat',
         label: 'Direktorat',
-        description: 'Agenda bersama seluruh pimpinan.',
         icon: 'bi-people-fill',
+        description: 'Agenda bersama pimpinan',
     },
     {
         value: 'direktur',
         label: 'Direktur',
-        description: 'Agenda khusus Direktur.',
         icon: 'bi-person-badge-fill',
+        description: 'Agenda khusus Direktur',
     },
     {
         value: 'wakil_direktur_1',
         label: 'Wakil Direktur I',
-        description: 'Agenda khusus Wakil Direktur I.',
         icon: 'bi-person-workspace',
+        description: 'Agenda Wakil Direktur I',
     },
     {
         value: 'wakil_direktur_2',
         label: 'Wakil Direktur II',
-        description: 'Agenda khusus Wakil Direktur II.',
         icon: 'bi-person-workspace',
+        description: 'Agenda Wakil Direktur II',
     },
 ];
 
@@ -45,16 +46,6 @@ const AGENDA_TYPES = [
     'Akademik',
     'Lainnya',
 ];
-
-const AGENDA_COLORS = {
-    Rapat: '#7F1D1D',
-    Kunjungan: '#1D4ED8',
-    Internal: '#4338CA',
-    Eksternal: '#047857',
-    Seremonial: '#C2410C',
-    Akademik: '#7E22CE',
-    Lainnya: '#475569',
-};
 
 const INITIAL_FORM = {
     requester_unit: '',
@@ -71,56 +62,35 @@ const INITIAL_FORM = {
     is_public: false,
 };
 
-function getCurrentUser() {
-    try {
-        return JSON.parse(
-            localStorage.getItem('admin_user') || '{}'
-        );
-    } catch {
-        return {};
-    }
-}
+const ACCEPTED_EXTENSIONS = [
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+];
 
-function getErrorMessage(error) {
-    const data = error?.response?.data;
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-    return (
-        Object.values(data?.errors || {})
-            .flat()
-            .find(Boolean) ||
-        data?.message ||
-        'Terjadi kesalahan saat mengirim pengajuan.'
-    );
-}
+const formatSize = (bytes) =>
+    `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 
-function formatDate(value) {
-    if (!value) return '-';
-
-    const [year, month, day] = value
-        .split('-')
-        .map(Number);
-
-    return new Date(
-        year,
-        month - 1,
-        day
-    ).toLocaleDateString('id-ID', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-    });
-}
+const getErrorMessage = (error) =>
+    Object.values(error?.response?.data?.errors || {})
+        .flat()
+        .find(Boolean) ||
+    error?.response?.data?.message ||
+    'Pengajuan gagal dikirim.';
 
 function FormField({
     label,
     required = false,
-    hint,
     children,
+    hint,
 }) {
     return (
-        <div>
-            <label className="form-label fw-bold mb-2">
+        <div className="mb-3">
+            <label className="form-label fw-bold">
                 {label}
                 {required && (
                     <span className="text-danger ms-1">*</span>
@@ -130,23 +100,96 @@ function FormField({
             {children}
 
             {hint && (
-                <div className="form-text mt-2">
-                    {hint}
-                </div>
+                <div className="form-text">{hint}</div>
             )}
         </div>
     );
 }
 
-function PreviewItem({ icon, label, value }) {
+function FileUpload({
+    id,
+    label,
+    required,
+    file,
+    onChange,
+    onRemove,
+    disabled,
+}) {
     return (
-        <div className="dsrq-preview-row">
-            <i className={`bi ${icon}`} />
+        <div className="border rounded-4 p-3 h-100">
+            <div className="d-flex align-items-center justify-content-between gap-2 mb-2">
+                <span className="small fw-bold">
+                    {label}
+                </span>
 
-            <div>
-                <small>{label}</small>
-                <strong>{value || '-'}</strong>
+                <span
+                    className={
+                        required
+                            ? 'badge rounded-pill bg-danger-subtle text-danger'
+                            : 'badge rounded-pill bg-light text-secondary'
+                    }
+                >
+                    {required ? 'Wajib' : 'Opsional'}
+                </span>
             </div>
+
+            <label
+                htmlFor={id}
+                className="d-flex align-items-center justify-content-center gap-2 border border-2 border-dashed rounded-4 bg-light px-3 py-3 w-100"
+                style={{
+                    cursor: disabled
+                        ? 'not-allowed'
+                        : 'pointer',
+                    minHeight: 68,
+                }}
+            >
+                <i className="bi bi-cloud-arrow-up text-danger fs-5" />
+                <span className="small fw-semibold">
+                    {file ? 'Ganti Dokumen' : 'Pilih Dokumen'}
+                </span>
+            </label>
+
+            <input
+                id={id}
+                type="file"
+                className="d-none"
+                accept=".pdf,.doc,.docx,.xls,.xlsx"
+                onChange={onChange}
+                disabled={disabled}
+            />
+
+            {file ? (
+                <div className="d-flex align-items-center gap-2 mt-3">
+                    <i className="bi bi-file-earmark-check-fill text-success" />
+
+                    <div className="flex-grow-1 min-w-0">
+                        <div
+                            className="small fw-bold text-truncate"
+                            title={file.name}
+                        >
+                            {file.name}
+                        </div>
+
+                        <div className="small text-muted">
+                            {formatSize(file.size)}
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-outline-danger rounded-circle"
+                        disabled={disabled}
+                        title="Hapus dokumen"
+                        onClick={onRemove}
+                    >
+                        <i className="bi bi-x-lg" />
+                    </button>
+                </div>
+            ) : (
+                <div className="small text-muted mt-2">
+                    PDF, Word, Excel · Maks. 5 MB
+                </div>
+            )}
         </div>
     );
 }
@@ -154,10 +197,15 @@ function PreviewItem({ icon, label, value }) {
 export default function DirectorateScheduleRequestPage() {
     const navigate = useNavigate();
 
-    const currentUser = useMemo(
-        () => getCurrentUser(),
-        []
-    );
+    const currentUser = useMemo(() => {
+        try {
+            return JSON.parse(
+                localStorage.getItem('admin_user') || '{}'
+            );
+        } catch {
+            return {};
+        }
+    }, []);
 
     const basePath =
         currentUser.role === 'user'
@@ -171,15 +219,9 @@ export default function DirectorateScheduleRequestPage() {
         ...INITIAL_FORM,
     });
 
+    const [rundown, setRundown] = useState(null);
+    const [tor, setTor] = useState(null);
     const [saving, setSaving] = useState(false);
-
-    const selectedDirectorate = DIRECTORATES.find(
-        (item) => item.value === form.directorate
-    );
-
-    const agendaColor =
-        AGENDA_COLORS[form.agenda_type] ||
-        AGENDA_COLORS.Lainnya;
 
     const changeField = (field, value) => {
         setForm((previous) => ({
@@ -188,50 +230,88 @@ export default function DirectorateScheduleRequestPage() {
         }));
     };
 
-    const isFormValid =
-        form.requester_unit.trim().length > 0 &&
-        form.pic_name.trim().length > 0 &&
-        form.directorate !== '' &&
-        form.title.trim().length > 0 &&
-        form.event_date !== '' &&
-        (
-            form.all_day ||
-            (
-                form.start_time !== '' &&
-                form.end_time !== '' &&
-                form.end_time > form.start_time
-            )
-        );
+    const selectedDirectorate = DIRECTORATES.find(
+        (item) => item.value === form.directorate
+    );
+
+    const handleFileChange = (
+        event,
+        setter,
+        label
+    ) => {
+        const file = event.target.files?.[0];
+
+        if (!file) {
+            setter(null);
+            return;
+        }
+
+        const extension = file.name
+            .split('.')
+            .pop()
+            ?.toLowerCase();
+
+        if (!ACCEPTED_EXTENSIONS.includes(extension)) {
+            event.target.value = '';
+            setter(null);
+
+            showWarningAlert(
+                'Format Tidak Didukung',
+                `${label} harus berformat PDF, DOC, DOCX, XLS, atau XLSX.`
+            );
+            return;
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+            event.target.value = '';
+            setter(null);
+
+            showWarningAlert(
+                'File Terlalu Besar',
+                `${label} maksimal 5 MB.`
+            );
+            return;
+        }
+
+        setter(file);
+    };
+
+    const removeFile = (id, setter) => {
+        setter(null);
+
+        const input = document.getElementById(id);
+
+        if (input) {
+            input.value = '';
+        }
+    };
+
+    const resetForm = () => {
+        setForm({ ...INITIAL_FORM });
+        removeFile('directorate_rundown', setRundown);
+        removeFile('directorate_tor', setTor);
+    };
 
     const validateForm = async () => {
-        if (!form.requester_unit.trim()) {
+        if (
+            !form.requester_unit.trim() ||
+            !form.pic_name.trim()
+        ) {
             await showWarningAlert(
-                'Unit Pengaju Belum Diisi',
-                'Masukkan nama unit yang mengajukan agenda.'
+                'Informasi Belum Lengkap',
+                'Unit pengaju dan nama PIC wajib diisi.'
             );
             return false;
         }
 
-        if (!form.pic_name.trim()) {
+        if (
+            !form.directorate ||
+            !form.title.trim() ||
+            !form.event_date
+        ) {
             await showWarningAlert(
-                'Nama PIC Belum Diisi',
-                'Masukkan nama penanggung jawab kegiatan.'
-            );
-            return false;
-        }
-
-        if (!form.directorate) {
-            await showWarningAlert(
-                'Pilih Agenda Untuk',
-                'Pilih pimpinan yang dituju.'
-            );
-            return false;
-        }
-
-        if (!form.title.trim() || !form.event_date) {
-            await showWarningAlert(
-                'Data Belum Lengkap',
-                'Judul dan tanggal kegiatan wajib diisi.'
+                'Agenda Belum Lengkap',
+                'Pilih pimpinan serta isi judul dan tanggal kegiatan.'
             );
             return false;
         }
@@ -251,8 +331,33 @@ export default function DirectorateScheduleRequestPage() {
             return false;
         }
 
+        if (!rundown) {
+            await showWarningAlert(
+                'Rundown Wajib',
+                'Lampirkan rundown kegiatan sebelum mengirim pengajuan.'
+            );
+            return false;
+        }
+
         return true;
     };
+
+    const isFormValid = Boolean(
+        form.requester_unit.trim() &&
+        form.pic_name.trim() &&
+        form.directorate &&
+        form.title.trim() &&
+        form.event_date &&
+        rundown &&
+        (
+            form.all_day ||
+            (
+                form.start_time &&
+                form.end_time &&
+                form.end_time > form.start_time
+            )
+        )
+    );
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -264,55 +369,64 @@ export default function DirectorateScheduleRequestPage() {
         const confirmation = await showConfirmAlert({
             title: 'Kirim Pengajuan Jadwal?',
             text:
-                `Agenda "${form.title.trim()}" dari ` +
-                `${form.requester_unit.trim()} ` +
-                `dengan PIC ${form.pic_name.trim()} ` +
-                'akan dikirim untuk persetujuan admin.',
+                `Agenda "${form.title.trim()}" akan dikirim ` +
+                'untuk persetujuan admin Direktorat.',
             icon: 'question',
             confirmButtonText: 'Ya, Kirim Pengajuan',
             cancelButtonText: 'Batal',
         });
 
-        if (!confirmation?.isConfirmed) return;
+        if (!confirmation?.isConfirmed) {
+            return;
+        }
 
-        const payload = {
-            requester_unit: form.requester_unit.trim(),
-            pic_name: form.pic_name.trim(),
-            directorate: form.directorate,
-            title: form.title.trim(),
-            description:
-                form.description.trim() || null,
-            event_date: form.event_date,
-            start_time: form.all_day
-                ? null
-                : form.start_time,
-            end_time: form.all_day
-                ? null
-                : form.end_time,
-            all_day: Boolean(form.all_day),
-            location:
-                form.location.trim() || null,
-            agenda_type: form.agenda_type,
-            is_public: Boolean(form.is_public),
-        };
+        const data = new FormData();
+
+        data.append('requester_unit', form.requester_unit.trim());
+        data.append('pic_name', form.pic_name.trim());
+        data.append('directorate', form.directorate);
+        data.append('title', form.title.trim());
+        data.append('event_date', form.event_date);
+        data.append('agenda_type', form.agenda_type);
+        data.append('all_day', form.all_day ? '1' : '0');
+        data.append('is_public', form.is_public ? '1' : '0');
+
+        if (form.description.trim()) {
+            data.append('description', form.description.trim());
+        }
+
+        if (form.location.trim()) {
+            data.append('location', form.location.trim());
+        }
+
+        if (!form.all_day) {
+            data.append('start_time', form.start_time);
+            data.append('end_time', form.end_time);
+        }
+
+        data.append('rundown', rundown);
+
+        if (tor) {
+            data.append('tor', tor);
+        }
 
         try {
             setSaving(true);
 
             await api.post(
                 '/event-schedule-requests',
-                payload
+                data
             );
 
             await showSuccessAlert(
                 'Pengajuan Berhasil',
-                'Pengajuan jadwal berhasil dikirim. Pantau statusnya di Riwayat Pengajuan.'
+                'Pengajuan jadwal berhasil dikirim dan menunggu persetujuan.'
             );
 
             navigate(historyPath);
         } catch (error) {
             console.error(
-                'Submit schedule request:',
+                'Submit Directorate Schedule:',
                 error?.response?.data || error
             );
 
@@ -326,10 +440,8 @@ export default function DirectorateScheduleRequestPage() {
     };
 
     return (
-        <div className="dsrq-page">
-            {/* HEADER */}
-
-            <header className="dsrq-header">
+        <div className="container-fluid px-0">
+            <header className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
                 <div>
                     <span className="badge rounded-pill bg-danger-subtle text-danger px-3 py-2 mb-3">
                         SEKRETARIAT PIMPINAN
@@ -345,7 +457,7 @@ export default function DirectorateScheduleRequestPage() {
                     </p>
                 </div>
 
-                <div className="dsrq-header-actions">
+                <div className="d-flex flex-wrap gap-2">
                     <Link
                         to={historyPath}
                         className="btn btn-outline-danger rounded-pill"
@@ -365,365 +477,339 @@ export default function DirectorateScheduleRequestPage() {
             </header>
 
             <div className="row g-4">
-                {/* FORM */}
-
                 <div className="col-xl-8">
-                    <form
-                        className="dsrq-form"
-                        onSubmit={handleSubmit}
-                    >
-                        <div className="dsrq-section-heading">
-                            <div className="dsrq-section-icon">
-                                <i className="bi bi-person-lines-fill" />
-                            </div>
-
-                            <div>
-                                <h5 className="fw-black mb-1">
+                    <form onSubmit={handleSubmit}>
+                        <section className="card border-0 shadow-sm rounded-5 mb-4">
+                            <div className="card-body p-4">
+                                <h5 className="fw-black mb-4">
+                                    <i className="bi bi-person-lines-fill text-danger me-2" />
                                     Informasi Pengaju
                                 </h5>
-                                <p className="text-muted small mb-0">
-                                    Identitas unit dan penanggung jawab kegiatan.
-                                </p>
+
+                                <div className="row g-3">
+                                    <div className="col-md-6">
+                                        <FormField label="Unit Pengaju" required>
+                                            <input
+                                                className="form-control"
+                                                value={form.requester_unit}
+                                                onChange={(e) =>
+                                                    changeField(
+                                                        'requester_unit',
+                                                        e.target.value
+                                                    )
+                                                }
+                                                maxLength={255}
+                                                placeholder="Nama unit atau bagian"
+                                                required
+                                            />
+                                        </FormField>
+                                    </div>
+
+                                    <div className="col-md-6">
+                                        <FormField label="Nama PIC" required>
+                                            <input
+                                                className="form-control"
+                                                value={form.pic_name}
+                                                onChange={(e) =>
+                                                    changeField(
+                                                        'pic_name',
+                                                        e.target.value
+                                                    )
+                                                }
+                                                maxLength={255}
+                                                placeholder="Penanggung jawab kegiatan"
+                                                required
+                                            />
+                                        </FormField>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        </section>
 
-                        <div className="row g-3 mb-4">
-                            {/* FIELD BARU: UNIT */}
-
-                            <div className="col-md-6">
-                                <FormField
-                                    label="Unit Pengaju"
-                                    required
-                                    hint="Isi Nama Unit / Bagian / Divisi yang mengajukan agenda."
-                                >
-                                    <input
-                                        type="text"
-                                        className="form-control form-control-lg"
-                                        placeholder="Contoh: Unit Sekretariat Pimpinan"
-                                        maxLength={255}
-                                        value={form.requester_unit}
-                                        onChange={(event) =>
-                                            changeField(
-                                                'requester_unit',
-                                                event.target.value
-                                            )
-                                        }
-                                        required
-                                    />
-                                </FormField>
-                            </div>
-
-                            {/* FIELD BARU: PIC */}
-
-                            <div className="col-md-6">
-                                <FormField
-                                    label="Nama PIC"
-                                    required
-                                    hint="Penanggung jawab kegiatan."
-                                >
-                                    <input
-                                        type="text"
-                                        className="form-control form-control-lg"
-                                        placeholder="Nama lengkap PIC"
-                                        maxLength={255}
-                                        value={form.pic_name}
-                                        onChange={(event) =>
-                                            changeField(
-                                                'pic_name',
-                                                event.target.value
-                                            )
-                                        }
-                                        required
-                                    />
-                                </FormField>
-                            </div>
-                        </div>
-
-                        <div className="dsrq-section-heading">
-                            <div className="dsrq-section-icon">
-                                <i className="bi bi-calendar2-event-fill" />
-                            </div>
-
-                            <div>
-                                <h5 className="fw-black mb-1">
+                        <section className="card border-0 shadow-sm rounded-5 mb-4">
+                            <div className="card-body p-4">
+                                <h5 className="fw-black mb-4">
+                                    <i className="bi bi-calendar2-event-fill text-danger me-2" />
                                     Informasi Agenda
                                 </h5>
-                                <p className="text-muted small mb-0">
-                                    Tentukan jadwal dan pimpinan yang dituju.
-                                </p>
-                            </div>
-                        </div>
 
-                        <div className="mb-4">
-                            <FormField
-                                label="Agenda Untuk"
-                                required
-                            >
-                                <div className="dsrq-directorates">
-                                    {DIRECTORATES.map((item) => {
-                                        const active =
-                                            form.directorate ===
-                                            item.value;
-
-                                        return (
-                                            <button
+                                <FormField label="Agenda Untuk" required>
+                                    <div className="row g-2">
+                                        {DIRECTORATES.map((item) => (
+                                            <div
+                                                className="col-12 col-md-6"
                                                 key={item.value}
-                                                type="button"
-                                                className={`dsrq-directorate ${
-                                                    active ? 'active' : ''
-                                                }`}
-                                                onClick={() =>
+                                            >
+                                                <button
+                                                    type="button"
+                                                    className={
+                                                        form.directorate === item.value
+                                                            ? 'btn btn-outline-danger border-2 rounded-4 p-3 text-start w-100 h-100 bg-danger-subtle'
+                                                            : 'btn btn-light border rounded-4 p-3 text-start w-100 h-100'
+                                                    }
+                                                    onClick={() =>
+                                                        changeField(
+                                                            'directorate',
+                                                            item.value
+                                                        )
+                                                    }
+                                                >
+                                                    <div className="d-flex align-items-center gap-3">
+                                                        <i className={`bi ${item.icon} fs-4 text-danger`} />
+                                                        <span>
+                                                            <strong className="d-block">
+                                                                {item.label}
+                                                            </strong>
+                                                            <small className="text-muted">
+                                                                {item.description}
+                                                            </small>
+                                                        </span>
+                                                    </div>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </FormField>
+
+                                <FormField label="Judul / Nama Kegiatan" required>
+                                    <input
+                                        className="form-control"
+                                        value={form.title}
+                                        onChange={(e) =>
+                                            changeField('title', e.target.value)
+                                        }
+                                        maxLength={255}
+                                        required
+                                    />
+                                </FormField>
+
+                                <div className="row g-3">
+                                    <div className="col-md-6">
+                                        <FormField label="Tanggal Kegiatan" required>
+                                            <input
+                                                type="date"
+                                                className="form-control"
+                                                value={form.event_date}
+                                                onChange={(e) =>
                                                     changeField(
-                                                        'directorate',
-                                                        item.value
+                                                        'event_date',
+                                                        e.target.value
+                                                    )
+                                                }
+                                                required
+                                            />
+                                        </FormField>
+                                    </div>
+
+                                    <div className="col-md-6">
+                                        <FormField label="Kategori Agenda">
+                                            <select
+                                                className="form-select"
+                                                value={form.agenda_type}
+                                                onChange={(e) =>
+                                                    changeField(
+                                                        'agenda_type',
+                                                        e.target.value
                                                     )
                                                 }
                                             >
-                                                <span className="dsrq-directorate-icon">
-                                                    <i
-                                                        className={`bi ${item.icon}`}
-                                                    />
-                                                </span>
-
-                                                <span className="flex-grow-1">
-                                                    <strong className="d-block">
-                                                        {item.label}
-                                                    </strong>
-                                                    <small>
-                                                        {item.description}
-                                                    </small>
-                                                </span>
-
-                                                {active && (
-                                                    <i className="bi bi-check-circle-fill text-danger" />
-                                                )}
-                                            </button>
-                                        );
-                                    })}
+                                                {AGENDA_TYPES.map((type) => (
+                                                    <option key={type} value={type}>
+                                                        {type}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </FormField>
+                                    </div>
                                 </div>
-                            </FormField>
-                        </div>
 
-                        <div className="mb-4">
-                            <FormField
-                                label="Judul / Nama Kegiatan"
-                                required
-                            >
-                                <input
-                                    type="text"
-                                    className="form-control form-control-lg"
-                                    placeholder="Contoh: Rapat Koordinasi Program Kerja"
-                                    maxLength={255}
-                                    value={form.title}
-                                    onChange={(event) =>
-                                        changeField(
-                                            'title',
-                                            event.target.value
-                                        )
-                                    }
-                                    required
-                                />
-                            </FormField>
-                        </div>
+                                <div className="d-flex justify-content-between align-items-center rounded-4 bg-light p-3 mb-3">
+                                    <div>
+                                        <strong>Sepanjang Hari</strong>
+                                        <div className="small text-muted">
+                                            Aktifkan untuk kegiatan seharian.
+                                        </div>
+                                    </div>
+                                    <div className="form-check form-switch">
+                                        <input
+                                            type="checkbox"
+                                            className="form-check-input"
+                                            checked={form.all_day}
+                                            onChange={(e) =>
+                                                changeField(
+                                                    'all_day',
+                                                    e.target.checked
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                </div>
 
-                        <div className="row g-3 mb-4">
-                            <div className="col-md-6">
-                                <FormField
-                                    label="Tanggal Kegiatan"
-                                    required
-                                >
+                                {!form.all_day && (
+                                    <div className="row g-3">
+                                        <div className="col-md-6">
+                                            <FormField label="Jam Mulai" required>
+                                                <input
+                                                    type="time"
+                                                    className="form-control"
+                                                    value={form.start_time}
+                                                    onChange={(e) =>
+                                                        changeField(
+                                                            'start_time',
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    required
+                                                />
+                                            </FormField>
+                                        </div>
+
+                                        <div className="col-md-6">
+                                            <FormField label="Jam Selesai" required>
+                                                <input
+                                                    type="time"
+                                                    className="form-control"
+                                                    value={form.end_time}
+                                                    onChange={(e) =>
+                                                        changeField(
+                                                            'end_time',
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    required
+                                                />
+                                            </FormField>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <FormField label="Lokasi Kegiatan">
                                     <input
-                                        type="date"
-                                        className="form-control form-control-lg"
-                                        value={form.event_date}
-                                        onChange={(event) =>
+                                        className="form-control"
+                                        value={form.location}
+                                        onChange={(e) =>
                                             changeField(
-                                                'event_date',
-                                                event.target.value
+                                                'location',
+                                                e.target.value
                                             )
                                         }
-                                        required
+                                        maxLength={255}
                                     />
                                 </FormField>
-                            </div>
 
-                            <div className="col-md-6">
-                                <FormField label="Kategori Agenda">
-                                    <select
-                                        className="form-select form-select-lg"
-                                        value={form.agenda_type}
-                                        onChange={(event) =>
+                                <FormField label="Deskripsi / Keperluan">
+                                    <textarea
+                                        rows={4}
+                                        className="form-control"
+                                        maxLength={5000}
+                                        value={form.description}
+                                        onChange={(e) =>
                                             changeField(
-                                                'agenda_type',
-                                                event.target.value
+                                                'description',
+                                                e.target.value
                                             )
                                         }
-                                    >
-                                        {AGENDA_TYPES.map((type) => (
-                                            <option
-                                                key={type}
-                                                value={type}
-                                            >
-                                                {type}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    />
                                 </FormField>
-                            </div>
-                        </div>
 
-                        <div className="dsrq-switch mb-4">
-                            <div>
-                                <strong className="d-block">
-                                    Sepanjang Hari
-                                </strong>
-                                <small className="text-muted">
-                                    Aktifkan jika agenda berlangsung seharian.
-                                </small>
-                            </div>
-
-                            <div className="form-check form-switch">
-                                <input
-                                    type="checkbox"
-                                    className="form-check-input"
-                                    checked={form.all_day}
-                                    onChange={(event) =>
-                                        changeField(
-                                            'all_day',
-                                            event.target.checked
-                                        )
-                                    }
-                                    aria-label="Agenda sepanjang hari"
-                                />
-                            </div>
-                        </div>
-
-                        {!form.all_day && (
-                            <div className="row g-3 mb-4">
-                                <div className="col-md-6">
-                                    <FormField
-                                        label="Jam Mulai"
-                                        required
-                                    >
+                                <div className="d-flex justify-content-between align-items-center bg-light rounded-4 p-3">
+                                    <div>
+                                        <strong>Agenda Publik</strong>
+                                        <div className="small text-muted">
+                                            Tampilkan agenda setelah disetujui.
+                                        </div>
+                                    </div>
+                                    <div className="form-check form-switch">
                                         <input
-                                            type="time"
-                                            className="form-control form-control-lg"
-                                            value={form.start_time}
-                                            onChange={(event) =>
+                                            type="checkbox"
+                                            className="form-check-input"
+                                            checked={form.is_public}
+                                            onChange={(e) =>
                                                 changeField(
-                                                    'start_time',
-                                                    event.target.value
+                                                    'is_public',
+                                                    e.target.checked
                                                 )
                                             }
-                                            required
                                         />
-                                    </FormField>
+                                    </div>
                                 </div>
+                            </div>
+                        </section>
 
-                                <div className="col-md-6">
-                                    <FormField
-                                        label="Jam Selesai"
-                                        required
-                                    >
-                                        <input
-                                            type="time"
-                                            className="form-control form-control-lg"
-                                            value={form.end_time}
-                                            onChange={(event) =>
-                                                changeField(
-                                                    'end_time',
-                                                    event.target.value
+                        <section className="card border-0 shadow-sm rounded-5 mb-4">
+                            <div className="card-body p-4">
+                                <h5 className="fw-black mb-2">
+                                    <i className="bi bi-paperclip text-danger me-2" />
+                                    Lampiran Kegiatan
+                                </h5>
+
+                                <p className="small text-muted mb-3">
+                                    Rundown wajib dilampirkan. TOR dapat
+                                    ditambahkan jika tersedia.
+                                </p>
+
+                                <div className="row g-3">
+                                    <div className="col-12 col-md-6">
+                                        <FileUpload
+                                            id="directorate_rundown"
+                                            label="Rundown Kegiatan"
+                                            required
+                                            file={rundown}
+                                            disabled={saving}
+                                            onChange={(e) =>
+                                                handleFileChange(
+                                                    e,
+                                                    setRundown,
+                                                    'Rundown'
                                                 )
                                             }
-                                            required
+                                            onRemove={() =>
+                                                removeFile(
+                                                    'directorate_rundown',
+                                                    setRundown
+                                                )
+                                            }
                                         />
-                                    </FormField>
+                                    </div>
+
+                                    <div className="col-12 col-md-6">
+                                        <FileUpload
+                                            id="directorate_tor"
+                                            label="TOR (Term of Reference)"
+                                            file={tor}
+                                            disabled={saving}
+                                            onChange={(e) =>
+                                                handleFileChange(
+                                                    e,
+                                                    setTor,
+                                                    'TOR'
+                                                )
+                                            }
+                                            onRemove={() =>
+                                                removeFile(
+                                                    'directorate_tor',
+                                                    setTor
+                                                )
+                                            }
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        )}
+                        </section>
 
-                        <div className="mb-4">
-                            <FormField label="Lokasi Kegiatan">
-                                <input
-                                    type="text"
-                                    className="form-control form-control-lg"
-                                    placeholder="Contoh: Ruang Rapat Harmony"
-                                    maxLength={255}
-                                    value={form.location}
-                                    onChange={(event) =>
-                                        changeField(
-                                            'location',
-                                            event.target.value
-                                        )
-                                    }
-                                />
-                            </FormField>
-                        </div>
-
-                        <div className="mb-4">
-                            <FormField
-                                label="Deskripsi / Keperluan"
-                                hint="Tuliskan informasi pendukung untuk admin."
-                            >
-                                <textarea
-                                    className="form-control"
-                                    rows={5}
-                                    maxLength={5000}
-                                    value={form.description}
-                                    onChange={(event) =>
-                                        changeField(
-                                            'description',
-                                            event.target.value
-                                        )
-                                    }
-                                    placeholder="Tujuan dan rincian kegiatan..."
-                                />
-                            </FormField>
-                        </div>
-
-                        <div className="dsrq-switch mb-4">
-                            <div>
-                                <strong className="d-block">
-                                    Agenda Publik
-                                </strong>
-                                <small className="text-muted">
-                                    Agenda yang disetujui boleh ditampilkan
-                                    pada kalender publik.
-                                </small>
-                            </div>
-
-                            <div className="form-check form-switch">
-                                <input
-                                    type="checkbox"
-                                    className="form-check-input"
-                                    checked={form.is_public}
-                                    onChange={(event) =>
-                                        changeField(
-                                            'is_public',
-                                            event.target.checked
-                                        )
-                                    }
-                                    aria-label="Agenda publik"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="alert alert-info border-0 rounded-4 mb-4">
+                        <div className="alert alert-info border-0 rounded-4">
                             <i className="bi bi-info-circle-fill me-2" />
-                            Jadwal belum masuk kalender sebelum disetujui.
-                            Status dapat dipantau melalui Riwayat Pengajuan.
+                            Jadwal baru masuk kalender setelah
+                            disetujui oleh admin.
                         </div>
 
-                        <div className="dsrq-actions">
+                        <div className="d-flex justify-content-end flex-wrap gap-2 mb-4">
                             <button
                                 type="button"
                                 className="btn btn-light border rounded-pill px-4"
                                 disabled={saving}
-                                onClick={() =>
-                                    setForm({ ...INITIAL_FORM })
-                                }
+                                onClick={resetForm}
                             >
-                                <i className="bi bi-arrow-counterclockwise me-2" />
                                 Reset
                             </button>
 
@@ -748,352 +834,79 @@ export default function DirectorateScheduleRequestPage() {
                     </form>
                 </div>
 
-                {/* RINGKASAN */}
-
                 <div className="col-xl-4">
-                    <div className="dsrq-preview">
-                        <div className="dsrq-preview-heading">
-                            <div className="dsrq-section-icon">
-                                <i className="bi bi-calendar2-check-fill" />
-                            </div>
-
-                            <div>
-                                <h5 className="fw-black mb-1">
-                                    Ringkasan Pengajuan
-                                </h5>
-                                <p className="small text-muted mb-0">
-                                    Pratinjau sebelum dikirim.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div
-                            style={{
-                                height: 6,
-                                background: agendaColor,
-                            }}
-                        />
-
-                        <div className="p-4">
-                            <span className="badge rounded-pill bg-danger-subtle text-danger px-3 py-2 mb-3">
-                                Draft Pengajuan
-                            </span>
-
+                    <section className="card border-0 shadow-sm rounded-5 mb-4">
+                        <div className="card-body p-4">
                             <h5 className="fw-black mb-3">
-                                {form.title.trim() ||
-                                    'Judul agenda belum diisi'}
+                                Ringkasan Pengajuan
                             </h5>
 
-                            <PreviewItem
-                                icon="bi-building"
-                                label="Unit Pengaju"
-                                value={form.requester_unit}
-                            />
+                            <div className="small text-muted mb-2">
+                                Judul Kegiatan
+                            </div>
+                            <h6 className="fw-black">
+                                {form.title || 'Belum diisi'}
+                            </h6>
 
-                            <PreviewItem
-                                icon="bi-person-check"
-                                label="Nama PIC"
-                                value={form.pic_name}
-                            />
+                            <hr />
 
-                            <PreviewItem
-                                icon="bi-person-badge"
-                                label="Agenda Untuk"
-                                value={
-                                    selectedDirectorate?.label ||
-                                    'Belum dipilih'
-                                }
-                            />
-
-                            <PreviewItem
-                                icon="bi-calendar3"
-                                label="Tanggal"
-                                value={formatDate(form.event_date)}
-                            />
-
-                            <PreviewItem
-                                icon="bi-clock"
-                                label="Waktu"
-                                value={
+                            {[
+                                [
+                                    'Unit Pengaju',
+                                    form.requester_unit,
+                                ],
+                                [
+                                    'Nama PIC',
+                                    form.pic_name,
+                                ],
+                                [
+                                    'Agenda Untuk',
+                                    selectedDirectorate?.label,
+                                ],
+                                [
+                                    'Tanggal',
+                                    form.event_date,
+                                ],
+                                [
+                                    'Waktu',
                                     form.all_day
                                         ? 'Sepanjang Hari'
-                                        : `${form.start_time} - ${form.end_time} WIB`
-                                }
-                            />
-
-                            <PreviewItem
-                                icon="bi-tag"
-                                label="Kategori"
-                                value={form.agenda_type}
-                            />
-
-                            <PreviewItem
-                                icon="bi-geo-alt"
-                                label="Lokasi"
-                                value={form.location || 'Belum ditentukan'}
-                            />
-
-                            <PreviewItem
-                                icon="bi-globe2"
-                                label="Visibilitas"
-                                value={
-                                    form.is_public
-                                        ? 'Publik'
-                                        : 'Internal'
-                                }
-                            />
+                                        : `${form.start_time} - ${form.end_time}`,
+                                ],
+                                [
+                                    'Kategori',
+                                    form.agenda_type,
+                                ],
+                                [
+                                    'Lokasi',
+                                    form.location,
+                                ],
+                                [
+                                    'Rundown',
+                                    rundown?.name,
+                                ],
+                                [
+                                    'TOR',
+                                    tor?.name || 'Tidak dilampirkan',
+                                ],
+                            ].map(([label, value]) => (
+                                <div className="mb-3" key={label}>
+                                    <div className="small text-muted">
+                                        {label}
+                                    </div>
+                                    <div className="fw-semibold text-break">
+                                        {value || '-'}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    </div>
-
-                    <div className="dsrq-help">
-                        <div className="dsrq-section-icon mx-auto mb-3">
-                            <i className="bi bi-clock-history" />
-                        </div>
-
-                        <h6 className="fw-black mb-2">
-                            Pantau Pengajuan
-                        </h6>
-
-                        <p className="text-muted small">
-                            Riwayat Jadwal Direktorat sudah digabung
-                            dengan riwayat layanan lainnya.
-                        </p>
-
-                        <Link
-                            to={historyPath}
-                            className="btn btn-outline-danger rounded-pill w-100"
-                        >
-                            Buka Riwayat Pengajuan
-                        </Link>
-                    </div>
+                    </section>
                 </div>
             </div>
 
             <style>{`
-                .dsrq-page {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 18px;
-                    min-width: 0;
-                }
-
-                .dsrq-page .fw-black {
+                .fw-black {
                     font-weight: 900 !important;
-                }
-
-                .dsrq-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    flex-wrap: wrap;
-                    gap: 18px;
-                }
-
-                .dsrq-header h2 {
-                    font-size: 1.9rem;
-                }
-
-                .dsrq-header-actions {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 8px;
-                }
-
-                .dsrq-form,
-                .dsrq-preview,
-                .dsrq-help {
-                    background: #fff;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 22px;
-                    box-shadow: 0 6px 20px rgba(15, 23, 42, .04);
-                }
-
-                .dsrq-form {
-                    padding: 25px;
-                }
-
-                .dsrq-section-heading,
-                .dsrq-preview-heading {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    padding-bottom: 16px;
-                    margin-bottom: 22px;
-                    border-bottom: 1px solid #f1f5f9;
-                }
-
-                .dsrq-preview-heading {
-                    padding: 20px;
-                    margin: 0;
-                }
-
-                .dsrq-section-icon {
-                    width: 46px;
-                    height: 46px;
-                    flex: 0 0 46px;
-                    display: grid;
-                    place-items: center;
-                    border-radius: 14px;
-                    background: #fff1f2;
-                    color: #7f1d1d;
-                    font-size: 1.2rem;
-                }
-
-                .dsrq-directorates {
-                    display: grid;
-                    grid-template-columns: repeat(2, minmax(0, 1fr));
-                    gap: 10px;
-                }
-
-                .dsrq-directorate {
-                    display: flex;
-                    align-items: center;
-                    gap: 11px;
-                    min-width: 0;
-                    min-height: 80px;
-                    padding: 12px;
-                    text-align: left;
-                    background: #fff;
-                    color: #475569;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 15px;
-                }
-
-                .dsrq-directorate.active {
-                    border-color: #7f1d1d;
-                    background: #fff7f7;
-                    color: #7f1d1d;
-                }
-
-                .dsrq-directorate-icon {
-                    width: 42px;
-                    height: 42px;
-                    flex: 0 0 42px;
-                    display: grid;
-                    place-items: center;
-                    border-radius: 12px;
-                    background: #f1f5f9;
-                    color: #64748b;
-                }
-
-                .dsrq-directorate.active .dsrq-directorate-icon {
-                    background: #7f1d1d;
-                    color: #fff;
-                }
-
-                .dsrq-directorate small {
-                    display: block;
-                    margin-top: 3px;
-                    color: #94a3b8;
-                    font-size: .72rem;
-                }
-
-                .dsrq-switch {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    gap: 20px;
-                    padding: 16px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 15px;
-                    background: #f8fafc;
-                }
-
-                .dsrq-switch .form-check-input {
-                    width: 2.5rem;
-                    height: 1.35rem;
-                    cursor: pointer;
-                }
-
-                .dsrq-actions {
-                    display: flex;
-                    justify-content: flex-end;
-                    flex-wrap: wrap;
-                    gap: 10px;
-                    padding-top: 18px;
-                    border-top: 1px solid #f1f5f9;
-                }
-
-                .dsrq-actions .btn {
-                    min-height: 44px;
-                    font-weight: 800;
-                }
-
-                .dsrq-preview {
-                    overflow: hidden;
-                    margin-bottom: 16px;
-                }
-
-                .dsrq-preview-row {
-                    display: flex;
-                    align-items: flex-start;
-                    gap: 12px;
-                    padding: 12px 0;
-                    border-bottom: 1px solid #f1f5f9;
-                }
-
-                .dsrq-preview-row:last-child {
-                    border-bottom: 0;
-                }
-
-                .dsrq-preview-row > i {
-                    color: #7f1d1d;
-                    margin-top: 2px;
-                }
-
-                .dsrq-preview-row > div {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 3px;
-                    min-width: 0;
-                }
-
-                .dsrq-preview-row small {
-                    font-size: .71rem;
-                    font-weight: 800;
-                    color: #94a3b8;
-                }
-
-                .dsrq-preview-row strong {
-                    font-size: .85rem;
-                    color: #334155;
-                    overflow-wrap: anywhere;
-                }
-
-                .dsrq-help {
-                    padding: 22px;
-                    text-align: center;
-                }
-
-                @media (max-width: 767px) {
-                    .dsrq-header h2 {
-                        font-size: 1.5rem;
-                    }
-
-                    .dsrq-header-actions {
-                        width: 100%;
-                    }
-
-                    .dsrq-header-actions .btn {
-                        flex: 1;
-                        font-size: .8rem;
-                    }
-
-                    .dsrq-form {
-                        padding: 17px;
-                    }
-
-                    .dsrq-directorates {
-                        grid-template-columns: 1fr;
-                    }
-
-                    .dsrq-actions {
-                        flex-direction: column-reverse;
-                    }
-
-                    .dsrq-actions .btn {
-                        width: 100%;
-                    }
                 }
             `}</style>
         </div>

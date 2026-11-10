@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../../api/axios';
 import MerchandiseRevisionForm from '../../components/MerchandiseRevisionForm';
+import DirectorateDocuments from '../../components/DirectorateDocuments';
 
 const TYPES = {
     merchandise: {
@@ -70,17 +71,17 @@ function formatDate(value) {
     const raw = String(value);
     const date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
         ? new Date(...((parts) => [parts[0], parts[1] - 1, parts[2]])(
-              raw.split('-').map(Number)
-          ))
+            raw.split('-').map(Number)
+        ))
         : new Date(value);
 
     return Number.isNaN(date.getTime())
         ? '-'
         : date.toLocaleDateString('id-ID', {
-              day: '2-digit',
-              month: 'long',
-              year: 'numeric',
-          });
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+        });
 }
 
 function formatDateTime(value) {
@@ -90,13 +91,13 @@ function formatDateTime(value) {
     return Number.isNaN(date.getTime())
         ? '-'
         : date.toLocaleString('id-ID', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false,
-          });
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+        });
 }
 
 function formatTime(value) {
@@ -193,8 +194,8 @@ function InfoItem({
                                 }}
                             >
                                 {value === null ||
-                                value === undefined ||
-                                value === ''
+                                    value === undefined ||
+                                    value === ''
                                     ? '-'
                                     : value}
                             </div>
@@ -383,7 +384,7 @@ export default function MyRequestDetailPage() {
             console.error('Fetch request detail:', err?.response?.data || err);
             setError(
                 err?.response?.data?.message ||
-                    'Detail pengajuan tidak dapat dimuat.'
+                'Detail pengajuan tidak dapat dimuat.'
             );
         } finally {
             setLoading(false);
@@ -401,13 +402,13 @@ export default function MyRequestDetailPage() {
 
     const displayConfig = isBorrowing
         ? {
-              ...config,
-              label: isAsset ? 'Request Barang' : 'Peminjaman Barang',
-              icon: isAsset
-                  ? 'bi-box2-heart-fill'
-                  : 'bi-box-arrow-up-right',
-              color: isAsset ? 'info' : 'success',
-          }
+            ...config,
+            label: isAsset ? 'Request Barang' : 'Peminjaman Barang',
+            icon: isAsset
+                ? 'bi-box2-heart-fill'
+                : 'bi-box-arrow-up-right',
+            color: isAsset ? 'info' : 'success',
+        }
         : config;
 
     const status = STATUSES[data?.status] || [
@@ -419,13 +420,13 @@ export default function MyRequestDetailPage() {
     const title = !data
         ? '-'
         : type === 'humas'
-          ? getCoverage(data.coverage_type)
-          : isBorrowing
-            ? data.purpose || displayConfig?.label
-            : data.title ||
-              data.event_name ||
-              data.activity_name ||
-              displayConfig?.label;
+            ? getCoverage(data.coverage_type)
+            : isBorrowing
+                ? data.purpose || displayConfig?.label
+                : data.title ||
+                data.event_name ||
+                data.activity_name ||
+                displayConfig?.label;
 
     const timeline = useMemo(() => {
         if (!data) return [];
@@ -540,8 +541,8 @@ export default function MyRequestDetailPage() {
                 description: isAsset
                     ? 'Barang telah diserahkan kepada pemohon.'
                     : type === 'humas'
-                      ? 'Hasil pekerjaan Humas telah tersedia.'
-                      : 'Proses pelayanan telah selesai.',
+                        ? 'Hasil pekerjaan Humas telah tersedia.'
+                        : 'Proses pelayanan telah selesai.',
                 date: data.completed_at || data.updated_at,
                 icon: 'bi-check2-all',
                 status: 'done',
@@ -916,7 +917,16 @@ export default function MyRequestDetailPage() {
                                                 fullWidth
                                             />
                                         )}
+
+                                        <div className="col-12">
+                                            <DirectorateDocuments
+                                                request={data}
+                                                compact
+                                            />
+                                        </div>
+
                                     </>
+
                                 )}
 
                                 {/* MERCHANDISE */}
@@ -1170,13 +1180,13 @@ export default function MyRequestDetailPage() {
                                         ? data.status === 'approved'
                                             ? 'Agenda sudah masuk kalender Direktorat.'
                                             : data.status === 'pending'
-                                              ? 'Menunggu keputusan admin.'
-                                              : 'Pengajuan telah diproses.'
+                                                ? 'Menunggu keputusan admin.'
+                                                : 'Pengajuan telah diproses.'
                                         : isAsset && data.status === 'completed'
-                                          ? 'Barang telah diserahkan.'
-                                          : data.status === 'returned'
-                                            ? 'Peminjaman selesai.'
-                                            : 'Pantau perkembangan pengajuan.'}
+                                            ? 'Barang telah diserahkan.'
+                                            : data.status === 'returned'
+                                                ? 'Peminjaman selesai.'
+                                                : 'Pantau perkembangan pengajuan.'}
                                 </p>
                             </div>
 

@@ -8,8 +8,10 @@ use App\Models\EventScheduleHistory;
 use App\Models\EventScheduleRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class EventScheduleRequestController extends Controller
 {
@@ -45,12 +47,6 @@ class EventScheduleRequestController extends Controller
         'Lainnya' => '#475569',
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | ACCESS
-    |--------------------------------------------------------------------------
-    */
-
     private function canApprove(Request $request): bool
     {
         return in_array(
@@ -79,88 +75,66 @@ class EventScheduleRequestController extends Controller
 
         abort_unless(
             (int) $scheduleRequest->requested_by ===
-                (int) $request->user()->id,
+                (int) $request->user()?->id,
             403,
             'Anda tidak memiliki akses ke pengajuan ini.'
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | VALIDASI INPUT
-    |--------------------------------------------------------------------------
-    */
-
     private function validateSchedule(Request $request): array
     {
         $validated = $request->validate([
             'requester_unit' => [
-                'required',
-                'string',
-                'max:255',
+                'required', 'string', 'max:255',
             ],
             'pic_name' => [
-                'required',
-                'string',
-                'max:255',
+                'required', 'string', 'max:255',
             ],
             'directorate' => [
                 'required',
                 Rule::in(self::DIRECTORATES),
             ],
             'title' => [
-                'required',
-                'string',
-                'max:255',
+                'required', 'string', 'max:255',
             ],
             'description' => [
-                'nullable',
-                'string',
-                'max:5000',
+                'nullable', 'string', 'max:5000',
             ],
             'event_date' => [
-                'required',
-                'date_format:Y-m-d',
+                'required', 'date_format:Y-m-d',
             ],
             'start_time' => [
-                'nullable',
-                'date_format:H:i',
+                'nullable', 'date_format:H:i',
             ],
             'end_time' => [
-                'nullable',
-                'date_format:H:i',
+                'nullable', 'date_format:H:i',
             ],
             'all_day' => [
-                'required',
-                'boolean',
+                'required', 'boolean',
             ],
             'location' => [
-                'nullable',
-                'string',
-                'max:255',
+                'nullable', 'string', 'max:255',
             ],
             'agenda_type' => [
                 'required',
                 Rule::in(self::AGENDA_TYPES),
             ],
             'is_public' => [
-                'sometimes',
-                'boolean',
+                'sometimes', 'boolean',
             ],
         ]);
 
-        foreach (['requester_unit', 'pic_name', 'title'] as $field) {
-            $validated[$field] = trim($validated[$field]);
+        foreach (
+            ['requester_unit', 'pic_name', 'title']
+            as $field
+        ) {
+            $validated[$field] = trim(
+                $validated[$field]
+            );
 
             if ($validated[$field] === '') {
-                $labels = [
-                    'requester_unit' => 'Unit pengaju',
-                    'pic_name' => 'Nama PIC',
-                    'title' => 'Judul agenda',
-                ];
-
                 throw ValidationException::withMessages([
-                    $field => $labels[$field] . ' wajib diisi.',
+                    $field => 'Kolom ini wajib diisi.',
                 ]);
             }
         }
@@ -191,11 +165,14 @@ class EventScheduleRequestController extends Controller
             ) {
                 throw ValidationException::withMessages([
                     'start_time' =>
-                        'Jam mulai dan jam selesai wajib diisi.',
+                        'Jam mulai dan selesai wajib diisi.',
                 ]);
             }
 
-            if ($validated['end_time'] <= $validated['start_time']) {
+            if (
+                $validated['end_time'] <=
+                $validated['start_time']
+            ) {
                 throw ValidationException::withMessages([
                     'end_time' =>
                         'Jam selesai harus setelah jam mulai.',
@@ -206,11 +183,40 @@ class EventScheduleRequestController extends Controller
         return $validated;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | FORMAT DETAIL RESPONSE
-    |--------------------------------------------------------------------------
-    */
+    private function validateDocuments(
+        Request $request,
+        bool $isCreating
+    ): void {
+        $request->validate([
+            'rundown' => [
+                $isCreating ? 'required' : 'nullable',
+                'file',
+                'mimes:pdf,doc,docx,xls,xlsx',
+                'max:5120',
+            ],
+            'tor' => [
+                'nullable',
+                'file',
+                'mimes:pdf,doc,docx,xls,xlsx',
+                'max:5120',
+            ],
+        ], [
+            'rundown.required' =>
+                'Rundown kegiatan wajib dilampirkan.',
+            'rundown.file' =>
+                'Rundown harus berupa file yang valid.',
+            'rundown.mimes' =>
+                'Rundown harus berformat PDF, Word, atau Excel.',
+            'rundown.max' =>
+                'Ukuran rundown maksimal 5 MB.',
+            'tor.file' =>
+                'TOR harus berupa file yang valid.',
+            'tor.mimes' =>
+                'TOR harus berformat PDF, Word, atau Excel.',
+            'tor.max' =>
+                'Ukuran TOR maksimal 5 MB.',
+        ]);
+    }
 
     private function detail(
         EventScheduleRequest $scheduleRequest
@@ -224,14 +230,11 @@ class EventScheduleRequestController extends Controller
 
         return [
             'id' => $scheduleRequest->id,
-
             'requested_by' => $scheduleRequest->requested_by,
             'requester_name' => $scheduleRequest->requester?->name,
 
-            // INFORMASI BARU
             'requester_unit' => $scheduleRequest->requester_unit,
             'pic_name' => $scheduleRequest->pic_name,
-
             'directorate' => $scheduleRequest->directorate,
             'title' => $scheduleRequest->title,
             'description' => $scheduleRequest->description,
@@ -253,17 +256,23 @@ class EventScheduleRequestController extends Controller
             'is_public' => (bool) $scheduleRequest->is_public,
             'status' => $scheduleRequest->status,
 
+            'rundown_name' => $scheduleRequest->rundown_name,
+            'rundown_url' => $scheduleRequest->rundown_url,
+            'tor_name' => $scheduleRequest->tor_name,
+            'tor_url' => $scheduleRequest->tor_url,
+
             'approved_schedule_id' =>
                 $scheduleRequest->approved_schedule_id,
-
-            'approved_schedule' => $scheduleRequest->approvedSchedule,
+            'approved_schedule' =>
+                $scheduleRequest->approvedSchedule,
 
             'reviewed_by' => $scheduleRequest->reviewed_by,
             'reviewer_name' => $scheduleRequest->reviewer?->name,
             'reviewed_at' => $scheduleRequest->reviewed_at
                 ?->toISOString(),
 
-            'rejection_reason' => $scheduleRequest->rejection_reason,
+            'rejection_reason' =>
+                $scheduleRequest->rejection_reason,
 
             'edited_by' => $scheduleRequest->edited_by,
             'editor_name' => $scheduleRequest->editor?->name,
@@ -272,7 +281,6 @@ class EventScheduleRequestController extends Controller
 
             'created_at' => $scheduleRequest->created_at
                 ?->toISOString(),
-
             'updated_at' => $scheduleRequest->updated_at
                 ?->toISOString(),
         ];
@@ -289,12 +297,6 @@ class EventScheduleRequestController extends Controller
             'data' => $data,
         ], $status);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | RIWAYAT PENGAJUAN USER
-    |--------------------------------------------------------------------------
-    */
 
     public function myRequests(Request $request)
     {
@@ -326,12 +328,6 @@ class EventScheduleRequestController extends Controller
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | DAFTAR PENGAJUAN ADMIN
-    |--------------------------------------------------------------------------
-    */
-
     public function index(Request $request)
     {
         $this->ensureCanApprove($request);
@@ -350,9 +346,7 @@ class EventScheduleRequestController extends Controller
                 Rule::in(self::DIRECTORATES),
             ],
             'search' => [
-                'nullable',
-                'string',
-                'max:255',
+                'nullable', 'string', 'max:255',
             ],
         ]);
 
@@ -371,17 +365,34 @@ class EventScheduleRequestController extends Controller
             $base->where(function ($query) use ($term) {
                 $query
                     ->where('title', 'like', "%{$term}%")
-                    ->orWhere('requester_unit', 'like', "%{$term}%")
-                    ->orWhere('pic_name', 'like', "%{$term}%")
-                    ->orWhere('location', 'like', "%{$term}%")
-                    ->orWhere('description', 'like', "%{$term}%")
+                    ->orWhere(
+                        'requester_unit',
+                        'like',
+                        "%{$term}%"
+                    )
+                    ->orWhere(
+                        'pic_name',
+                        'like',
+                        "%{$term}%"
+                    )
+                    ->orWhere(
+                        'location',
+                        'like',
+                        "%{$term}%"
+                    )
+                    ->orWhere(
+                        'description',
+                        'like',
+                        "%{$term}%"
+                    )
                     ->orWhereHas(
                         'requester',
-                        fn ($userQuery) => $userQuery->where(
-                            'name',
-                            'like',
-                            "%{$term}%"
-                        )
+                        fn ($userQuery) =>
+                            $userQuery->where(
+                                'name',
+                                'like',
+                                "%{$term}%"
+                            )
                     );
             });
         }
@@ -389,14 +400,11 @@ class EventScheduleRequestController extends Controller
         $summary = [
             'total' => (clone $base)->count(),
             'pending' => (clone $base)
-                ->where('status', 'pending')
-                ->count(),
+                ->where('status', 'pending')->count(),
             'approved' => (clone $base)
-                ->where('status', 'approved')
-                ->count(),
+                ->where('status', 'approved')->count(),
             'rejected' => (clone $base)
-                ->where('status', 'rejected')
-                ->count(),
+                ->where('status', 'rejected')->count(),
         ];
 
         if (!empty($validated['status'])) {
@@ -424,53 +432,160 @@ class EventScheduleRequestController extends Controller
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | CREATE REQUEST
-    |--------------------------------------------------------------------------
-    */
-
     public function store(Request $request)
     {
         $validated = $this->validateSchedule($request);
+        $this->validateDocuments($request, true);
 
-        // Pengajuan belum masuk kalender sampai disetujui.
-        $scheduleRequest = EventScheduleRequest::create([
-            ...$validated,
-            'requested_by' => $request->user()->id,
-            'status' => EventScheduleRequest::STATUS_PENDING,
-        ]);
+        $rundownPath = null;
+        $torPath = null;
 
-        return $this->success(
-            'Pengajuan jadwal berhasil dikirim dan menunggu persetujuan.',
-            $this->detail($scheduleRequest),
-            201
+        try {
+            $rundown = $request->file('rundown');
+            $tor = $request->file('tor');
+
+            $rundownPath = $rundown->store(
+                'directorate/rundown',
+                'public'
+            );
+
+            if ($tor) {
+                $torPath = $tor->store(
+                    'directorate/tor',
+                    'public'
+                );
+            }
+
+            $scheduleRequest = EventScheduleRequest::create([
+                ...$validated,
+                'requested_by' => $request->user()->id,
+
+                'rundown_path' => $rundownPath,
+                'rundown_name' =>
+                    $rundown->getClientOriginalName(),
+
+                'tor_path' => $torPath,
+                'tor_name' => $tor
+                    ? $tor->getClientOriginalName()
+                    : null,
+
+                'status' => EventScheduleRequest::STATUS_PENDING,
+            ]);
+
+            return $this->success(
+                'Pengajuan jadwal berhasil dikirim dan menunggu persetujuan.',
+                $this->detail($scheduleRequest),
+                201
+            );
+        } catch (Throwable $error) {
+            if ($rundownPath) {
+                Storage::disk('public')->delete($rundownPath);
+            }
+
+            if ($torPath) {
+                Storage::disk('public')->delete($torPath);
+            }
+
+            throw $error;
+        }
+    }
+
+    
+public function show(
+    Request $request,
+    EventScheduleRequest $scheduleRequest
+) {
+    // Admin boleh mengakses semua request.
+    // User hanya boleh mengakses pengajuannya sendiri.
+    $this->ensureCanView($request, $scheduleRequest);
+
+    // Akses dokumen menggunakan endpoint yang sama.
+    if ($request->filled('document')) {
+        return $this->serveDocument(
+            $request,
+            $scheduleRequest
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SHOW DETAIL
-    |--------------------------------------------------------------------------
-    */
+    return $this->success(
+        'Detail pengajuan jadwal berhasil diambil.',
+        $this->detail($scheduleRequest)
+    );
+}
 
-    public function show(
-        Request $request,
-        EventScheduleRequest $scheduleRequest
-    ) {
-        $this->ensureCanView($request, $scheduleRequest);
 
-        return $this->success(
-            'Detail pengajuan jadwal berhasil diambil.',
-            $this->detail($scheduleRequest)
-        );
+private function serveDocument(
+    Request $request,
+    EventScheduleRequest $scheduleRequest
+) {
+    $validated = $request->validate([
+        'document' => [
+            'required',
+            'in:rundown,tor',
+        ],
+        'disposition' => [
+            'nullable',
+            'in:inline,attachment',
+        ],
+    ]);
+
+    $type = $validated['document'];
+
+    if ($type === 'rundown') {
+        $path = $scheduleRequest->rundown_path;
+        $filename = $scheduleRequest->rundown_name;
+    } else {
+        $path = $scheduleRequest->tor_path;
+        $filename = $scheduleRequest->tor_name;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | UPDATE PENDING REQUEST
-    |--------------------------------------------------------------------------
-    */
+    if (!$path) {
+        abort(404, 'Dokumen belum dilampirkan.');
+    }
+
+    $disk = Storage::disk('public');
+
+    if (!$disk->exists($path)) {
+        abort(404, 'File dokumen tidak ditemukan.');
+    }
+
+    $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+    $allowedExtensions = [
+        'pdf',
+        'doc',
+        'docx',
+        'xls',
+        'xlsx',
+    ];
+
+    if (!in_array($extension, $allowedExtensions, true)) {
+        abort(404, 'Format dokumen tidak didukung.');
+    }
+
+    $disposition = $validated['disposition'] ?? 'attachment';
+
+    // Preview inline hanya diperbolehkan untuk PDF.
+    if ($disposition === 'inline' && $extension !== 'pdf') {
+        $disposition = 'attachment';
+    }
+
+    $filename = basename(
+        $filename ?: "dokumen.{$extension}"
+    );
+
+    return $disk->response(
+        $path,
+        $filename,
+        [
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ],
+        $disposition
+    );
+}
+
+
 
     public function update(
         Request $request,
@@ -479,44 +594,101 @@ class EventScheduleRequestController extends Controller
         $this->ensureCanApprove($request);
 
         $validated = $this->validateSchedule($request);
+        $this->validateDocuments($request, false);
 
-        $scheduleRequest = DB::transaction(
-            function () use ($scheduleRequest, $validated, $request) {
-                $locked = EventScheduleRequest::query()
-                    ->lockForUpdate()
-                    ->findOrFail($scheduleRequest->id);
+        $newRundown = null;
+        $newTor = null;
 
-                if (
-                    $locked->status !==
-                    EventScheduleRequest::STATUS_PENDING
-                ) {
-                    throw ValidationException::withMessages([
-                        'status' =>
-                            'Hanya pengajuan pending yang dapat diedit.',
-                    ]);
-                }
-
-                $locked->update([
-                    ...$validated,
-                    'edited_by' => $request->user()->id,
-                    'edited_at' => now(),
-                ]);
-
-                return $locked->fresh();
+        try {
+            if ($request->hasFile('rundown')) {
+                $newRundown = $request->file('rundown')->store(
+                    'directorate/rundown',
+                    'public'
+                );
             }
-        );
 
-        return $this->success(
-            'Pengajuan jadwal berhasil diperbarui.',
-            $this->detail($scheduleRequest)
-        );
+            if ($request->hasFile('tor')) {
+                $newTor = $request->file('tor')->store(
+                    'directorate/tor',
+                    'public'
+                );
+            }
+
+            $oldPaths = [];
+
+            $scheduleRequest = DB::transaction(
+                function () use (
+                    $scheduleRequest,
+                    $validated,
+                    $request,
+                    $newRundown,
+                    $newTor,
+                    &$oldPaths
+                ) {
+                    $locked = EventScheduleRequest::query()
+                        ->lockForUpdate()
+                        ->findOrFail($scheduleRequest->id);
+
+                    if (
+                        $locked->status !==
+                        EventScheduleRequest::STATUS_PENDING
+                    ) {
+                        throw ValidationException::withMessages([
+                            'status' =>
+                                'Hanya pengajuan pending yang dapat diedit.',
+                        ]);
+                    }
+
+                    $changes = [
+                        ...$validated,
+                        'edited_by' => $request->user()->id,
+                        'edited_at' => now(),
+                    ];
+
+                    if ($newRundown) {
+                        $oldPaths[] = $locked->rundown_path;
+
+                        $changes['rundown_path'] = $newRundown;
+                        $changes['rundown_name'] =
+                            $request->file('rundown')
+                                ->getClientOriginalName();
+                    }
+
+                    if ($newTor) {
+                        $oldPaths[] = $locked->tor_path;
+
+                        $changes['tor_path'] = $newTor;
+                        $changes['tor_name'] =
+                            $request->file('tor')
+                                ->getClientOriginalName();
+                    }
+
+                    $locked->update($changes);
+
+                    return $locked->fresh();
+                }
+            );
+
+            foreach ($oldPaths as $path) {
+                if ($path) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+
+            return $this->success(
+                'Pengajuan jadwal berhasil diperbarui.',
+                $this->detail($scheduleRequest)
+            );
+        } catch (Throwable $error) {
+            foreach ([$newRundown, $newTor] as $path) {
+                if ($path) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+
+            throw $error;
+        }
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | DETEKSI JADWAL BENTROK
-    |--------------------------------------------------------------------------
-    */
 
     private function conflictingDirectorates(
         string $directorate
@@ -525,10 +697,7 @@ class EventScheduleRequestController extends Controller
             return self::DIRECTORATES;
         }
 
-        return [
-            'direktorat',
-            $directorate,
-        ];
+        return ['direktorat', $directorate];
     }
 
     private function findConflict(
@@ -572,12 +741,6 @@ class EventScheduleRequestController extends Controller
             ->first();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | APPROVE REQUEST
-    |--------------------------------------------------------------------------
-    */
-
     public function approve(
         Request $request,
         EventScheduleRequest $scheduleRequest
@@ -600,28 +763,23 @@ class EventScheduleRequestController extends Controller
                     ]);
                 }
 
-                // Periksa bentrok dengan agenda yang sudah disetujui.
                 $conflict = $this->findConflict($locked);
 
                 if ($conflict) {
-                    return [
-                        'conflict' => $conflict,
-                    ];
+                    return ['conflict' => $conflict];
                 }
 
                 $actorId = $request->user()->id;
 
-                $color = self::COLORS[
-                    $locked->agenda_type
-                ] ?? self::COLORS['Lainnya'];
+                $color = self::COLORS[$locked->agenda_type]
+                    ?? self::COLORS['Lainnya'];
 
-                // Membuat event yang disetujui.
                 $event = EventSchedule::create([
                     'directorate' => $locked->directorate,
                     'title' => $locked->title,
                     'description' => $locked->description,
-                    'event_date' => $locked->event_date
-                        ->format('Y-m-d'),
+                    'event_date' =>
+                        $locked->event_date->format('Y-m-d'),
                     'start_time' => $locked->all_day
                         ? null
                         : $locked->start_time,
@@ -637,20 +795,18 @@ class EventScheduleRequestController extends Controller
                     'updated_by' => $actorId,
                 ]);
 
-                // Audit trail jadwal aktif.
                 EventScheduleHistory::create([
                     'event_schedule_id' => $event->id,
                     'user_id' => $actorId,
                     'action' => 'created',
                     'event_title' => $event->title,
                     'old_values' => null,
-
                     'new_values' => [
                         'directorate' => $event->directorate,
                         'title' => $event->title,
                         'description' => $event->description,
-                        'event_date' => $event->event_date
-                            ->format('Y-m-d'),
+                        'event_date' =>
+                            $event->event_date->format('Y-m-d'),
                         'start_time' => $event->start_time
                             ? substr($event->start_time, 0, 5)
                             : null,
@@ -663,7 +819,6 @@ class EventScheduleRequestController extends Controller
                         'color' => $event->color,
                         'is_public' => (bool) $event->is_public,
                     ],
-
                     'description' =>
                         'Agenda dibuat melalui approval pengajuan jadwal #' .
                         $locked->id,
@@ -717,12 +872,6 @@ class EventScheduleRequestController extends Controller
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | REJECT REQUEST - TANPA REVISI
-    |--------------------------------------------------------------------------
-    */
-
     public function reject(
         Request $request,
         EventScheduleRequest $scheduleRequest
@@ -731,9 +880,7 @@ class EventScheduleRequestController extends Controller
 
         $validated = $request->validate([
             'rejection_reason' => [
-                'required',
-                'string',
-                'max:2000',
+                'required', 'string', 'max:2000',
             ],
         ]);
 

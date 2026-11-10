@@ -42,7 +42,6 @@ api.interceptors.request.use(
             config.headers.Authorization = `Bearer ${token}`;
         }
 
-        // Multipart boundary ditentukan browser.
         if (config.data instanceof FormData) {
             if (
                 config.headers &&
@@ -69,18 +68,51 @@ const shouldRefreshNotifications = (config) => {
 
     const url = String(config?.url || '');
 
-    // Perubahan yang memengaruhi status pengajuan atau stok.
     return /\/(orders|humas-service-requests|borrow-requests|products)(\/|$)/.test(
         url
     );
 };
 
+const isDashboardAnalyticsResponse = (response) => {
+    const url = String(response?.config?.url || '');
+    const method = String(
+        response?.config?.method || 'get'
+    ).toLowerCase();
+
+    return (
+        method === 'get' &&
+        /\/dashboard\/analytics(?:\?.*)?$/.test(url) &&
+        response?.data?.success === true
+    );
+};
+
 api.interceptors.response.use(
     (response) => {
-        // Dijalankan hanya setelah request mutasi berhasil.
         if (shouldRefreshNotifications(response.config)) {
             window.dispatchEvent(
                 new Event('humas:notifications:refresh')
+            );
+        }
+
+        /*
+         * Beritahu rekap Direktorat tentang filter
+         * yang sudah diterapkan pada dashboard existing.
+         *
+         * Tidak mengubah response API maupun isi
+         * grafik dashboard lama.
+         */
+        if (isDashboardAnalyticsResponse(response)) {
+            const params = response.config?.params || {};
+
+            window.dispatchEvent(
+                new CustomEvent('humas:dashboard:filters', {
+                    detail: {
+                        service: params.service || 'all',
+                        status: params.status || 'all',
+                        start_date: params.start_date || '',
+                        end_date: params.end_date || '',
+                    },
+                })
             );
         }
 
