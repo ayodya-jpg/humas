@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class EventScheduleRequest extends Model
 {
@@ -25,6 +26,12 @@ class EventScheduleRequest extends Model
         'location',
         'agenda_type',
         'is_public',
+
+        'rundown_path',
+        'rundown_name',
+        'tor_path',
+        'tor_name',
+
         'status',
         'approved_schedule_id',
         'reviewed_by',
@@ -40,6 +47,11 @@ class EventScheduleRequest extends Model
         'is_public' => 'boolean',
         'reviewed_at' => 'datetime',
         'edited_at' => 'datetime',
+    ];
+
+    protected $appends = [
+        'rundown_url',
+        'tor_url',
     ];
 
     public function requester(): BelongsTo
@@ -71,6 +83,32 @@ class EventScheduleRequest extends Model
         return $this->belongsTo(
             EventSchedule::class,
             'approved_schedule_id'
+        );
+    }
+
+    public function getRundownUrlAttribute(): ?string
+    {
+    if (!$this->rundown_path) {
+        return null;
+        }
+
+    return url(
+        Storage::disk('public')->url(
+            $this->rundown_path
+        )
+        );
+    }
+
+    public function getTorUrlAttribute(): ?string
+    {
+        if (!$this->tor_path) {
+            return null;
+        }
+
+        return asset(
+            Storage::disk('public')->url(
+                $this->tor_path
+            )
         );
     }
 }

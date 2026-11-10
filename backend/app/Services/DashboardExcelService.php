@@ -42,7 +42,8 @@ class DashboardExcelService
     public function download(
         Collection $requests,
         array $summary,
-        array $filters
+        array $filters,
+        array $report = []
     ): StreamedResponse {
         $spreadsheet =
             new Spreadsheet();
@@ -157,12 +158,12 @@ class DashboardExcelService
         $this->buildBorrowingSheet(
             $borrowingSheet,
             $requests
-                ->where(
-                    'service',
-                    'borrowing'
-                )
+                ->where('service', 'borrowing')
                 ->values()
         );
+
+        // Tambahan: semua sheet baru berada pada workbook yang sama.
+        $this->appendIntegratedSheets($spreadsheet, $requests, $filters, $report);
 
         $spreadsheet
             ->setActiveSheetIndex(
@@ -669,14 +670,10 @@ class DashboardExcelService
 
             [
                 'Peminjaman SEKPiM',
-
-                $requests
-                    ->where(
-                        'service',
-                        'borrowing'
-                    )
-                    ->count(),
+                $requests->where('service', 'borrowing')->count(),
             ],
+            ['Request Aset SEKPiM', $requests->where('service', 'asset_request')->count()],
+            ['Pengajuan Jadwal Direktorat', $requests->where('service', 'schedule_request')->count()],
         ];
 
         $serviceRow =
@@ -2485,6 +2482,10 @@ class DashboardExcelService
             'borrowing' =>
                 'Peminjaman SEKPiM',
 
+            'asset_request' => 'Request Aset SEKPiM',
+            'schedule_request' => 'Pengajuan Jadwal Direktorat',
+            'agenda' => 'Agenda Direktorat',
+
             'all',
             null,
             '' =>
@@ -2628,5 +2629,114 @@ class DashboardExcelService
         ) {
             return '-';
         }
+    }
+
+    /** Tabel tambahan, tanpa mengubah format lima sheet lama. */
+    private function addIntegratedTable(
+        Spreadsheet $book, string $name, array $headers, array $rows
+    ): void {
+        $sheet = $book->createSheet();
+        $sheet->setTitle($name);
+        $this->writeHeaders($sheet, $headers);
+        $row = 2;
+        foreach ($rows as $values) {
+            foreach (array_values($values) as $i => $value) {
+                $column = Coordinate::stringFromColumnIndex($i + 1);
+                if (is_numeric($value) && !is_string($value)) {
+                    $sheet->setCellValue("{$column}{$row}", $value);
+                } else {
+                    $sheet->setCellValueExplicit(
+                        "{$column}{$row}",
+                        (string) ($value ?? ''),
+                        \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+                    );
+                }
+            }
+            $this->styleBodyRow($sheet, $row, count($headers));
+            $row++;
+        }
+        $this->finishOldStyleTable($sheet, $headers, $row - 1);
+        foreach ($headers as $i => $header) {
+            $column = Coordinate::stringFromColumnIndex($i + 1);
+            $sheet->getColumnDimension($column)->setWidth(
+                in_array($header, ['Judul', 'Catatan', 'Keputusan', 'Tindak Lanjut'], true)
+                    ? 44 : 23
+            );
+        }
+    }
+
+    private function appendIntegratedSheets(
+        Spreadsheet $book, Collection $requests, array $filters, array $report
+    ): void {
+        $asset = $requests->where('service', 'asset_request')->values();
+        $this->addIntegratedTable($book, 'Request Aset', [
+            'No', 'Kode', 'Pemohon', 'Keperluan', 'Tanggal Pengajuan',
+            'Status', 'Jumlah Barang', 'Daftar Barang', 'Tanggal Serah Terima'
+        ], $asset->map(fn ($item, $i) => [
+            $i + 1, $item['code'] ?? '-', $item['requester'] ?? '-',
+            $item['title'] ?? '-', $item['submitted_at'] ?? '-',
+            $item['status'] ?? '-', $item['total_quantity'] ?? 0,
+            $item['items_text'] ?? '-', $item['completed_at'] ?? '-',
+        ])->all());
+
+        $schedule = $requests->where('service', 'schedule_request')->values();
+        $this->addIntegratedTable($book, 'Pengajuan Jadwal', [
+            'No', 'Kode', 'Judul', 'Pemohon', 'Unit Pemohon', 'PIC',
+            'Direktorat', 'Tanggal Agenda', 'Kategori', 'Lokasi',
+            'Tanggal Pengajuan', 'Status', 'ID Agenda Disetujui'
+        ], $schedule->map(fn ($item, $i) => [
+            $i + 1, $item['code'] ?? '-', $item['title'] ?? '-',
+            $item['requester'] ?? '-', $item['unit'] ?? '-',
+            $item['pic_name'] ?? '-', $item['directorate'] ?? '-',
+            $item['event_date'] ?? '-', $item['agenda_type'] ?? '-',
+            $item['location'] ?? '-', $item['submitted_at'] ?? '-',
+            $item['status'] ?? '-', $item['approved_schedule_id'] ?? '-',
+        ])->all());
+
+        $agendas = collect($report['agendas'] ?? []);
+        $this->addIntegratedTable($book, 'Agenda Direktorat', [
+            'Tanggal', 'Direktorat', 'Judul', 'Kategori',
+            'Lokasi', 'Jam Mulai', 'Jam Selesai', 'Publik'
+        ], $agendas->map(fn ($item) => [
+            $item->event_date?->toDateString() ?? '-',
+            $item->directorate ?? '-', $item->title ?? '-',
+            $item->agenda_type ?? '-', $item->location ?? '-',
+            $item->start_time ?? '-', $item->end_time ?? '-',
+            $item->is_public ? 'Ya' : 'Tidak',
+        ])->all());
+
+        $summary = $report['agenda_summary'] ?? [];
+        $directorates = collect($summary['by_directorate'] ?? []);
+        $this->addIntegratedTable($book, 'Rekap per Direktorat', [
+            'Direktorat', 'Jumlah Agenda'
+        ], $directorates->map(fn ($item) => [
+            $item['label'] ?? '-', $item['total'] ?? 0,
+        ])->all());
+
+        $meetings = collect($report['meeting_records'] ?? []);
+        if ($meetings->isNotEmpty()) {
+            $this->addIntegratedTable($book, 'Realisasi Rapat', [
+                'Tanggal', 'Direktorat', 'Judul', 'Status', 'Jumlah Peserta',
+                'Catatan', 'Keputusan', 'Tindak Lanjut', 'PIC', 'Tenggat'
+            ], $meetings->map(fn ($item) => [
+                $item->meeting_date ?? '-', $item->directorate ?? '-',
+                $item->title ?? '-', $item->realization_status ?? '-',
+                $item->participants_count ?? 0, $item->notes ?? '-',
+                $item->decisions ?? '-', $item->follow_up ?? '-',
+                $item->follow_up_pic ?? '-', $item->follow_up_due_date ?? '-',
+            ])->all());
+        }
+
+        $yoy = collect($report['year_on_year']['items'] ?? []);
+        $this->addIntegratedTable($book, 'Year on Year', [
+            'Jenis Layanan', 'Tahun Sebelumnya', 'Tahun Ini',
+            'Selisih', 'Pertumbuhan (%)'
+        ], $yoy->map(fn ($item) => [
+            $item['label'], $item['previous'], $item['current'],
+            $item['difference'], $item['growth_percent'] ?? 'N/A',
+        ])->all());
+
+        // Catatan realisasi rapat hanya ditambahkan bila tabel telah tersedia.
+        // Bagian ini tidak menarik isi notulensi tanpa hak akses terpisah.
     }
 }

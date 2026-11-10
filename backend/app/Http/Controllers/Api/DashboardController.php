@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\BorrowRequest;
+use App\Models\EventSchedule;
+use App\Models\EventScheduleRequest;
 use App\Models\HumasServiceRequest;
 use App\Models\Order;
 use App\Services\DashboardExcelService;
@@ -26,11 +28,20 @@ class DashboardController extends Controller
 
     private const SERVICE_BORROWING = 'borrowing';
 
+    private const SERVICE_ASSET_REQUEST = 'asset_request';
+
+    private const SERVICE_SCHEDULE_REQUEST = 'schedule_request';
+
+    private const SERVICE_AGENDA = 'agenda';
+
     private const SERVICES = [
         self::SERVICE_ALL,
         self::SERVICE_MERCHANDISE,
         self::SERVICE_HUMAS,
         self::SERVICE_BORROWING,
+        self::SERVICE_ASSET_REQUEST,
+        self::SERVICE_SCHEDULE_REQUEST,
+        self::SERVICE_AGENDA,
     ];
 
     private const STATUSES = [
@@ -97,9 +108,8 @@ class DashboardController extends Controller
                 'service_distribution' =>
                     $this->buildServiceDistribution(
                         $result['requests'],
-                        $result[
-                            'available_services'
-                        ]
+                        $result['available_services'],
+                        $result['agendas']
                     ),
 
                 'status_distribution' =>
@@ -108,12 +118,28 @@ class DashboardController extends Controller
                     ),
 
                 'trend' =>
-                    $this->buildTrend(
+                    $this->augmentTrend(
+                        $this->buildTrend(
+                            $result['requests'],
+                            $result['start_date'],
+                            $result['end_date'],
+                            $result['group_by']
+                        ),
                         $result['requests'],
-                        $result['start_date'],
-                        $result['end_date'],
+                        $result['agendas'],
                         $result['group_by']
                     ),
+
+                'agenda_summary' =>
+                    $this->buildAgendaSummary($result['agendas']),
+
+                'meeting_summary' =>
+                    $this->buildMeetingSummary(
+                        $request->user(), $result['start_date'], $result['end_date']
+                    ),
+
+                'year_on_year' =>
+                    $this->buildYearOnYear($request, $result),
 
                 'recent_requests' =>
                     $result['requests']
@@ -143,6 +169,15 @@ class DashboardController extends Controller
                 $result['requests']
             );
 
+        $report = [
+            'agendas' => $result['agendas'],
+            'meeting_records' => $this->loadMeetingRecords(
+                $request->user(), $result['start_date'], $result['end_date']
+            ),
+            'year_on_year' => $this->buildYearOnYear($request, $result),
+            'agenda_summary' => $this->buildAgendaSummary($result['agendas']),
+        ];
+
         return $excelService->download(
             $result['requests'],
             $summary,
@@ -163,7 +198,8 @@ class DashboardController extends Controller
 
                 'group_by' =>
                     $result['group_by'],
-            ]
+            ],
+            $report
         );
     }
 
@@ -332,6 +368,11 @@ class DashboardController extends Controller
                 $service,
                 self::SERVICE_BORROWING,
                 $availableServices
+            ) ||
+            $this->shouldLoadService(
+                $service,
+                self::SERVICE_ASSET_REQUEST,
+                $availableServices
             )
         ) {
             $requests =
@@ -340,10 +381,29 @@ class DashboardController extends Controller
                         $user,
                         $status,
                         $startDate,
-                        $endDate
+                        $endDate,
+                        $service
                     )
                 );
         }
+
+        if ($this->shouldLoadService(
+            $service,
+            self::SERVICE_SCHEDULE_REQUEST,
+            $availableServices
+        )) {
+            $requests = $requests->merge(
+                $this->loadScheduleRequests(
+                    $user, $status, $startDate, $endDate
+                )
+            );
+        }
+
+        $agendas = $this->shouldLoadService(
+            $service,
+            self::SERVICE_AGENDA,
+            $availableServices
+        ) ? $this->loadAgendas($user, $startDate, $endDate) : collect();
 
         $requests =
             $requests
@@ -387,6 +447,8 @@ class DashboardController extends Controller
 
             'requests' =>
                 $requests,
+
+            'agendas' => $agendas,
         ];
     }
 
@@ -484,7 +546,8 @@ class DashboardController extends Controller
         mixed $user,
         string $status,
         Carbon $startDate,
-        Carbon $endDate
+        Carbon $endDate,
+        string $service
     ): Collection {
         $query =
             BorrowRequest::query()
@@ -505,6 +568,15 @@ class DashboardController extends Controller
             $startDate,
             $endDate
         );
+
+        if ($service === self::SERVICE_ASSET_REQUEST) {
+            $query->where('request_type', 'asset_request');
+        } elseif ($service === self::SERVICE_BORROWING) {
+            $query->where(function ($builder) {
+                $builder->where('request_type', 'borrow')
+                    ->orWhereNull('request_type');
+            });
+        }
 
         return $query
             ->orderByDesc(
@@ -1211,10 +1283,14 @@ class DashboardController extends Controller
                 $item->id,
 
             'service' =>
-                self::SERVICE_BORROWING,
+                $item->request_type === 'asset_request'
+                    ? self::SERVICE_ASSET_REQUEST
+                    : self::SERVICE_BORROWING,
 
             'service_label' =>
-                'Peminjaman SEKPiM',
+                $item->request_type === 'asset_request'
+                    ? 'Request Aset SEKPiM'
+                    : 'Peminjaman SEKPiM',
 
             'code' =>
                 $item->borrow_code
@@ -1277,7 +1353,9 @@ class DashboardController extends Controller
 
             'completed_at' =>
                 $this->dateTimeValue(
-                    $item->returned_at
+                    $item->request_type === 'asset_request'
+                        ? $item->completed_at
+                        : $item->returned_at
                 ),
 
             'revision_requested_at' =>
@@ -1485,7 +1563,8 @@ class DashboardController extends Controller
 
     private function buildServiceDistribution(
         Collection $requests,
-        array $availableServices
+        array $availableServices,
+        Collection $agendas
     ): array {
         $labels = [
             self::SERVICE_MERCHANDISE =>
@@ -1496,6 +1575,12 @@ class DashboardController extends Controller
 
             self::SERVICE_BORROWING =>
                 'Peminjaman SEKPiM',
+            self::SERVICE_ASSET_REQUEST =>
+                'Request Aset SEKPiM',
+            self::SERVICE_SCHEDULE_REQUEST =>
+                'Pengajuan Jadwal Direktorat',
+            self::SERVICE_AGENDA =>
+                'Agenda Direktorat',
         ];
 
         return collect(
@@ -1506,14 +1591,12 @@ class DashboardController extends Controller
                     string $service
                 ) use (
                     $requests,
-                    $labels
+                    $labels,
+                    $agendas
                 ): array {
-                    $items =
-                        $requests
-                            ->where(
-                                'service',
-                                $service
-                            );
+                    $items = $requests->where('service', $service);
+                    $agendaCount = $service === self::SERVICE_AGENDA
+                        ? $agendas->count() : 0;
 
                     return [
                         'service' =>
@@ -1525,8 +1608,9 @@ class DashboardController extends Controller
                             ],
 
                         'total' =>
-                            $items
-                                ->count(),
+                            $items->count() + $agendaCount,
+
+                        'scheduled' => $agendaCount,
 
                         'pending' =>
                             $items
@@ -1929,8 +2013,15 @@ class DashboardController extends Controller
                 ]
             )
         ) {
-            $services[] =
-                self::SERVICE_BORROWING;
+            $services[] = self::SERVICE_BORROWING;
+            $services[] = self::SERVICE_ASSET_REQUEST;
+        }
+
+        // Pengajuan jadwal resmi dapat dilihat penuh hanya oleh
+        // admin dan superadmin, sesuai aturan approval jadwal.
+        if (in_array($user->role, ['admin', 'superadmin'], true)) {
+            $services[] = self::SERVICE_SCHEDULE_REQUEST;
+            $services[] = self::SERVICE_AGENDA;
         }
 
         return array_values(
@@ -2269,5 +2360,186 @@ class DashboardController extends Controller
         ) {
             return '-';
         }
+    }
+
+    /** Normalisasi pengajuan jadwal, tetap satu rekaman per permohonan. */
+    private function loadScheduleRequests(
+        mixed $user, string $status, Carbon $start, Carbon $end
+    ): Collection {
+        $query = EventScheduleRequest::query()->with('requester')
+            ->whereBetween('created_at', [$start, $end]);
+
+        if (!in_array($user->role, ['admin', 'superadmin'], true)) {
+            $query->where('requested_by', $user->id);
+        }
+        if ($status !== 'all') {
+            // Pengajuan jadwal hanya memiliki pending, approved, rejected.
+            $query->where('status', $status);
+        }
+
+        return $query->get()->map(fn ($item): array => [
+            'id' => $item->id,
+            'service' => self::SERVICE_SCHEDULE_REQUEST,
+            'service_label' => 'Pengajuan Jadwal Direktorat',
+            'code' => 'JDL-' . $item->id,
+            'title' => $item->title,
+            'requester' => $item->requester?->name ?? '-',
+            'requester_email' => $item->requester?->email ?? '-',
+            'unit' => $item->requester_unit ?? '-',
+            'pic_name' => $item->pic_name ?? '-',
+            'directorate' => $item->directorate,
+            'event_date' => $this->dateValue($item->event_date),
+            'agenda_type' => $item->agenda_type ?? '-',
+            'location' => $item->location ?? '-',
+            'status' => $item->status,
+            'submitted_at' => $this->dateTimeValue($item->created_at),
+            'approved_at' => $item->status === 'approved'
+                ? $this->dateTimeValue($item->reviewed_at) : null,
+            'rejected_at' => $item->status === 'rejected'
+                ? $this->dateTimeValue($item->reviewed_at) : null,
+            'completed_at' => null,
+            'rejection_reason' => $item->rejection_reason ?? '-',
+            'admin_note' => '-',
+            'revision_count' => 0,
+            'approved_schedule_id' => $item->approved_schedule_id,
+            'detail_url' => null,
+        ])->values();
+    }
+
+    /** Agenda berbeda dari pengajuan jadwal, sehingga tidak masuk total pengajuan. */
+    private function loadAgendas(mixed $user, Carbon $start, Carbon $end): Collection
+    {
+        $query = EventSchedule::query()
+            ->whereBetween('event_date', [
+                $start->toDateString(), $end->toDateString()
+            ]);
+
+        if (!in_array($user->role, ['admin', 'superadmin'], true)) {
+            $query->where('is_public', true);
+        }
+
+        return $query->orderBy('event_date')->get();
+    }
+
+    private function buildAgendaSummary(Collection $agendas): array
+    {
+        $today = today()->toDateString();
+        $directorates = [
+            'direktorat' => 'Direktorat Bersama',
+            'direktur' => 'Direktur',
+            'wakil_direktur_1' => 'Wakil Direktur I',
+            'wakil_direktur_2' => 'Wakil Direktur II',
+        ];
+        return [
+            'total' => $agendas->count(),
+            'meetings_planned' => $agendas->where('agenda_type', 'Rapat')->count(),
+            'upcoming' => $agendas->filter(
+                fn ($a) => $a->event_date?->toDateString() >= $today
+            )->count(),
+            'by_directorate' => collect($directorates)->map(
+                fn ($label, $key) => [
+                    'key' => $key,
+                    'label' => $label,
+                    'total' => $agendas->where('directorate', $key)->count(),
+                ]
+            )->values()->all(),
+        ];
+    }
+
+    /** Catatan realisasi rapat hanya tersedia untuk admin dan jika tabel ada. */
+    private function loadMeetingRecords(mixed $user, Carbon $start, Carbon $end): Collection
+    {
+        if (!in_array($user->role, ['admin', 'superadmin'], true) ||
+            !\Illuminate\Support\Facades\Schema::hasTable('meeting_records')) {
+            return collect();
+        }
+        return \Illuminate\Support\Facades\DB::table('meeting_records')
+            ->whereBetween('meeting_date', [$start->toDateString(), $end->toDateString()])
+            ->orderBy('meeting_date')->get();
+    }
+
+    private function buildMeetingSummary(mixed $user, Carbon $start, Carbon $end): array
+    {
+        $available = in_array($user->role, ['admin', 'superadmin'], true) &&
+            \Illuminate\Support\Facades\Schema::hasTable('meeting_records');
+        if (!$available) return ['available' => false, 'held' => null];
+        return [
+            'available' => true,
+            'held' => $this->loadMeetingRecords($user, $start, $end)
+                ->where('realization_status', 'held')->count(),
+        ];
+    }
+
+    /** Menambah seri tanpa mengubah rumus dasar tren pengajuan. */
+    private function augmentTrend(
+        array $trend, Collection $requests, Collection $agendas, string $groupBy
+    ): array {
+        return array_map(function (array $point) use ($requests, $agendas, $groupBy): array {
+            $key = $point['period'];
+            $fmt = $groupBy === 'month' ? 'Y-m' : 'Y-m-d';
+
+            $samePeriod = static function ($value) use ($fmt, $key): bool {
+                if (!$value) return false;
+                try {
+                    return Carbon::parse($value)->format($fmt) === $key;
+                } catch (\Throwable) {
+                    return false;
+                }
+            };
+
+            foreach ([self::SERVICE_ASSET_REQUEST, self::SERVICE_SCHEDULE_REQUEST] as $service) {
+                $point[$service] = $requests->filter(
+                    fn ($item) => $item['service'] === $service &&
+                        $samePeriod($item['submitted_at'] ?? null)
+                )->count();
+            }
+            $point['agenda'] = $agendas->filter(
+                fn ($item) => $samePeriod($item->event_date)
+            )->count();
+            return $point;
+        }, $trend);
+    }
+
+    /** Membandingkan tanggal yang sama tahun lalu; basis nol menghasilkan N/A. */
+    private function buildYearOnYear(Request $request, array $current): array
+    {
+        $previousFilters = [
+            'service' => $current['service'],
+            'status' => $current['status'],
+            'start_date' => $current['start_date']->copy()->subYearNoOverflow()->toDateString(),
+            'end_date' => $current['end_date']->copy()->subYearNoOverflow()->toDateString(),
+            'group_by' => $current['group_by'],
+        ];
+        $previous = $this->buildDashboardData($request, $previousFilters);
+        $services = [
+            self::SERVICE_MERCHANDISE => 'Merchandise',
+            self::SERVICE_HUMAS => 'Liputan Humas',
+            self::SERVICE_BORROWING => 'Peminjaman SEKPiM',
+            self::SERVICE_ASSET_REQUEST => 'Request Aset SEKPiM',
+            self::SERVICE_SCHEDULE_REQUEST => 'Pengajuan Jadwal Direktorat',
+            self::SERVICE_AGENDA => 'Agenda Direktorat (terjadwal)',
+        ];
+        $items = [];
+        foreach ($services as $key => $label) {
+            if (!in_array($key, $current['available_services'], true)) continue;
+            $now = $key === self::SERVICE_AGENDA
+                ? $current['agendas']->count()
+                : $current['requests']->where('service', $key)->count();
+            $before = $key === self::SERVICE_AGENDA
+                ? $previous['agendas']->count()
+                : $previous['requests']->where('service', $key)->count();
+            $items[] = [
+                'service' => $key, 'label' => $label,
+                'current' => $now, 'previous' => $before,
+                'difference' => $now - $before,
+                'growth_percent' => $before === 0
+                    ? null : round(($now - $before) / $before * 100, 2),
+            ];
+        }
+        return [
+            'previous_start' => $previousFilters['start_date'],
+            'previous_end' => $previousFilters['end_date'],
+            'items' => $items,
+        ];
     }
 }

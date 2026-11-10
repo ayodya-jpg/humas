@@ -66,6 +66,21 @@ const SERVICE_CONFIG = {
         icon: 'bi-box-seam-fill',
         color: 'success',
     },
+    asset_request: {
+        label: 'Request Aset SEKPiM',
+        icon: 'bi-box2-heart-fill',
+        color: 'warning',
+    },
+    schedule_request: {
+        label: 'Pengajuan Jadwal Direktorat',
+        icon: 'bi-calendar-check-fill',
+        color: 'info',
+    },
+    agenda: {
+        label: 'Agenda Direktorat',
+        icon: 'bi-calendar-event-fill',
+        color: 'secondary',
+    },
 };
 
 const STATUS_CONFIG = {
@@ -138,6 +153,8 @@ const EMPTY_ANALYTICS = {
     status_distribution: [],
     trend: [],
     recent_requests: [],
+    agenda_summary: { total: 0, meetings_planned: 0, upcoming: 0, by_directorate: [] },
+    year_on_year: { previous_start: '', previous_end: '', items: [] },
 };
 
 const PIE_COLORS = [
@@ -1190,8 +1207,14 @@ export default function Dashboard() {
                 }
 
                 if (
-                    item.service ===
-                    'borrowing'
+                    item.service === 'schedule_request'
+                ) {
+                    return '/admin/director-schedule/requests';
+                }
+
+                if (
+                    item.service === 'borrowing' ||
+                    item.service === 'asset_request'
                 ) {
                     return canViewBorrowingApproval
                         ? `/admin/borrow-requests/${item.id}`
@@ -1741,12 +1764,17 @@ export default function Dashboard() {
                                     </option>
                                 )}
 
-                                {availableServices.includes(
-                                    'borrowing'
-                                ) && (
-                                    <option value="borrowing">
-                                        Peminjaman SEKPiM
-                                    </option>
+                                {availableServices.includes('borrowing') && (
+                                    <option value="borrowing">Peminjaman SEKPiM</option>
+                                )}
+                                {availableServices.includes('asset_request') && (
+                                    <option value="asset_request">Request Aset SEKPiM</option>
+                                )}
+                                {availableServices.includes('schedule_request') && (
+                                    <option value="schedule_request">Pengajuan Jadwal Direktorat</option>
+                                )}
+                                {availableServices.includes('agenda') && (
+                                    <option value="agenda">Agenda Direktorat</option>
                                 )}
                             </select>
                         </div>
@@ -2019,13 +2047,71 @@ export default function Dashboard() {
                 )}
             </div>
 
+            {availableServices.includes('agenda') && (
+                <div className="card border-0 shadow-sm rounded-5 mb-4">
+                    <div className="card-body p-4">
+                        <h4 className="fw-black mb-3">Agenda Direktorat</h4>
+                        <div className="row g-3">
+                            {[['Agenda Terjadwal', analytics.agenda_summary?.total],
+                              ['Kategori Rapat', analytics.agenda_summary?.meetings_planned],
+                              ['Agenda Mendatang', analytics.agenda_summary?.upcoming],
+                              ['Rapat Terlaksana', analytics.meeting_summary?.available ? analytics.meeting_summary.held : '—']].map(([label, value]) => (
+                                <div className="col-md-6 col-xl-3" key={label}>
+                                    <div className="border rounded-4 p-3">
+                                        <div className="small text-muted">{label}</div>
+                                        <h3 className="fw-black mb-0">{Number(value || 0).toLocaleString('id-ID')}</h3>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <h6 className="fw-bold mt-3">Rekap per Direktorat</h6>
+                        <div className="row g-2">
+                            {(analytics.agenda_summary?.by_directorate || []).map(item => (
+                                <div className="col-sm-6 col-xl-3" key={item.key}>
+                                    <div className="rounded-3 bg-light p-3 d-flex justify-content-between gap-2">
+                                        <span className="small">{item.label}</span>
+                                        <strong>{item.total}</strong>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="small text-muted mt-3">
+                            Filter status berlaku pada pengajuan, sedangkan seri agenda berdasarkan tanggal kegiatan. Agenda dihitung dari tanggal jadwal, terpisah dari jumlah pengajuan. Rapat terjadwal belum tentu terlaksana.
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {(analytics.year_on_year?.items || []).length > 0 && (
+                <div className="card border-0 shadow-sm rounded-5 mb-4">
+                    <div className="card-body p-4">
+                        <h4 className="fw-black mb-1">Year-on-Year Seluruh Layanan</h4>
+                        <p className="text-muted small">Dibandingkan dengan {formatDate(analytics.year_on_year.previous_start)} s.d. {formatDate(analytics.year_on_year.previous_end)}.</p>
+                        <div className="table-responsive">
+                            <table className="table table-hover align-middle">
+                                <thead className="table-light"><tr><th>Layanan</th><th className="text-end">Tahun Lalu</th><th className="text-end">Tahun Ini</th><th className="text-end">Selisih</th><th className="text-end">YoY</th></tr></thead>
+                                <tbody>{analytics.year_on_year.items.map(item => (
+                                    <tr key={item.service}>
+                                        <td className="fw-semibold">{item.label}</td>
+                                        <td className="text-end">{item.previous}</td>
+                                        <td className="text-end">{item.current}</td>
+                                        <td className="text-end">{item.difference}</td>
+                                        <td className="text-end">{item.growth_percent === null ? 'N/A' : `${item.growth_percent}%`}</td>
+                                    </tr>
+                                ))}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="row g-4 mb-4">
                 <div className="col-xl-8">
                     <section className="card border-0 shadow-sm rounded-5 h-100">
                         <div className="card-body p-4">
                             <div className="mb-4">
                                 <h4 className="fw-black mb-1">
-                                    Tren Pengajuan
+                                    Tren Layanan &amp; Agenda
                                 </h4>
 
                                 <p className="text-muted mb-0">
@@ -2159,6 +2245,16 @@ export default function Dashboard() {
                                                     r: 6,
                                                 }}
                                             />
+                                        
+                                            {availableServices.includes('asset_request') && (
+                                                <Line type="monotone" dataKey="asset_request" name="Request Aset" stroke="#eab308" strokeWidth={3} dot={{ r: 3 }} />
+                                            )}
+                                            {availableServices.includes('schedule_request') && (
+                                                <Line type="monotone" dataKey="schedule_request" name="Pengajuan Jadwal" stroke="#9333ea" strokeWidth={3} dot={{ r: 3 }} />
+                                            )}
+                                            {availableServices.includes('agenda') && (
+                                                <Line type="monotone" dataKey="agenda" name="Agenda Direktorat (terjadwal)" stroke="#0f766e" strokeWidth={3} dot={{ r: 3 }} strokeDasharray="6 3" />
+                                            )}
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -2265,9 +2361,8 @@ export default function Dashboard() {
                         </h4>
 
                         <p className="text-muted mb-0">
-                            Perbandingan status pada
-                            Merchandise, Liputan Humas, dan
-                            Peminjaman SEKPiM.
+                            Perbandingan setiap layanan, termasuk Request Aset,
+                            Pengajuan Jadwal, dan Agenda Direktorat terjadwal.
                         </p>
                     </div>
 
@@ -2407,6 +2502,10 @@ export default function Dashboard() {
                                             0,
                                         ]}
                                     />
+                                
+                                    {availableServices.includes('agenda') && (
+                                        <Bar dataKey="scheduled" name="Terjadwal" fill="#0f766e" radius={[8,8,0,0]} />
+                                    )}
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
