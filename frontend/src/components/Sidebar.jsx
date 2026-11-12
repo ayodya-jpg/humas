@@ -291,9 +291,9 @@ const isItemAllowed = (item, currentUser) => {
 
 export default function Sidebar({
     sidebarOpen = false,
-    setSidebarOpen = () => {},
+    setSidebarOpen = () => { },
     isSidebarOpen = false,
-    setIsSidebarOpen = () => {},
+    setIsSidebarOpen = () => { },
 }) {
     const location = useLocation();
 
@@ -432,7 +432,7 @@ export default function Sidebar({
                     console.error(
                         `Fetch sidebar badge ${key} error:`,
                         result.reason?.response?.data ||
-                            result.reason
+                        result.reason
                     );
                 }
             });
@@ -554,7 +554,7 @@ export default function Sidebar({
                         '/admin/users/'
                     ) &&
                     location.pathname !==
-                        '/admin/users/create'
+                    '/admin/users/create'
                 )
             );
         }
@@ -624,7 +624,15 @@ export default function Sidebar({
                             />
 
                             <span className="sidebar-logo-fallback">
-                                T
+                                <img
+                                    src="/images/logo-putih-tus.png"
+                                    alt="Telkom University Surabaya"
+                                    className="sidebar-logo-img"
+                                    onError={(event) => {
+                                        event.currentTarget.style.display =
+                                            'none';
+                                    }}
+                                />
                             </span>
                         </div>
 
@@ -695,11 +703,10 @@ export default function Sidebar({
                                         <Link
                                             key={`${group.title}-${item.path}-${item.label}`}
                                             to={item.path}
-                                            className={`sidebar-link ${
-                                                active
+                                            className={`sidebar-link ${active
                                                     ? 'active'
                                                     : ''
-                                            }`}
+                                                }`}
                                             onClick={closeSidebar}
                                         >
                                             <span className="sidebar-link-icon">
