@@ -1,3 +1,4 @@
+
 import {
     useCallback,
     useEffect,
@@ -63,7 +64,7 @@ const extractResponseData = (response) => {
 const getRoleLabel = (role) =>
     ROLE_LABELS[role] || role || 'Pengguna';
 
-const createMenuGroups = (basePath, isSuperadmin) => [
+const createMenuGroups = (basePath) => [
     {
         title: 'Utama',
         items: [
@@ -117,8 +118,6 @@ const createMenuGroups = (basePath, isSuperadmin) => [
                 permission: 'request.borrowing.create',
                 badgeKey: null,
             },
-
-            // BARU: tersedia untuk seluruh akun login
             {
                 label: 'Request Jadwal Direktorat',
                 icon: 'bi-calendar2-plus-fill',
@@ -127,7 +126,6 @@ const createMenuGroups = (basePath, isSuperadmin) => [
                 publicAuthenticated: true,
                 badgeKey: null,
             },
-
             {
                 label: 'Riwayat Pengajuan',
                 icon: 'bi-clock-history',
@@ -173,7 +171,6 @@ const createMenuGroups = (basePath, isSuperadmin) => [
         ],
     },
 
-    // BARU: khusus Admin dan Superadmin
     {
         title: 'Layanan Direktorat',
         adminOnly: true,
@@ -242,25 +239,7 @@ const createMenuGroups = (basePath, isSuperadmin) => [
             },
         ],
     },
-
-    {
-        title: 'Akses Superadmin',
-        adminOnly: true,
-        superadminOnly: true,
-        items: [
-            {
-                label: 'Pengaturan Hak Akses',
-                icon: 'bi-shield-lock-fill',
-                path: '/admin/users',
-                permission: null,
-                superadminOnly: true,
-                badgeKey: null,
-            },
-        ],
-    },
-].filter(
-    (group) => !group.superadminOnly || isSuperadmin
-);
+];
 
 const isItemAllowed = (item, currentUser) => {
     if (item.publicAuthenticated) {
@@ -291,9 +270,9 @@ const isItemAllowed = (item, currentUser) => {
 
 export default function Sidebar({
     sidebarOpen = false,
-    setSidebarOpen = () => { },
+    setSidebarOpen = () => {},
     isSidebarOpen = false,
-    setIsSidebarOpen = () => { },
+    setIsSidebarOpen = () => {},
 }) {
     const location = useLocation();
 
@@ -302,8 +281,6 @@ export default function Sidebar({
     const currentUser = getStoredUser();
 
     const role = currentUser?.role || 'user';
-
-    const isSuperadmin = role === 'superadmin';
     const isUserRole = role === 'user';
 
     const basePath = isUserRole ? '/user' : '/admin';
@@ -315,8 +292,8 @@ export default function Sidebar({
         Boolean(isSidebarOpen);
 
     const menuGroups = useMemo(
-        () => createMenuGroups(basePath, isSuperadmin),
-        [basePath, isSuperadmin]
+        () => createMenuGroups(basePath),
+        [basePath]
     );
 
     /*
@@ -389,7 +366,6 @@ export default function Sidebar({
             requestKeys.push('products');
         }
 
-        // BARU: menghitung request jadwal pending
         if (canViewScheduleApproval) {
             requests.push(
                 api.get('/event-schedule-requests')
@@ -703,10 +679,9 @@ export default function Sidebar({
                                         <Link
                                             key={`${group.title}-${item.path}-${item.label}`}
                                             to={item.path}
-                                            className={`sidebar-link ${active
-                                                    ? 'active'
-                                                    : ''
-                                                }`}
+                                            className={`sidebar-link ${
+                                                active ? 'active' : ''
+                                            }`}
                                             onClick={closeSidebar}
                                         >
                                             <span className="sidebar-link-icon">

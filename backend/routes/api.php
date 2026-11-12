@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Http\Controllers\Api\AuthController;
@@ -75,18 +76,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     /*
     |--------------------------------------------------------------------------
-    | KALENDER KEGIATAN TERINTEGRASI - BARU
+    | KALENDER KEGIATAN TERINTEGRASI
     |--------------------------------------------------------------------------
-    |
-    | Menggabungkan:
-    | - Agenda Direktorat resmi
-    | - Request Jadwal Direktorat pending
-    | - Pengajuan layanan HUMAS
-    | - Pengajuan peminjaman SEKPiM
-    |
-    | Hanya admin yang diperbolehkan membaca data
-    | gabungan. Validasi role dilakukan oleh controller.
-    |
     */
 
     Route::get('/integrated-calendar/events', [
@@ -98,10 +89,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
     |--------------------------------------------------------------------------
     | JADWAL DIREKTORAT - KALENDER
     |--------------------------------------------------------------------------
-    |
-    | Semua user login dapat melihat jadwal.
-    | Hak kelola divalidasi oleh controller.
-    |
     */
 
     Route::get('/event-schedules', [
@@ -272,8 +259,17 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     /*
     |--------------------------------------------------------------------------
-    | MERCHANDISE - STORE
+    | MERCHANDISE - PENGAJUAN DAN REVISI USER
     |--------------------------------------------------------------------------
+    |
+    | Pengajuan baru dan pengiriman ulang revisi merupakan
+    | tindakan pemohon, bukan tindakan approval admin.
+    |
+    | Method resubmit() pada OrderController tetap memastikan:
+    | 1. Pengajuan adalah milik user yang login.
+    | 2. Status pengajuan adalah "revision".
+    | 3. Data dan barang yang dipilih valid.
+    |
     */
 
     Route::middleware('permission:request.merchandise.create')
@@ -282,6 +278,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
                 OrderController::class,
                 'store',
             ]);
+
+            Route::post('/orders/{id}/resubmit', [
+                OrderController::class,
+                'resubmit',
+            ])->whereNumber('id');
         });
 
     /*
@@ -317,6 +318,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     |--------------------------------------------------------------------------
     | MERCHANDISE - APPROVAL PROCESS
     |--------------------------------------------------------------------------
+    |
+    | Hanya admin yang memiliki permission proses approval.
+    | Resubmit sengaja TIDAK ditempatkan di sini.
+    |
     */
 
     Route::middleware('permission:approval.merchandise.process')
@@ -339,11 +344,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
             Route::put('/orders/{id}/complete', [
                 OrderController::class,
                 'complete',
-            ])->whereNumber('id');
-
-            Route::post('/orders/{id}/resubmit', [
-                OrderController::class,
-                'resubmit',
             ])->whereNumber('id');
         });
 
@@ -585,8 +585,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
             ->whereNumber('user')
             ->middleware('permission:users.manage');
 
-        // Dipertahankan dari route yang kamu kirim.
-        Route::patch('/admin/users/{user}', [
+        Route::patch('/users/{user}', [
             UserController::class,
             'update',
         ])
