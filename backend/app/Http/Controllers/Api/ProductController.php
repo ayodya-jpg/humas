@@ -7,8 +7,10 @@ use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use RuntimeException;
 use Throwable;
 
 class ProductController extends Controller
@@ -29,9 +31,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Detail produk berhasil diambil.',
-            'data' => $product->load(
-                'category:id,name,slug,status'
-            ),
+            'data' => $product->load('category:id,name,slug,status'),
         ]);
     }
 
@@ -93,10 +93,18 @@ class ProductController extends Controller
                 ]),
             ],
 
-            'image' => [
+            // Gambar diunggah langsung dari perangkat.
+            'image_file' => [
                 'nullable',
-                'string',
-                'max:2000',
+                'file',
+                'mimes:jpg,jpeg,png,webp',
+                'max:5120',
+            ],
+
+            // Digunakan ketika admin ingin menghapus foto lama.
+            'remove_image' => [
+                'sometimes',
+                'boolean',
             ],
 
             'status' => [
@@ -106,6 +114,20 @@ class ProductController extends Controller
                     'inactive',
                 ]),
             ],
+        ];
+    }
+
+    private function messages(): array
+    {
+        return [
+            'image_file.mimes' =>
+                'Gambar harus berupa JPG, JPEG, PNG, atau WEBP.',
+
+            'image_file.max' =>
+                'Ukuran gambar maksimal 5 MB.',
+
+            'image_file.file' =>
+                'Berkas gambar tidak valid.',
         ];
     }
 
@@ -125,8 +147,6 @@ class ProductController extends Controller
         if ($type === 'checkout') {
             $sekpimType = null;
         } elseif (!$product && !$sekpimType) {
-            // Produk lama bertipe borrow/both
-            // dianggap sebagai barang peminjaman.
             $sekpimType = 'borrow';
         }
 
@@ -145,30 +165,130 @@ class ProductController extends Controller
 
             'sekpim_item_type' => $sekpimType,
 
-            'image' => isset($data['image'])
-                ? trim($data['image'])
-                : null,
-
             'status' => $data['status'],
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | UPLOAD FOTO PRODUK
+    |--------------------------------------------------------------------------
+    |
+    | Semua produk menggunakan disk public Laravel.
+    | Folder: storage/app/public/products
+    |
+    */
+
+    private function uploadImage(Request $request): ?string
+    {
+        if (!$request->hasFile('image_file')) {
+            return null;
+        }
+
+        $path = $request->file('image_file')->store(
+            'products',
+            'public'
+        );
+
+        if (!$path) {
+            throw new RuntimeException(
+                'Gagal menyimpan gambar produk.'
+            );
+        }
+
+        return $path;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | IDENTIFIKASI FOTO LOKAL
+    |--------------------------------------------------------------------------
+    |
+    | File eksternal milik produk lama tidak boleh dihapus.
+    | Hanya file pada storage/products yang dapat dibersihkan.
+    |
+    */
+
+    private function localImagePath(?string $image): ?string
+    {
+        if (!$image) {
+            return null;
+        }
+
+        $host = parse_url($image, PHP_URL_HOST);
+
+        $appHost = parse_url(
+            config('app.url'),
+            PHP_URL_HOST
+        );
+
+        if (
+            $host &&
+            $appHost &&
+            strcasecmp($host, $appHost) !== 0
+        ) {
+            return null;
+        }
+
+        $path = parse_url(
+            $image,
+            PHP_URL_PATH
+        );
+
+        if (
+            !is_string($path) ||
+            !preg_match(
+                '~^/storage/products/([A-Za-z0-9._-]+)$~',
+                $path,
+                $match
+            )
+        ) {
+            return null;
+        }
+
+        return 'products/' . $match[1];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TAMBAH PRODUK
+    |--------------------------------------------------------------------------
+    */
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate(
-            $this->rules()
+            $this->rules(),
+            $this->messages()
         );
 
         $slug = $this->uniqueSlug(
             $validated['slug'] ?? $validated['name']
         );
 
+        $newImagePath = null;
+
         try {
+            $newImagePath = $this->uploadImage($request);
+
             $product = DB::transaction(
-                fn () => Product::create([
-                    ...$this->productData($validated),
-                    'slug' => $slug,
-                ])
+                function () use (
+                    $validated,
+                    $slug,
+                    $newImagePath
+                ): Product {
+                    return Product::create([
+                        ...$this->productData($validated),
+
+                        'image' => $newImagePath
+                            ? Storage::disk('public')->url(
+                                $newImagePath
+                            )
+                            : null,
+
+                        'slug' => $slug,
+                    ]);
+                }
             );
 
             return response()->json([
@@ -179,6 +299,12 @@ class ProductController extends Controller
                 ),
             ], 201);
         } catch (Throwable $error) {
+            if ($newImagePath) {
+                Storage::disk('public')->delete(
+                    $newImagePath
+                );
+            }
+
             report($error);
 
             return response()->json([
@@ -189,35 +315,87 @@ class ProductController extends Controller
         }
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | EDIT PRODUK
+    |--------------------------------------------------------------------------
+    |
+    | 1. Ada foto baru   => ganti foto lama.
+    | 2. remove_image=1  => hapus foto.
+    | 3. Tidak keduanya  => pertahankan foto lama.
+    |
+    */
+
     public function update(
         Request $request,
         Product $product
     ): JsonResponse {
         $validated = $request->validate(
-            $this->rules($product)
+            $this->rules($product),
+            $this->messages()
         );
 
-        $slug = array_key_exists('slug', $validated)
-            && $validated['slug']
-                ? Str::slug($validated['slug'])
-                : $product->slug;
+        $slug = !empty($validated['slug'])
+            ? Str::slug($validated['slug'])
+            : $product->slug;
+
+        $oldImagePath = $this->localImagePath(
+            $product->image
+        );
+
+        $newImagePath = null;
+
+        $removeImage = $request->boolean(
+            'remove_image'
+        );
 
         try {
+            $newImagePath = $this->uploadImage(
+                $request
+            );
+
             DB::transaction(
                 function () use (
                     $product,
                     $validated,
-                    $slug
+                    $slug,
+                    $newImagePath,
+                    $removeImage
                 ): void {
-                    $product->update([
+                    $data = [
                         ...$this->productData(
                             $validated,
                             $product
                         ),
+
                         'slug' => $slug,
-                    ]);
+                    ];
+
+                    if ($newImagePath) {
+                        $data['image'] = Storage::disk(
+                            'public'
+                        )->url($newImagePath);
+                    } elseif ($removeImage) {
+                        $data['image'] = null;
+                    }
+
+                    // Jika tidak ada perubahan gambar,
+                    // foto lama tetap digunakan.
+
+                    $product->update($data);
                 }
             );
+
+            // Bersihkan foto lokal lama setelah
+            // penyimpanan database berhasil.
+            if (
+                ($newImagePath || $removeImage) &&
+                $oldImagePath
+            ) {
+                Storage::disk('public')->delete(
+                    $oldImagePath
+                );
+            }
 
             return response()->json([
                 'success' => true,
@@ -227,6 +405,12 @@ class ProductController extends Controller
                 ),
             ]);
         } catch (Throwable $error) {
+            if ($newImagePath) {
+                Storage::disk('public')->delete(
+                    $newImagePath
+                );
+            }
+
             report($error);
 
             return response()->json([
@@ -237,10 +421,26 @@ class ProductController extends Controller
         }
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | HAPUS PRODUK
+    |--------------------------------------------------------------------------
+    */
+
     public function destroy(Product $product): JsonResponse
     {
+        $oldImagePath = $this->localImagePath(
+            $product->image
+        );
+
         try {
             $product->delete();
+
+            if ($oldImagePath) {
+                Storage::disk('public')->delete(
+                    $oldImagePath
+                );
+            }
 
             return response()->json([
                 'success' => true,
@@ -252,7 +452,8 @@ class ProductController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Produk gagal dihapus karena masih digunakan dalam pengajuan.',
+                'message' =>
+                    'Produk gagal dihapus karena masih digunakan dalam pengajuan.',
                 'data' => null,
             ], 422);
         }
@@ -261,11 +462,16 @@ class ProductController extends Controller
     private function uniqueSlug(string $name): string
     {
         $base = Str::slug($name) ?: 'produk';
+
         $slug = $base;
+
         $counter = 2;
 
         while (
-            Product::where('slug', $slug)->exists()
+            Product::where(
+                'slug',
+                $slug
+            )->exists()
         ) {
             $slug = $base . '-' . $counter++;
         }
