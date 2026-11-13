@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\IntegratedCalendarController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\UserCalendarAvailabilityController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -124,6 +125,16 @@ Route::middleware('auth:sanctum')->group(function (): void {
         EventScheduleController::class,
         'destroy',
     ])->whereNumber('eventSchedule');
+
+
+    Route::get(
+        '/integrated-calendar/user-events',
+        [
+            UserCalendarAvailabilityController::class,
+            'index',
+        ]
+    );
+
 
     /*
     |--------------------------------------------------------------------------

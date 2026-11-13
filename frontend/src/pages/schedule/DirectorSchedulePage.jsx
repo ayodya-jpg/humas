@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
@@ -80,13 +79,7 @@ const SOURCES = [
         icon: 'bi-box-seam-fill',
         color: '#047857',
     },
-    {
-        key: 'pending_schedule',
-        label: 'Pengajuan Jadwal',
-        short: 'Pengajuan',
-        icon: 'bi-hourglass-split',
-        color: '#D97706',
-    },
+    
 ];
 
 const STATUSES = {
@@ -167,12 +160,12 @@ function formatDateTime(value) {
 
     return date && !Number.isNaN(date.getTime())
         ? date.toLocaleString('id-ID', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-          })
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        })
         : '-';
 }
 
@@ -367,8 +360,8 @@ function InfoBox({ label, value }) {
             <small>{label}</small>
             <strong>
                 {value === undefined ||
-                value === null ||
-                value === ''
+                    value === null ||
+                    value === ''
                     ? '-'
                     : String(value)}
             </strong>
@@ -473,39 +466,53 @@ export default function DirectorSchedulePage() {
     |--------------------------------------------------------------------------
     */
 
+
     const loadOfficial = useCallback(
         async (showLoader = true) => {
             try {
-                if (showLoader) setLoading(true);
+                if (showLoader) {
+                    setLoading(true);
+                }
 
                 setOfficialError('');
 
-                const response = await api.get(
-                    '/event-schedules'
-                );
+                const endpoint = isAdmin
+                    ? '/event-schedules'
+                    : '/event-schedules/public';
 
-                const data = response?.data?.data || {};
+                const response = await api.get(endpoint);
 
-                setOfficialEvents(
-                    Array.isArray(data.events)
+                const data = response?.data?.data;
+
+                const rows = Array.isArray(data)
+                    ? data
+                    : Array.isArray(data?.events)
                         ? data.events
-                        : []
-                );
+                        : [];
 
-                setCanManage(Boolean(data.can_manage));
+                setOfficialEvents(rows);
+
+                setCanManage(
+                    isAdmin &&
+                    Boolean(data?.can_manage)
+                );
             } catch (error) {
                 console.error(
-                    'Load directorate schedules',
+                    'Load directorate schedules:',
                     error
                 );
 
                 setOfficialError(getError(error));
+                setOfficialEvents([]);
             } finally {
-                if (showLoader) setLoading(false);
+                if (showLoader) {
+                    setLoading(false);
+                }
             }
         },
-        []
+        [isAdmin]
     );
+
 
     /*
     |--------------------------------------------------------------------------
@@ -513,9 +520,9 @@ export default function DirectorSchedulePage() {
     |--------------------------------------------------------------------------
     */
 
+
     const loadIntegrated = useCallback(async () => {
         if (
-            !isAdmin ||
             !calendarRange?.start ||
             !calendarRange?.end
         ) {
@@ -526,8 +533,12 @@ export default function DirectorSchedulePage() {
             setSyncing(true);
             setIntegratedError('');
 
+            const endpoint = isAdmin
+                ? '/integrated-calendar/events'
+                : '/integrated-calendar/user-events';
+
             const response = await api.get(
-                '/integrated-calendar/events',
+                endpoint,
                 {
                     params: {
                         start: calendarRange.start,
@@ -539,11 +550,13 @@ export default function DirectorSchedulePage() {
             const rows = response?.data?.data?.events;
 
             setIntegratedEvents(
-                Array.isArray(rows) ? rows : []
+                Array.isArray(rows)
+                    ? rows
+                    : []
             );
         } catch (error) {
             console.error(
-                'Load integrated calendar',
+                'Load integrated calendar:',
                 error
             );
 
@@ -553,6 +566,7 @@ export default function DirectorSchedulePage() {
             setSyncing(false);
         }
     }, [isAdmin, calendarRange]);
+
 
     useEffect(() => {
         loadOfficial();
@@ -585,7 +599,7 @@ export default function DirectorSchedulePage() {
 
         setCalendarRange(old =>
             old?.start === next.start &&
-            old?.end === next.end
+                old?.end === next.end
                 ? old
                 : next
         );
@@ -644,10 +658,7 @@ export default function DirectorSchedulePage() {
     */
 
     const visibleIntegrated = useMemo(() => {
-        if (
-            !isAdmin ||
-            sourceFilter === 'directorate'
-        ) {
+        if (sourceFilter === 'directorate') {
             return [];
         }
 
@@ -836,10 +847,10 @@ export default function DirectorSchedulePage() {
             detailMode
                 ? null
                 : findConflict(
-                      officialEvents,
-                      form,
-                      form.id
-                  ),
+                    officialEvents,
+                    form,
+                    form.id
+                ),
         [
             officialEvents,
             form,
@@ -1290,13 +1301,13 @@ export default function DirectorSchedulePage() {
 
             const response = editing
                 ? await api.put(
-                      `/event-schedules/${form.id}`,
-                      payload
-                  )
+                    `/event-schedules/${form.id}`,
+                    payload
+                )
                 : await api.post(
-                      '/event-schedules',
-                      payload
-                  );
+                    '/event-schedules',
+                    payload
+                );
 
             closeAlert();
 
@@ -1304,7 +1315,7 @@ export default function DirectorSchedulePage() {
                 'Agenda Berhasil Disimpan',
 
                 response?.data?.message ||
-                    'Agenda sudah tersimpan.'
+                'Agenda sudah tersimpan.'
             );
 
             setModalOpen(false);
@@ -1511,52 +1522,110 @@ export default function DirectorSchedulePage() {
                             )}
                         </div>
 
-                        <div className="schedule-source-list">
-                            {SOURCES.filter(
-                                item =>
-                                    isAdmin ||
-                                    [
-                                        'all',
-                                        'directorate',
-                                    ].includes(item.key)
-                            ).map(item => (
-                                <button
-                                    key={item.key}
-                                    type="button"
-                                    className={`schedule-source ${
-                                        sourceFilter === item.key
-                                            ? 'active'
-                                            : ''
-                                    }`}
 
-                                    onClick={() => {
-                                        setSourceFilter(item.key);
-                                        setOwnerFilter('semua');
-                                        setTypeFilter('Semua');
-                                    }}
-                                >
-                                    <span
-                                        className="source-icon"
+                        <div className="schedule-source-list">
+                            {SOURCES.map((item) => {
+                                const active = sourceFilter === item.key;
+
+                                return (
+                                    <button
+                                        key={item.key}
+                                        type="button"
+                                        className={`schedule-source ${active ? 'active' : ''
+                                            }`}
+                                        onClick={() => {
+                                            setSourceFilter(item.key);
+                                            setOwnerFilter('semua');
+                                            setTypeFilter('Semua');
+                                        }}
                                         style={{
-                                            background:
-                                                item.color,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            width: '100%',
+                                            minHeight: '43px',
+                                            padding: '8px 10px',
+                                            backgroundColor: active
+                                                ? '#fff1f2'
+                                                : '#f8fafc',
+                                            border: active
+                                                ? '1px solid #fecaca'
+                                                : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
                                         }}
                                     >
-                                        <i
-                                            className={`bi ${item.icon}`}
-                                        />
-                                    </span>
+                                        {/* IKON LAYANAN */}
+                                        <span
+                                            className="source-icon"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                backgroundColor: item.color,
+                                                color: '#ffffff',
+                                                width: '28px',
+                                                height: '28px',
+                                                minWidth: '28px',
+                                                borderRadius: '8px',
+                                                visibility: 'visible',
+                                                opacity: 1,
+                                            }}
+                                        >
+                                            <i
+                                                className={`bi ${item.icon}`}
+                                                style={{
+                                                    display: 'inline-block',
+                                                    color: '#ffffff',
+                                                    fontSize: '14px',
+                                                }}
+                                            />
+                                        </span>
 
-                                    <span className="source-name">
-                                        {item.short}
-                                    </span>
+                                        {/* NAMA LAYANAN */}
+                                        <span
+                                            className="source-name"
+                                            style={{
+                                                display: 'inline-block',
+                                                flex: 1,
+                                                minWidth: 0,
+                                                fontSize: '12px',
+                                                lineHeight: 1.4,
+                                                fontWeight: 700,
+                                                color: active
+                                                    ? '#991b1b'
+                                                    : '#334155',
+                                                opacity: 1,
+                                                visibility: 'visible',
+                                            }}
+                                        >
+                                            {item.label}
+                                        </span>
 
-                                    <small className="source-count">
-                                        {counts[item.key] || 0}
-                                    </small>
-                                </button>
-                            ))}
+                                        {/* JUMLAH KEGIATAN */}
+                                        <small
+                                            className="source-count"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                minWidth: '25px',
+                                                padding: '3px 7px',
+                                                borderRadius: '999px',
+                                                backgroundColor: '#ffffff',
+                                                color: '#334155',
+                                                fontWeight: 800,
+                                                fontSize: '12px',
+                                            }}
+                                        >
+                                            {counts[item.key] ?? 0}
+                                        </small>
+                                    </button>
+                                );
+                            })}
                         </div>
+
 
                         <div className="border-top my-3" />
 
@@ -2129,7 +2198,7 @@ export default function DirectorSchedulePage() {
                                         [
                                             'Status',
                                             STATUSES[selectedProps.status] ||
-                                                selectedProps.status,
+                                            selectedProps.status,
                                         ],
                                         [
                                             selectedSource === 'humas'
@@ -2154,7 +2223,7 @@ export default function DirectorSchedulePage() {
                                         [
                                             'Telepon PIC',
                                             selectedProps.pic_phone ||
-                                                selectedProps.pic_whatsapp,
+                                            selectedProps.pic_whatsapp,
                                         ],
                                         [
                                             'Lokasi',
@@ -2163,7 +2232,7 @@ export default function DirectorSchedulePage() {
                                         [
                                             'Kategori',
                                             selectedProps.coverage_type ||
-                                                selectedProps.agenda_type,
+                                            selectedProps.agenda_type,
                                         ],
                                     ]
                                         .filter(([, value]) =>
@@ -2620,13 +2689,12 @@ export default function DirectorSchedulePage() {
                                                 form.event_date && (
                                                     <div className="col-12">
                                                         <div
-                                                            className={`alert ${
-                                                                invalidTime
-                                                                    ? 'alert-warning'
-                                                                    : conflict
-                                                                        ? 'alert-danger'
-                                                                        : 'alert-success'
-                                                            } mb-0`}
+                                                            className={`alert ${invalidTime
+                                                                ? 'alert-warning'
+                                                                : conflict
+                                                                    ? 'alert-danger'
+                                                                    : 'alert-success'
+                                                                } mb-0`}
                                                         >
                                                             {invalidTime
                                                                 ? 'Jam selesai harus setelah jam mulai.'
