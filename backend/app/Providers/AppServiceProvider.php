@@ -8,20 +8,36 @@ use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
+    /*
+    |--------------------------------------------------------------------------
+    | REGISTER SERVICES
+    |--------------------------------------------------------------------------
+    */
+
     public function register(): void
     {
         /*
-         * Validasi file Excel sebelum dikirim ke user.
-         * DashboardController dan struktur sheet lama tidak diubah.
+         * Semua export Dashboard menggunakan
+         * generator Excel yang sudah divalidasi.
+         *
+         * Tidak mengubah format maupun isi
+         * sheet laporan yang sudah tersedia.
          */
+
         $this->app->bind(
             DashboardExcelService::class,
             VerifiedDashboardExcelService::class
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | BOOT SERVICES
+    |--------------------------------------------------------------------------
+    */
+
     public function boot(): void
     {
-        //
+        // Tidak ada konversi WebP/PDF tambahan.
     }
 }

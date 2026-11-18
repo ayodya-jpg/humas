@@ -3,17 +3,15 @@
 namespace App\Services;
 
 use Illuminate\Support\Collection;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use RuntimeException;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 use ZipArchive;
 
 /**
- * Membuat XLSX lengkap pada file sementara, memvalidasinya,
- * kemudian mengirimnya dengan Content-Length yang tepat.
- *
- * Semua sheet dan formatting tetap menggunakan DashboardExcelService.
+ * Menjaga agar laporan Dashboard tidak dikirim sebagai XLSX rusak.
+ * Semua isi sheet tetap dibuat oleh DashboardExcelService.
  */
 class VerifiedDashboardExcelService extends DashboardExcelService
 {
@@ -22,125 +20,180 @@ class VerifiedDashboardExcelService extends DashboardExcelService
         array $summary,
         array $filters,
         array $report = []
-    ): BinaryFileResponse {
-        $source = parent::download(
+    ): StreamedResponse {
+        $original = parent::download(
             $requests,
             $summary,
             $filters,
             $report
         );
 
-        if (!$source instanceof StreamedResponse) {
+        if (!($original instanceof StreamedResponse)) {
             throw new RuntimeException(
-                'Generator Excel tidak mengembalikan stream XLSX.'
+                'Generator dashboard tidak menghasilkan stream Excel.'
             );
         }
 
-        $temporaryPath = tempnam(
-            sys_get_temp_dir(),
-            'humas_excel_'
-        );
+        $directory = storage_path('app');
 
-        if ($temporaryPath === false) {
+        if (!is_dir($directory) || !is_writable($directory)) {
             throw new RuntimeException(
-                'Tidak bisa membuat file sementara untuk export Excel.'
+                'Folder storage/app Laravel tidak bisa ditulis.'
+            );
+        }
+
+        $tempFile = tempnam($directory, 'humas_excel_');
+
+        if ($tempFile === false) {
+            throw new RuntimeException(
+                'Tidak dapat membuat file sementara Excel.'
             );
         }
 
         try {
-            $this->captureXlsx($source, $temporaryPath);
-            $this->validateXlsx($temporaryPath);
-
-            $start = preg_replace(
-                '/[^0-9-]/',
-                '',
-                (string) (
-                    $filters['start_date']
-                    ?? now()->subDays(29)->toDateString()
-                )
-            );
-
-            $end = preg_replace(
-                '/[^0-9-]/',
-                '',
-                (string) (
-                    $filters['end_date']
-                    ?? now()->toDateString()
-                )
-            );
-
-            $filename = sprintf(
-                'Laporan_Dashboard_HUMAS_SEKPIM_%s_sd_%s.xlsx',
-                $start,
-                $end
-            );
-
-            // BinaryFileResponse mengirim berkas utuh, bukan stream
-            // yang masih mengerjakan pembentukan XLSX saat download.
-            return response()->download(
-                $temporaryPath,
-                $filename,
-                [
-                    'Content-Type' =>
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    'Cache-Control' =>
-                        'private, no-store, no-cache, must-revalidate',
-                    'Pragma' => 'no-cache',
-                    'X-Content-Type-Options' => 'nosniff',
-                    'X-Excel-Verified' => '1',
-                ]
-            )->deleteFileAfterSend(true);
+            $this->saveOriginalStream($original, $tempFile);
+            $this->verifyXlsx($tempFile);
         } catch (Throwable $error) {
-            @unlink($temporaryPath);
-
+            @unlink($tempFile);
             report($error);
 
             throw new RuntimeException(
-                'Export Excel gagal divalidasi. '
-                . 'File yang rusak tidak dikirim. '
-                . $error->getMessage(),
+                'Export Excel gagal. File tidak valid sehingga download ' .
+                'dibatalkan. Penyebab: ' . $error->getMessage(),
                 0,
                 $error
             );
         }
+
+        $start = preg_replace(
+            '/[^0-9-]/',
+            '',
+            (string) ($filters['start_date'] ?? now()->toDateString())
+        );
+
+        $end = preg_replace(
+            '/[^0-9-]/',
+            '',
+            (string) ($filters['end_date'] ?? now()->toDateString())
+        );
+
+        $filename = sprintf(
+            'Laporan_Dashboard_HUMAS_SEKPIM_%s_sd_%s.xlsx',
+            $start,
+            $end
+        );
+
+        clearstatcache(true, $tempFile);
+        $size = filesize($tempFile);
+
+        /*
+        |--------------------------------------------------------------------------
+        | KIRIM FILE YANG SUDAH DIVALIDASI
+        |--------------------------------------------------------------------------
+        |
+        | StreamedResponse kompatibel dengan versi controller
+        | yang mengembalikan Response maupun StreamedResponse.
+        |
+        */
+
+        return response()->streamDownload(
+            static function () use ($tempFile): void {
+                $handle = null;
+
+                try {
+                    $handle = @fopen($tempFile, 'rb');
+
+                    if ($handle === false) {
+                        throw new RuntimeException(
+                            'File Excel hasil validasi tidak dapat dibaca.'
+                        );
+                    }
+
+                    while (!feof($handle)) {
+                        $chunk = fread($handle, 64 * 1024);
+
+                        if ($chunk === false) {
+                            throw new RuntimeException(
+                                'Terjadi kesalahan saat membaca file Excel.'
+                            );
+                        }
+
+                        echo $chunk;
+                    }
+                } finally {
+                    if (is_resource($handle)) {
+                        fclose($handle);
+                    }
+
+                    @unlink($tempFile);
+                }
+            },
+            $filename,
+            [
+                'Content-Type' =>
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+
+                'Content-Length' =>
+                    (string) $size,
+
+                'Cache-Control' =>
+                    'private, no-store, no-cache, must-revalidate',
+
+                'X-Content-Type-Options' =>
+                    'nosniff',
+
+                'X-HUMAS-XLSX-Validated' =>
+                    '1',
+            ]
+        );
     }
 
-    /**
-     * Menangkap output PhpSpreadsheet dari callback lama ke disk.
-     * Tidak perlu memasukkan seluruh ZIP XLSX ke string di memori.
-     */
-    private function captureXlsx(
+    /*
+    |--------------------------------------------------------------------------
+    | SIMPAN HASIL GENERATOR KE FILE SEMENTARA
+    |--------------------------------------------------------------------------
+    |
+    | Hasil generator lama ditangkap dahulu.
+    | Output tidak dikirim ke browser sebelum lolos validasi.
+    |
+    */
+
+    private function saveOriginalStream(
         StreamedResponse $response,
-        string $path
+        string $destination
     ): void {
-        $file = @fopen($path, 'wb');
+        $file = @fopen($destination, 'wb');
 
         if ($file === false) {
             throw new RuntimeException(
-                'File sementara Excel tidak dapat ditulis.'
+                'Tidak dapat membuka file Excel sementara untuk ditulis.'
             );
         }
 
-        $startingLevel = ob_get_level();
-        $failedToWrite = false;
-        $streamError = null;
+        $initialBufferLevel = ob_get_level();
+
+        $writeError = false;
+        $generationError = null;
 
         ob_start(
-            static function (string $chunk) use (
+            static function (string $buffer) use (
                 $file,
-                &$failedToWrite
+                &$writeError
             ): string {
-                $length = strlen($chunk);
+                $length = strlen($buffer);
                 $offset = 0;
 
                 while ($offset < $length) {
                     $written = @fwrite(
                         $file,
-                        substr($chunk, $offset)
+                        substr($buffer, $offset)
                     );
 
-                    if ($written === false || $written === 0) {
-                        $failedToWrite = true;
+                    if (
+                        $written === false ||
+                        $written === 0
+                    ) {
+                        $writeError = true;
                         break;
                     }
 
@@ -155,48 +208,82 @@ class VerifiedDashboardExcelService extends DashboardExcelService
         try {
             $response->sendContent();
         } catch (Throwable $error) {
-            $streamError = $error;
+            $generationError = $error;
         } finally {
-            while (ob_get_level() > $startingLevel) {
+            /*
+            | Lepaskan semua buffer yang mungkin
+            | dibuka selama proses pembuatan Excel.
+            */
+
+            while (
+                ob_get_level() >
+                $initialBufferLevel
+            ) {
                 ob_end_flush();
             }
 
+            fflush($file);
             fclose($file);
         }
 
-        if ($streamError !== null) {
-            throw $streamError;
+        if ($generationError !== null) {
+            throw $generationError;
         }
 
-        if ($failedToWrite) {
+        if ($writeError) {
             throw new RuntimeException(
-                'Penyimpanan sementara Excel tidak selesai.'
+                'Penulisan file Excel sementara tidak selesai.'
             );
         }
     }
 
-    /**
-     * Memeriksa XLSX sebagai ZIP dan memastikan komponen utama
-     * workbook tersedia, termasuk minimal satu worksheet.
-     */
-    private function validateXlsx(string $path): void
-    {
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDASI FILE XLSX
+    |--------------------------------------------------------------------------
+    |
+    | Pemeriksaan:
+    |
+    | 1. File benar-benar tersedia.
+    | 2. Ukuran tidak kosong.
+    | 3. Header merupakan ZIP.
+    | 4. Struktur ZIP tidak rusak.
+    | 5. Komponen Excel tersedia.
+    | 6. Workbook dapat dibaca oleh PhpSpreadsheet.
+    |
+    */
+
+    private function verifyXlsx(
+        string $path
+    ): void {
         clearstatcache(true, $path);
 
+        /*
+        |--------------------------------------------------------------------------
+        | CEK FILE
+        |--------------------------------------------------------------------------
+        */
+
         if (
-            !is_file($path)
-            || (filesize($path) ?: 0) < 200
+            !is_file($path) ||
+            (filesize($path) ?: 0) < 200
         ) {
             throw new RuntimeException(
-                'Ukuran file Excel kosong atau tidak wajar.'
+                'Hasil export kosong atau terlalu kecil.'
             );
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | CEK HEADER ZIP
+        |--------------------------------------------------------------------------
+        */
 
         $handle = @fopen($path, 'rb');
 
         if ($handle === false) {
             throw new RuntimeException(
-                'File Excel sementara tidak bisa dibaca.'
+                'File export tidak dapat diperiksa.'
             );
         }
 
@@ -208,84 +295,66 @@ class VerifiedDashboardExcelService extends DashboardExcelService
 
         if ($magic !== "PK\x03\x04") {
             throw new RuntimeException(
-                'Header file bukan XLSX/ZIP. '
-                . 'Periksa kemungkinan output PHP atau error yang tercetak.'
+                'Isi file bukan XLSX/ZIP. Ada kemungkinan output error PHP tercetak.'
             );
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | CEK EKSTENSI ZIP
+        |--------------------------------------------------------------------------
+        */
 
         if (!class_exists(ZipArchive::class)) {
             throw new RuntimeException(
-                'Ekstensi PHP ZIP belum diaktifkan.'
+                'Ekstensi ZIP PHP belum tersedia.'
             );
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | CEK INTEGRITAS ZIP
+        |--------------------------------------------------------------------------
+        */
 
         $zip = new ZipArchive();
-        $status = $zip->open($path, ZipArchive::CHECKCONS);
 
-        if ($status !== true) {
+        $result = $zip->open(
+            $path,
+            ZipArchive::CHECKCONS
+        );
+
+        if ($result !== true) {
             throw new RuntimeException(
-                'Arsip ZIP XLSX gagal diuji integritasnya. '
-                . 'Kode error ZIP: ' . $status
+                'File ZIP Excel tidak lengkap atau rusak. Kode: ' .
+                $result
             );
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | CEK STRUKTUR WORKBOOK
+        |--------------------------------------------------------------------------
+        */
+
         try {
-            foreach ([
-                '[Content_Types].xml',
-                '_rels/.rels',
-                'xl/workbook.xml',
-                'xl/_rels/workbook.xml.rels',
-            ] as $required) {
-                if ($zip->locateName($required) === false) {
-                    throw new RuntimeException(
-                        'Komponen XLSX tidak ada: ' . $required
-                    );
-                }
-            }
-
-            $hasSheet = false;
-
-            for ($i = 0; $i < $zip->numFiles; $i++) {
-                $entry = $zip->getNameIndex($i);
-
+            foreach (
+                [
+                    '[Content_Types].xml',
+                    '_rels/.rels',
+                    'xl/workbook.xml',
+                    'xl/_rels/workbook.xml.rels',
+                    'xl/worksheets/sheet1.xml',
+                ] as $required
+            ) {
                 if (
-                    is_string($entry)
-                    && preg_match(
-                        '~^xl/worksheets/sheet[0-9]+\.xml$~',
-                        $entry
-                    )
+                    $zip->locateName(
+                        $required
+                    ) === false
                 ) {
-                    $hasSheet = true;
-                    break;
-                }
-            }
-
-            if (!$hasSheet) {
-                throw new RuntimeException(
-                    'Tidak ditemukan worksheet Excel.'
-                );
-            }
-
-            // Workbook XML kecil; validasi well-formed jika DOM aktif.
-            if (class_exists(\DOMDocument::class)) {
-                $workbookXml = $zip->getFromName(
-                    'xl/workbook.xml'
-                );
-
-                if ($workbookXml === false) {
                     throw new RuntimeException(
-                        'Workbook XML tidak dapat dibaca.'
-                    );
-                }
-
-                $xml = new \DOMDocument();
-
-                if (!@$xml->loadXML(
-                    $workbookXml,
-                    LIBXML_NONET
-                )) {
-                    throw new RuntimeException(
-                        'Workbook XML tidak valid.'
+                        'Komponen Excel tidak ditemukan: ' .
+                        $required
                     );
                 }
             }
@@ -293,20 +362,50 @@ class VerifiedDashboardExcelService extends DashboardExcelService
             $zip->close();
         }
 
-        // Verifikasi terakhir dengan pembaca XLSX asli PhpSpreadsheet.
-        // ZIP yang valid belum tentu berisi worksheet/XML Excel yang valid.
+        /*
+        |--------------------------------------------------------------------------
+        | UJI BACA ULANG DENGAN PHPSPREADSHEET
+        |--------------------------------------------------------------------------
+        |
+        | ZIP yang valid belum tentu merupakan
+        | workbook Excel yang dapat dibuka.
+        |
+        | Karena itu, workbook dibaca kembali
+        | sebelum file dikirim ke user.
+        |
+        */
+
+        $workbook = null;
+
         try {
-            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader('Xlsx');
+            $reader = IOFactory::createReader('Xlsx');
+
             $reader->setReadDataOnly(true);
+
             $workbook = $reader->load($path);
-            $workbook->disconnectWorksheets();
-            unset($workbook);
+
+            if (
+                $workbook->getSheetCount() < 1
+            ) {
+                throw new RuntimeException(
+                    'Workbook Excel tidak memiliki worksheet.'
+                );
+            }
         } catch (Throwable $error) {
             throw new RuntimeException(
-                'File XLSX gagal dibuka kembali oleh PhpSpreadsheet: '
-                . $error->getMessage(),
+                'Workbook tidak dapat dibaca kembali: ' .
+                $error->getMessage(),
                 0,
                 $error
+            );
+        } finally {
+            if ($workbook !== null) {
+                $workbook->disconnectWorksheets();
+            }
+
+            unset(
+                $workbook,
+                $reader
             );
         }
     }
