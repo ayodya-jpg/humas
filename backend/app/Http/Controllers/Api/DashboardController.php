@@ -16,7 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class DashboardController extends Controller
 {
@@ -152,7 +152,7 @@ class DashboardController extends Controller
     public function export(
         Request $request,
         DashboardExcelService $excelService
-    ): StreamedResponse {
+    ): Response {
         $filters =
             $this->validateFilters(
                 $request

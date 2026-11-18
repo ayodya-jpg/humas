@@ -11,7 +11,7 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class DashboardExcelService
 {
@@ -44,7 +44,7 @@ class DashboardExcelService
         array $summary,
         array $filters,
         array $report = []
-    ): StreamedResponse {
+    ): Response {
         $spreadsheet =
             new Spreadsheet();
 

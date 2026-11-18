@@ -507,6 +507,85 @@ const getDownloadFilename = (
     return fallbackFilename;
 };
 
+/**
+ * Cegah file HTML/JSON atau unduhan ZIP terpotong disimpan sebagai .xlsx.
+ * XLSX wajib memiliki ZIP local header dan end-of-central-directory record.
+ */
+const validateExcelBlob = async (blob) => {
+    if (!(blob instanceof Blob) || blob.size < 200) {
+        throw new Error(
+            'File Excel dari server kosong atau tidak lengkap. Periksa log Laravel.'
+        );
+    }
+
+    const head = new Uint8Array(
+        await blob.slice(0, 4).arrayBuffer()
+    );
+
+    const isZip =
+        head[0] === 0x50 &&
+        head[1] === 0x4b &&
+        head[2] === 0x03 &&
+        head[3] === 0x04;
+
+    if (!isZip) {
+        const preview = await blob.slice(0, 2048).text();
+
+        try {
+            const data = JSON.parse(preview);
+
+            throw new Error(
+                data?.message ||
+                'Server mengembalikan JSON, bukan Excel. Periksa export dashboard.'
+            );
+        } catch (error) {
+            if (
+                error instanceof SyntaxError
+            ) {
+                throw new Error(
+                    'Respons server bukan file Excel (XLSX). ' +
+                    'Periksa backend, status HTTP dan log Laravel. ' +
+                    'Tidak ada file rusak yang diunduh.'
+                );
+            }
+            throw error;
+        }
+    }
+
+    // Arsip ZIP/XLSX normal diakhiri End of Central Directory (PK 05 06).
+    const tail = new Uint8Array(
+        await blob.slice(
+            Math.max(0, blob.size - 65557)
+        ).arrayBuffer()
+    );
+
+    let hasEndRecord = false;
+
+    for (let i = tail.length - 22; i >= 0; i--) {
+        if (
+            tail[i] === 0x50 &&
+            tail[i + 1] === 0x4b &&
+            tail[i + 2] === 0x05 &&
+            tail[i + 3] === 0x06
+        ) {
+            const commentLength =
+                tail[i + 20] + tail[i + 21] * 256;
+
+            if (i + 22 + commentLength === tail.length) {
+                hasEndRecord = true;
+                break;
+            }
+        }
+    }
+
+    if (!hasEndRecord) {
+        throw new Error(
+            'File XLSX terpotong atau tidak lengkap saat diunduh. ' +
+            'Silakan periksa koneksi dan log backend. File tidak disimpan.'
+        );
+    }
+};
+
 const getBlobErrorMessage =
     async (
         error,
@@ -1111,6 +1190,8 @@ export default function Dashboard() {
                         }
                     );
 
+                await validateExcelBlob(blob);
+
                 const blobUrl =
                     window.URL
                         .createObjectURL(
@@ -1150,10 +1231,10 @@ export default function Dashboard() {
 
                 link.remove();
 
-                window.URL
-                    .revokeObjectURL(
-                        blobUrl
-                    );
+                // Jangan cabut object URL sebelum browser memulai download.
+                window.setTimeout(() => {
+                    window.URL.revokeObjectURL(blobUrl);
+                }, 60000);
             } catch (
                 error
             ) {
