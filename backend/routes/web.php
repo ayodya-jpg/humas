@@ -1,4 +1,3 @@
-
 <?php
 
 use Illuminate\Support\Facades\Route;
@@ -8,11 +7,14 @@ use Illuminate\Support\Facades\Route;
 | Web Routes
 |--------------------------------------------------------------------------
 |
-| Route halaman utama Laravel.
+| Route utama aplikasi Laravel HUMAS & SEKPiM.
 |
-| Konversi WebP ke PDF tidak digunakan.
-| Seluruh API HUMAS & SEKPiM tetap berada
-| pada routes/api.php.
+| Tidak menggunakan konversi WebP ke PDF.
+| Seluruh endpoint API tetap berada di routes/api.php.
+|
+| PENTING:
+| Jangan menambahkan spasi, baris kosong, atau BOM
+| sebelum tag pembuka PHP.
 |
 */
 
