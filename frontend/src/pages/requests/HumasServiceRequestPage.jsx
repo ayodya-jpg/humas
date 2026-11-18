@@ -778,7 +778,7 @@ export default function HumasServiceRequestPage() {
 
                 showWarningAlert(
                     'Ukuran File Terlalu Besar',
-                    'Ukuran lampiran maksimal 10 MB.'
+                    'Ukuran lampiran maksimal 5 MB.'
                 );
 
                 return;
@@ -1940,7 +1940,7 @@ export default function HumasServiceRequestPage() {
                                         </p>
 
                                         <p className="small text-muted mb-0">
-                                            PDF, DOC, DOCX, JPG, JPEG, atau PNG. Maksimal 10 MB.
+                                            PDF, DOC, DOCX, JPG, JPEG, atau PNG. Maksimal 5 MB.
                                         </p>
 
                                         <input

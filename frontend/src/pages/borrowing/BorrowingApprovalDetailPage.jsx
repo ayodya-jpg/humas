@@ -396,7 +396,7 @@ const validateEvidenceFile =
                     false,
 
                 message:
-                    'Ukuran file maksimal 10 MB.',
+                    'Ukuran file maksimal 5 MB.',
             };
         }
 
@@ -2619,7 +2619,7 @@ export default function BorrowingApprovalDetailPage() {
                                                         />
 
                                                         <div className="form-text">
-                                                            PDF, JPG, JPEG atau PNG. Maksimal 10 MB.
+                                                            PDF, JPG, JPEG atau PNG. Maksimal 5 MB.
                                                         </div>
 
                                                         <SelectedFileCard
@@ -2710,7 +2710,7 @@ export default function BorrowingApprovalDetailPage() {
                                                         />
 
                                                         <div className="form-text">
-                                                            PDF, JPG, JPEG atau PNG. Maksimal 10 MB.
+                                                            PDF, JPG, JPEG atau PNG. Maksimal 5 MB.
                                                         </div>
 
                                                         <SelectedFileCard
@@ -2822,7 +2822,7 @@ export default function BorrowingApprovalDetailPage() {
                                                         />
 
                                                         <div className="form-text">
-                                                            PDF, JPG, JPEG atau PNG. Maksimal 10 MB.
+                                                            PDF, JPG, JPEG atau PNG. Maksimal 5 MB.
                                                         </div>
 
                                                         <SelectedFileCard

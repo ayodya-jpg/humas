@@ -1,8 +1,10 @@
+
 <?php
 
 use App\Http\Controllers\Api\DashboardDirectorateController;
 use App\Http\Controllers\Api\NotificationReadController;
 use App\Http\Middleware\ForceJsonResponse;
+use App\Http\Middleware\LimitUploadFileSize;
 use App\Http\Middleware\PermissionMiddleware;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Auth\AuthenticationException;
@@ -48,7 +50,7 @@ return Application::configure(
 
                     /*
                     |--------------------------------------------------------------------------
-                    | REKAP DIREKTORAT DI DASHBOARD EXISTING
+                    | REKAP DIREKTORAT DI DASHBOARD
                     |--------------------------------------------------------------------------
                     */
 
@@ -61,18 +63,49 @@ return Application::configure(
     )
     ->withMiddleware(
         function (Middleware $middleware): void {
+
+            /*
+            |--------------------------------------------------------------------------
+            | MIDDLEWARE API
+            |--------------------------------------------------------------------------
+            |
+            | ForceJsonResponse:
+            | Semua endpoint API menggunakan JSON.
+            |
+            | LimitUploadFileSize:
+            | Semua file upload maksimal 5 MB per file.
+            |
+            | Aturan berlaku untuk seluruh layanan:
+            | HUMAS, SEKPiM, Merchandise, dan Direktorat.
+            |
+            */
+
             $middleware->prependToGroup('api', [
                 ForceJsonResponse::class,
+                LimitUploadFileSize::class,
             ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | ROLE & PERMISSION
+            |--------------------------------------------------------------------------
+            */
 
             $middleware->alias([
                 'role' => RoleMiddleware::class,
+
                 'permission' => PermissionMiddleware::class,
             ]);
         }
     )
     ->withExceptions(
         function (Exceptions $exceptions): void {
+
+            /*
+            |--------------------------------------------------------------------------
+            | AUTHENTICATION ERROR
+            |--------------------------------------------------------------------------
+            */
 
             $exceptions->render(
                 function (
@@ -85,12 +118,20 @@ return Application::configure(
 
                     return response()->json([
                         'success' => false,
+
                         'message' =>
                             'Unauthenticated. Silakan login terlebih dahulu.',
+
                         'data' => null,
                     ], 401);
                 }
             );
+
+            /*
+            |--------------------------------------------------------------------------
+            | HTTP ERROR
+            |--------------------------------------------------------------------------
+            */
 
             $exceptions->render(
                 function (
@@ -127,11 +168,19 @@ return Application::configure(
 
                     return response()->json([
                         'success' => false,
+
                         'message' => $message,
+
                         'data' => null,
                     ], $statusCode);
                 }
             );
+
+            /*
+            |--------------------------------------------------------------------------
+            | SERVER ERROR
+            |--------------------------------------------------------------------------
+            */
 
             $exceptions->render(
                 function (
@@ -169,8 +218,10 @@ return Application::configure(
 
                     return response()->json([
                         'success' => false,
+
                         'message' =>
                             'Terjadi kesalahan pada server.',
+
                         'data' => $data,
                     ], 500);
                 }
