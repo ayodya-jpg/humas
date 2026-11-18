@@ -292,5 +292,22 @@ class VerifiedDashboardExcelService extends DashboardExcelService
         } finally {
             $zip->close();
         }
+
+        // Verifikasi terakhir dengan pembaca XLSX asli PhpSpreadsheet.
+        // ZIP yang valid belum tentu berisi worksheet/XML Excel yang valid.
+        try {
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader('Xlsx');
+            $reader->setReadDataOnly(true);
+            $workbook = $reader->load($path);
+            $workbook->disconnectWorksheets();
+            unset($workbook);
+        } catch (Throwable $error) {
+            throw new RuntimeException(
+                'File XLSX gagal dibuka kembali oleh PhpSpreadsheet: '
+                . $error->getMessage(),
+                0,
+                $error
+            );
+        }
     }
 }
