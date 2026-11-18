@@ -1,0 +1,1797 @@
+import {
+    useCallback,
+    useEffect,
+    useId,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
+
+import { createPortal } from 'react-dom';
+
+import api from '../api/axios';
+
+/*
+|--------------------------------------------------------------------------
+| KONFIGURASI
+|--------------------------------------------------------------------------
+*/
+
+const SWIPE_THRESHOLD = 45;
+
+/*
+|--------------------------------------------------------------------------
+| NORMALISASI URL GAMBAR
+|--------------------------------------------------------------------------
+*/
+
+function resolveImageUrl(value) {
+    if (
+        typeof value !== 'string' ||
+        !value.trim()
+    ) {
+        return '';
+    }
+
+    const source = value.trim();
+
+    if (/^https?:\/\//i.test(source)) {
+        return source;
+    }
+
+    if (/^(data:|blob:|javascript:|\/\/)/i.test(source)) {
+        return '';
+    }
+
+    try {
+        const apiBase = new URL(
+            api.defaults.baseURL || '/api',
+            window.location.origin
+        );
+
+        let path = source;
+
+        if (path.startsWith('/')) {
+            return new URL(
+                path,
+                apiBase.origin
+            ).href;
+        }
+
+        if (
+            path.startsWith('storage/') ||
+            path.startsWith('uploads/')
+        ) {
+            return new URL(
+                `/${path}`,
+                apiBase.origin
+            ).href;
+        }
+
+        if (
+            path.startsWith('products/') ||
+            path.startsWith('product-images/')
+        ) {
+            return new URL(
+                `/storage/${path}`,
+                apiBase.origin
+            ).href;
+        }
+
+        return new URL(
+            `/${path}`,
+            apiBase.origin
+        ).href;
+    } catch {
+        return '';
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| MENGUMPULKAN FOTO PRODUK
+|--------------------------------------------------------------------------
+*/
+
+function getProductImages(product) {
+    if (!product) {
+        return [];
+    }
+
+    let gallery = product.gallery_images;
+
+    if (typeof gallery === 'string') {
+        try {
+            gallery = JSON.parse(gallery);
+        } catch {
+            gallery = [];
+        }
+    }
+
+    if (!Array.isArray(gallery)) {
+        gallery = [];
+    }
+
+    const images = [
+        product.image,
+        ...gallery,
+    ];
+
+    return [
+        ...new Set(
+            images
+                .map(resolveImageUrl)
+                .filter(Boolean)
+        ),
+    ];
+}
+
+/*
+|--------------------------------------------------------------------------
+| FORMAT STOK
+|--------------------------------------------------------------------------
+*/
+
+function normalizeStock(value) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return 0;
+    }
+
+    return Math.max(
+        0,
+        number
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| ELEMEN YANG BISA MENERIMA FOKUS
+|--------------------------------------------------------------------------
+*/
+
+function getFocusableElements(container) {
+    if (!container) {
+        return [];
+    }
+
+    return Array.from(
+        container.querySelectorAll(
+            'button:not([disabled]), ' +
+            'a[href], ' +
+            'input:not([disabled]), ' +
+            'select:not([disabled]), ' +
+            'textarea:not([disabled]), ' +
+            '[tabindex]:not([tabindex="-1"])'
+        )
+    ).filter(
+        (element) =>
+            element.getClientRects().length > 0
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| PRODUCT DETAIL MODAL
+|--------------------------------------------------------------------------
+|
+| Digunakan oleh:
+|
+| - Merchandise HUMAS
+| - Peminjaman Barang SEKPiM
+| - Request Aset SEKPiM
+| - Data Produk Admin
+|
+| Props:
+|
+| open        : boolean
+| product     : object
+| onClose     : function
+| serviceName : string
+| onAddToCart : function (optional)
+|
+*/
+
+export default function ProductDetailModal({
+    open = false,
+    product = null,
+    onClose,
+    serviceName = '',
+    onAddToCart,
+}) {
+    const titleId = useId();
+
+    const modalRef = useRef(null);
+    const lightboxRef = useRef(null);
+    const zoomButtonRef = useRef(null);
+
+    const closeRef = useRef(onClose);
+    const touchStartRef = useRef(null);
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATE
+    |--------------------------------------------------------------------------
+    */
+
+    const [activeIndex, setActiveIndex] = useState(0);
+
+    const [zoomOpen, setZoomOpen] = useState(false);
+
+    const [failedImages, setFailedImages] = useState([]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUK DAN FOTO
+    |--------------------------------------------------------------------------
+    */
+
+    const images = useMemo(
+        () => getProductImages(product),
+        [product]
+    );
+
+    const imageCount = images.length;
+
+    const currentIndex =
+        imageCount > 0
+            ? Math.min(
+                  activeIndex,
+                  imageCount - 1
+              )
+            : 0;
+
+    const currentImage =
+        images[currentIndex] || '';
+
+    const imageFailed =
+        failedImages.includes(currentImage);
+
+    /*
+    |--------------------------------------------------------------------------
+    | DETAIL PRODUK
+    |--------------------------------------------------------------------------
+    */
+
+    const productName =
+        product?.name ||
+        'Detail Barang';
+
+    const categoryName =
+        product?.category?.name ||
+        product?.category_name ||
+        'Belum Dikategorikan';
+
+    const description =
+        typeof product?.description === 'string' &&
+        product.description.trim()
+            ? product.description.trim()
+            : 'Belum ada deskripsi barang yang ditambahkan admin.';
+
+    const stock = normalizeStock(
+        product?.stock
+    );
+
+    const hasStock = stock > 0;
+
+    /*
+    |--------------------------------------------------------------------------
+    | CALLBACK TUTUP
+    |--------------------------------------------------------------------------
+    */
+
+    useEffect(() => {
+        closeRef.current = onClose;
+    }, [onClose]);
+
+    const closeModal = useCallback(() => {
+        closeRef.current?.();
+    }, []);
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESET KETIKA PRODUK BERUBAH
+    |--------------------------------------------------------------------------
+    */
+
+    useEffect(() => {
+        setActiveIndex(0);
+        setZoomOpen(false);
+        setFailedImages([]);
+    }, [
+        product?.id,
+        open,
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | NAVIGASI FOTO
+    |--------------------------------------------------------------------------
+    */
+
+    const nextImage = useCallback(() => {
+        if (imageCount <= 1) {
+            return;
+        }
+
+        setActiveIndex(
+            (previous) =>
+                (previous + 1) % imageCount
+        );
+    }, [imageCount]);
+
+    const previousImage = useCallback(() => {
+        if (imageCount <= 1) {
+            return;
+        }
+
+        setActiveIndex(
+            (previous) =>
+                (
+                    previous - 1 + imageCount
+                ) % imageCount
+        );
+    }, [imageCount]);
+
+    const selectImage = (index) => {
+        if (
+            index >= 0 &&
+            index < imageCount
+        ) {
+            setActiveIndex(index);
+        }
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | GAMBAR GAGAL DIMUAT
+    |--------------------------------------------------------------------------
+    */
+
+    const handleImageError = useCallback((url) => {
+        setFailedImages((previous) => {
+            if (previous.includes(url)) {
+                return previous;
+            }
+
+            return [
+                ...previous,
+                url,
+            ];
+        });
+    }, []);
+
+    /*
+    |--------------------------------------------------------------------------
+    | SWIPE FOTO DI HP
+    |--------------------------------------------------------------------------
+    */
+
+    const handleTouchStart = (event) => {
+        touchStartRef.current =
+            event.touches[0]?.clientX ?? null;
+    };
+
+    const handleTouchEnd = (event) => {
+        const startX =
+            touchStartRef.current;
+
+        const endX =
+            event.changedTouches[0]?.clientX;
+
+        touchStartRef.current = null;
+
+        if (
+            startX === null ||
+            typeof endX !== 'number' ||
+            imageCount <= 1
+        ) {
+            return;
+        }
+
+        const difference = endX - startX;
+
+        if (
+            Math.abs(difference) <
+            SWIPE_THRESHOLD
+        ) {
+            return;
+        }
+
+        if (difference < 0) {
+            nextImage();
+        } else {
+            previousImage();
+        }
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | KUNCI SCROLL SAAT MODAL TERBUKA
+    |--------------------------------------------------------------------------
+    */
+
+    useEffect(() => {
+        if (!open || !product) {
+            return undefined;
+        }
+
+        const previousOverflow =
+            document.body.style.overflow;
+
+        const previousFocus =
+            document.activeElement;
+
+        document.body.style.overflow =
+            'hidden';
+
+        const frame = requestAnimationFrame(
+            () => {
+                modalRef.current?.focus();
+            }
+        );
+
+        return () => {
+            cancelAnimationFrame(frame);
+
+            document.body.style.overflow =
+                previousOverflow;
+
+            if (
+                previousFocus &&
+                typeof previousFocus.focus === 'function'
+            ) {
+                previousFocus.focus();
+            }
+        };
+    }, [
+        open,
+        product?.id,
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | FOKUS SAAT MEMBUKA FOTO BESAR
+    |--------------------------------------------------------------------------
+    */
+
+    useEffect(() => {
+        if (!open || !zoomOpen) {
+            return undefined;
+        }
+
+        const frame = requestAnimationFrame(
+            () => {
+                lightboxRef.current?.focus();
+            }
+        );
+
+        return () => {
+            cancelAnimationFrame(frame);
+
+            if (modalRef.current) {
+                zoomButtonRef.current?.focus();
+            }
+        };
+    }, [
+        open,
+        zoomOpen,
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | KONTROL KEYBOARD
+    |--------------------------------------------------------------------------
+    |
+    | Escape     : Menutup foto besar / modal
+    | ArrowLeft  : Foto sebelumnya
+    | ArrowRight : Foto berikutnya
+    | Tab        : Fokus tetap di modal
+    |
+    */
+
+    useEffect(() => {
+        if (!open || !product) {
+            return undefined;
+        }
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+
+                if (zoomOpen) {
+                    setZoomOpen(false);
+                } else {
+                    closeModal();
+                }
+
+                return;
+            }
+
+            if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                nextImage();
+                return;
+            }
+
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                previousImage();
+                return;
+            }
+
+            if (event.key !== 'Tab') {
+                return;
+            }
+
+            const container = zoomOpen
+                ? lightboxRef.current
+                : modalRef.current;
+
+            if (!container) {
+                return;
+            }
+
+            const elements =
+                getFocusableElements(container);
+
+            if (elements.length === 0) {
+                event.preventDefault();
+                container.focus();
+                return;
+            }
+
+            const first = elements[0];
+            const last = elements[elements.length - 1];
+
+            const focused =
+                document.activeElement;
+
+            if (
+                event.shiftKey &&
+                (
+                    focused === first ||
+                    focused === container ||
+                    !container.contains(focused)
+                )
+            ) {
+                event.preventDefault();
+                last.focus();
+            } else if (
+                !event.shiftKey &&
+                (
+                    focused === last ||
+                    focused === container ||
+                    !container.contains(focused)
+                )
+            ) {
+                event.preventDefault();
+                first.focus();
+            }
+        };
+
+        document.addEventListener(
+            'keydown',
+            handleKeyDown
+        );
+
+        return () => {
+            document.removeEventListener(
+                'keydown',
+                handleKeyDown
+            );
+        };
+    }, [
+        open,
+        product,
+        zoomOpen,
+        closeModal,
+        nextImage,
+        previousImage,
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | RENDER GAMBAR
+    |--------------------------------------------------------------------------
+    */
+
+    const renderImage = (large = false) => {
+        if (
+            !currentImage ||
+            imageFailed
+        ) {
+            return (
+                <div className="pdm-empty-image">
+                    <i className="bi bi-image" />
+
+                    <strong>
+                        Foto Tidak Tersedia
+                    </strong>
+
+                    <span>
+                        Belum ada foto untuk barang ini.
+                    </span>
+                </div>
+            );
+        }
+
+        return (
+            <img
+                key={currentImage}
+                src={currentImage}
+                alt={`${productName} - foto ${currentIndex + 1}`}
+                className={
+                    large
+                        ? 'pdm-lightbox-image'
+                        : 'pdm-main-photo'
+                }
+                draggable={false}
+                onError={() =>
+                    handleImageError(
+                        currentImage
+                    )
+                }
+            />
+        );
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | RENDER MODAL
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        !open ||
+        !product ||
+        typeof document === 'undefined'
+    ) {
+        return null;
+    }
+
+    return createPortal(
+        <>
+            {/* BACKDROP */}
+
+            <div
+                className="pdm-overlay"
+                onMouseDown={(event) => {
+                    if (
+                        event.target ===
+                        event.currentTarget
+                    ) {
+                        closeModal();
+                    }
+                }}
+            >
+                {/* MODAL */}
+
+                <section
+                    ref={modalRef}
+                    className="pdm-dialog"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby={titleId}
+                    aria-hidden={zoomOpen ? true : undefined}
+                    tabIndex={-1}
+                >
+                    {/* HEADER */}
+
+                    <header className="pdm-header">
+                        <div className="pdm-header-content">
+                            <span className="pdm-eyebrow">
+                                <i className="bi bi-box-seam me-2" />
+
+                                DETAIL BARANG
+                            </span>
+
+                            <h2
+                                id={titleId}
+                                className="pdm-header-title"
+                            >
+                                {productName}
+                            </h2>
+
+                            {serviceName && (
+                                <span className="pdm-service-badge">
+                                    {serviceName}
+                                </span>
+                            )}
+                        </div>
+
+                        <button
+                            type="button"
+                            className="pdm-close-button"
+                            onClick={closeModal}
+                            aria-label="Tutup detail barang"
+                            title="Tutup"
+                        >
+                            <i className="bi bi-x-lg" />
+                        </button>
+                    </header>
+
+                    {/* BODY */}
+
+                    <div className="pdm-body">
+                        <div className="pdm-grid">
+                            {/* GALERI */}
+
+                            <div className="pdm-gallery-column">
+                                {/* FOTO UTAMA */}
+
+                                <div
+                                    className="pdm-image-stage"
+                                    onTouchStart={
+                                        handleTouchStart
+                                    }
+                                    onTouchEnd={
+                                        handleTouchEnd
+                                    }
+                                >
+                                    {renderImage()}
+
+                                    {/* TOMBOL ZOOM */}
+
+                                    {currentImage &&
+                                        !imageFailed && (
+                                            <button
+                                                ref={zoomButtonRef}
+                                                type="button"
+                                                className="pdm-zoom-button"
+                                                onClick={() =>
+                                                    setZoomOpen(true)
+                                                }
+                                                aria-label="Perbesar foto"
+                                                title="Perbesar foto"
+                                            >
+                                                <i className="bi bi-arrows-fullscreen" />
+
+                                                <span>
+                                                    Perbesar
+                                                </span>
+                                            </button>
+                                        )}
+
+                                    {/* NAVIGASI */}
+
+                                    {imageCount > 1 && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                className="pdm-arrow pdm-arrow-left"
+                                                onClick={
+                                                    previousImage
+                                                }
+                                                aria-label="Foto sebelumnya"
+                                            >
+                                                <i className="bi bi-chevron-left" />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                className="pdm-arrow pdm-arrow-right"
+                                                onClick={
+                                                    nextImage
+                                                }
+                                                aria-label="Foto berikutnya"
+                                            >
+                                                <i className="bi bi-chevron-right" />
+                                            </button>
+                                        </>
+                                    )}
+
+                                    {/* COUNTER */}
+
+                                    {imageCount > 0 && (
+                                        <span className="pdm-counter">
+                                            <i className="bi bi-images" />
+
+                                            {currentIndex + 1}
+                                            {' / '}
+                                            {imageCount}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* THUMBNAIL */}
+
+                                {imageCount > 1 && (
+                                    <div className="pdm-thumbnails">
+                                        {images.map(
+                                            (url, index) => (
+                                                <button
+                                                    key={url}
+                                                    type="button"
+                                                    className={`pdm-thumbnail ${
+                                                        currentIndex === index
+                                                            ? 'active'
+                                                            : ''
+                                                    }`}
+                                                    onClick={() =>
+                                                        selectImage(index)
+                                                    }
+                                                    aria-label={`Tampilkan foto ${index + 1}`}
+                                                    aria-pressed={
+                                                        currentIndex === index
+                                                    }
+                                                >
+                                                    {failedImages.includes(url) ? (
+                                                        <i className="bi bi-image" />
+                                                    ) : (
+                                                        <img
+                                                            src={url}
+                                                            alt=""
+                                                            loading="lazy"
+                                                            onError={() =>
+                                                                handleImageError(url)
+                                                            }
+                                                        />
+                                                    )}
+                                                </button>
+                                            )
+                                        )}
+                                    </div>
+                                )}
+
+                                <p className="pdm-gallery-help">
+                                    <i className="bi bi-hand-index-thumb me-2" />
+
+                                    {imageCount > 1
+                                        ? 'Geser foto atau gunakan tombol panah untuk melihat gambar lainnya.'
+                                        : 'Foto barang dikelola oleh admin.'}
+                                </p>
+                            </div>
+
+                            {/* DETAIL PRODUK */}
+
+                            <div className="pdm-detail-column">
+                                {/* KATEGORI DAN STATUS */}
+
+                                <div className="pdm-badges">
+                                    <span className="pdm-category">
+                                        <i className="bi bi-tag" />
+
+                                        {categoryName}
+                                    </span>
+
+                                    <span
+                                        className={`pdm-status ${
+                                            hasStock
+                                                ? 'available'
+                                                : 'empty'
+                                        }`}
+                                    >
+                                        <i
+                                            className={`bi ${
+                                                hasStock
+                                                    ? 'bi-check-circle-fill'
+                                                    : 'bi-exclamation-circle-fill'
+                                            }`}
+                                        />
+
+                                        {hasStock
+                                            ? 'Stok Tersedia'
+                                            : 'Stok Habis'}
+                                    </span>
+                                </div>
+
+                                {/* NAMA */}
+
+                                <h3 className="pdm-product-name">
+                                    {productName}
+                                </h3>
+
+                                {/* STOK */}
+
+                                <div className="pdm-stock-card">
+                                    <div className="pdm-stock-icon">
+                                        <i className="bi bi-boxes" />
+                                    </div>
+
+                                    <div>
+                                        <span className="pdm-stock-label">
+                                            Stok Barang
+                                        </span>
+
+                                        <div className="pdm-stock-value">
+                                            {stock.toLocaleString('id-ID')}
+
+                                            <small>
+                                                unit
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* DESKRIPSI */}
+
+                                <div className="pdm-description-section">
+                                    <h4>
+                                        <i className="bi bi-card-text" />
+
+                                        Deskripsi Barang
+                                    </h4>
+
+                                    <p>
+                                        {description}
+                                    </p>
+                                </div>
+
+                                {/* INFORMASI */}
+
+                                <div className="pdm-info-box">
+                                    <i className="bi bi-info-circle" />
+
+                                    <span>
+                                        Informasi barang dan gambar
+                                        dikelola oleh admin.
+                                        Ketersediaan akhir mengikuti
+                                        proses pengajuan serta
+                                        persetujuan layanan.
+                                    </span>
+                                </div>
+
+                                {/* TOMBOL */}
+
+                                <div className="pdm-actions">
+                                    {typeof onAddToCart ===
+                                        'function' && (
+                                        <button
+                                            type="button"
+                                            className="pdm-add-button"
+                                            disabled={!hasStock}
+                                            onClick={() =>
+                                                onAddToCart(product)
+                                            }
+                                        >
+                                            <i className="bi bi-cart-plus-fill" />
+
+                                            {hasStock
+                                                ? 'Tambah ke Keranjang'
+                                                : 'Stok Tidak Tersedia'}
+                                        </button>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        className="pdm-back-button"
+                                        onClick={closeModal}
+                                    >
+                                        {typeof onAddToCart ===
+                                        'function'
+                                            ? 'Kembali'
+                                            : 'Tutup Detail'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            {/* LIGHTBOX / FOTO BESAR */}
+
+            {zoomOpen && (
+                <div
+                    className="pdm-lightbox-overlay"
+                    onMouseDown={(event) => {
+                        if (
+                            event.target ===
+                            event.currentTarget
+                        ) {
+                            setZoomOpen(false);
+                        }
+                    }}
+                >
+                    <section
+                        ref={lightboxRef}
+                        className="pdm-lightbox"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Foto besar ${productName}`}
+                        tabIndex={-1}
+                    >
+                        {/* HEADER LIGHTBOX */}
+
+                        <div className="pdm-lightbox-header">
+                            <span>
+                                <i className="bi bi-images me-2" />
+
+                                {currentIndex + 1}
+                                {' / '}
+                                {imageCount}
+                            </span>
+
+                            <strong>
+                                {productName}
+                            </strong>
+
+                            <button
+                                type="button"
+                                className="pdm-lightbox-close"
+                                onClick={() =>
+                                    setZoomOpen(false)
+                                }
+                                aria-label="Tutup foto besar"
+                            >
+                                <i className="bi bi-x-lg" />
+                            </button>
+                        </div>
+
+                        {/* GAMBAR LIGHTBOX */}
+
+                        <div
+                            className="pdm-lightbox-stage"
+                            onTouchStart={
+                                handleTouchStart
+                            }
+                            onTouchEnd={
+                                handleTouchEnd
+                            }
+                        >
+                            {renderImage(true)}
+
+                            {imageCount > 1 && (
+                                <>
+                                    <button
+                                        type="button"
+                                        className="pdm-arrow pdm-arrow-left"
+                                        onClick={
+                                            previousImage
+                                        }
+                                        aria-label="Foto sebelumnya"
+                                    >
+                                        <i className="bi bi-chevron-left" />
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className="pdm-arrow pdm-arrow-right"
+                                        onClick={
+                                            nextImage
+                                        }
+                                        aria-label="Foto berikutnya"
+                                    >
+                                        <i className="bi bi-chevron-right" />
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
+                        {/* INDIKATOR FOTO */}
+
+                        {imageCount > 1 && (
+                            <div className="pdm-lightbox-dots">
+                                {images.map(
+                                    (url, index) => (
+                                        <button
+                                            key={url}
+                                            type="button"
+                                            className={
+                                                currentIndex === index
+                                                    ? 'active'
+                                                    : ''
+                                            }
+                                            onClick={() =>
+                                                selectImage(index)
+                                            }
+                                            aria-label={`Foto ${index + 1}`}
+                                            aria-pressed={
+                                                currentIndex === index
+                                            }
+                                        />
+                                    )
+                                )}
+                            </div>
+                        )}
+                    </section>
+                </div>
+            )}
+
+            {/* CSS */}
+
+            <style>{`
+                .pdm-overlay {
+                    position: fixed;
+                    inset: 0;
+                    z-index: 2100;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 24px;
+                    background: rgba(15, 23, 42, .7);
+                    backdrop-filter: blur(7px);
+                    -webkit-backdrop-filter: blur(7px);
+                }
+
+                .pdm-dialog {
+                    width: 100%;
+                    max-width: 1080px;
+                    max-height: min(92dvh, 900px);
+                    display: flex;
+                    flex-direction: column;
+                    background: #ffffff;
+                    border-radius: 24px;
+                    overflow: hidden;
+                    box-shadow:
+                        0 25px 80px rgba(15,23,42,.28);
+                    outline: none;
+                    animation: pdmShow .2s ease;
+                }
+
+                .pdm-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 20px;
+                    padding: 22px 28px;
+                    color: #ffffff;
+                    background:
+                        linear-gradient(
+                            115deg,
+                            #0f172a,
+                            #1e293b
+                        );
+                    flex-shrink: 0;
+                }
+
+                .pdm-header-content {
+                    min-width: 0;
+                }
+
+                .pdm-eyebrow {
+                    color: #a7f3d0;
+                    font-size: 11px;
+                    font-weight: 800;
+                    letter-spacing: 1.3px;
+                }
+
+                .pdm-header-title {
+                    font-size: 21px;
+                    font-weight: 800;
+                    line-height: 1.35;
+                    margin: 9px 0 0;
+                    overflow-wrap: anywhere;
+                }
+
+                .pdm-service-badge {
+                    display: inline-block;
+                    margin-top: 10px;
+                    padding: 5px 11px;
+                    border-radius: 99px;
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: #dcfce7;
+                    background: rgba(16,185,129,.2);
+                    border: 1px solid rgba(167,243,208,.2);
+                }
+
+                .pdm-close-button,
+                .pdm-lightbox-close {
+                    display: grid;
+                    place-items: center;
+                    width: 40px;
+                    height: 40px;
+                    flex-shrink: 0;
+                    border: 1px solid rgba(255,255,255,.2);
+                    background: rgba(255,255,255,.12);
+                    color: #ffffff;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    transition: .2s;
+                }
+
+                .pdm-close-button:hover,
+                .pdm-lightbox-close:hover {
+                    background: rgba(255,255,255,.25);
+                }
+
+                .pdm-body {
+                    padding: 28px;
+                    overflow-y: auto;
+                    overscroll-behavior: contain;
+                }
+
+                .pdm-grid {
+                    display: grid;
+                    grid-template-columns:
+                        minmax(0,1.05fr)
+                        minmax(0,.95fr);
+                    gap: 30px;
+                    align-items: start;
+                }
+
+                .pdm-gallery-column,
+                .pdm-detail-column {
+                    min-width: 0;
+                }
+
+                .pdm-image-stage {
+                    position: relative;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 100%;
+                    height: 390px;
+                    max-height: 46vh;
+                    background: linear-gradient(
+                        135deg,
+                        #f8fafc,
+                        #e2e8f0
+                    );
+                    border: 1px solid #e2e8f0;
+                    border-radius: 20px;
+                    overflow: hidden;
+                    touch-action: pan-y;
+                    user-select: none;
+                }
+
+                .pdm-main-photo {
+                    display: block;
+                    width: 100%;
+                    height: 100%;
+                    padding: 15px;
+                    object-fit: contain;
+                }
+
+                .pdm-empty-image {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
+                    padding: 20px;
+                    color: #64748b;
+                    text-align: center;
+                }
+
+                .pdm-empty-image i {
+                    font-size: 45px;
+                    color: #94a3b8;
+                }
+
+                .pdm-empty-image strong {
+                    color: #475569;
+                    font-size: 15px;
+                }
+
+                .pdm-empty-image span {
+                    font-size: 12px;
+                }
+
+                .pdm-zoom-button {
+                    position: absolute;
+                    top: 12px;
+                    right: 12px;
+                    display: flex;
+                    align-items: center;
+                    gap: 7px;
+                    padding: 8px 12px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 99px;
+                    background: rgba(255,255,255,.96);
+                    color: #334155;
+                    font-size: 12px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    z-index: 2;
+                }
+
+                .pdm-zoom-button:hover {
+                    background: #ecfdf5;
+                    color: #047857;
+                }
+
+                .pdm-arrow {
+                    position: absolute;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    display: grid;
+                    place-items: center;
+                    width: 42px;
+                    height: 42px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 50%;
+                    background: rgba(255,255,255,.95);
+                    color: #0f172a;
+                    cursor: pointer;
+                    z-index: 2;
+                    box-shadow:
+                        0 4px 12px rgba(15,23,42,.14);
+                    transition: .2s;
+                }
+
+                .pdm-arrow:hover {
+                    background: #0f172a;
+                    color: #ffffff;
+                }
+
+                .pdm-arrow-left {
+                    left: 12px;
+                }
+
+                .pdm-arrow-right {
+                    right: 12px;
+                }
+
+                .pdm-counter {
+                    position: absolute;
+                    bottom: 13px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    display: flex;
+                    align-items: center;
+                    gap: 7px;
+                    padding: 7px 14px;
+                    border-radius: 99px;
+                    background: rgba(15,23,42,.8);
+                    color: #ffffff;
+                    font-size: 12px;
+                    font-weight: 700;
+                    white-space: nowrap;
+                }
+
+                .pdm-thumbnails {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 13px 2px 7px;
+                    overflow-x: auto;
+                    scrollbar-width: thin;
+                }
+
+                .pdm-thumbnail {
+                    display: grid;
+                    place-items: center;
+                    width: 72px;
+                    height: 72px;
+                    min-width: 72px;
+                    padding: 4px;
+                    border: 2px solid #e2e8f0;
+                    border-radius: 12px;
+                    background: #f8fafc;
+                    color: #94a3b8;
+                    font-size: 23px;
+                    cursor: pointer;
+                    overflow: hidden;
+                }
+
+                .pdm-thumbnail img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                    border-radius: 7px;
+                }
+
+                .pdm-thumbnail:hover {
+                    border-color: #64748b;
+                }
+
+                .pdm-thumbnail.active {
+                    border-color: #059669;
+                    box-shadow:
+                        0 0 0 2px rgba(5,150,105,.12);
+                }
+
+                .pdm-gallery-help {
+                    margin: 10px 0 0;
+                    font-size: 12px;
+                    color: #64748b;
+                    line-height: 1.6;
+                    text-align: center;
+                }
+
+                .pdm-badges {
+                    display: flex;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: 9px;
+                    margin-bottom: 15px;
+                }
+
+                .pdm-category,
+                .pdm-status {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 7px;
+                    padding: 7px 12px;
+                    font-size: 11px;
+                    font-weight: 700;
+                    border-radius: 99px;
+                }
+
+                .pdm-category {
+                    color: #334155;
+                    background: #f1f5f9;
+                    border: 1px solid #e2e8f0;
+                }
+
+                .pdm-status.available {
+                    color: #047857;
+                    background: #ecfdf5;
+                    border: 1px solid #a7f3d0;
+                }
+
+                .pdm-status.empty {
+                    color: #b91c1c;
+                    background: #fef2f2;
+                    border: 1px solid #fecaca;
+                }
+
+                .pdm-product-name {
+                    margin: 0 0 21px;
+                    color: #0f172a;
+                    font-size: clamp(21px,2.2vw,29px);
+                    font-weight: 850;
+                    line-height: 1.35;
+                    overflow-wrap: anywhere;
+                }
+
+                .pdm-stock-card {
+                    display: flex;
+                    align-items: center;
+                    gap: 16px;
+                    padding: 18px;
+                    margin-bottom: 24px;
+                    border-radius: 17px;
+                    background: #f0fdf4;
+                    border: 1px solid #d1fae5;
+                }
+
+                .pdm-stock-icon {
+                    display: grid;
+                    place-items: center;
+                    width: 52px;
+                    height: 52px;
+                    flex-shrink: 0;
+                    border-radius: 14px;
+                    background: #d1fae5;
+                    color: #047857;
+                    font-size: 25px;
+                }
+
+                .pdm-stock-label {
+                    color: #64748b;
+                    font-size: 12px;
+                    font-weight: 650;
+                }
+
+                .pdm-stock-value {
+                    display: flex;
+                    align-items: baseline;
+                    gap: 7px;
+                    margin-top: 3px;
+                    font-size: 30px;
+                    font-weight: 850;
+                    line-height: 1;
+                    color: #047857;
+                }
+
+                .pdm-stock-value small {
+                    color: #64748b;
+                    font-size: 13px;
+                    font-weight: 600;
+                }
+
+                .pdm-description-section {
+                    margin-bottom: 22px;
+                }
+
+                .pdm-description-section h4 {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin: 0 0 12px;
+                    color: #0f172a;
+                    font-size: 16px;
+                    font-weight: 800;
+                }
+
+                .pdm-description-section h4 i {
+                    color: #059669;
+                }
+
+                .pdm-description-section p {
+                    margin: 0;
+                    color: #475569;
+                    font-size: 14px;
+                    line-height: 1.85;
+                    white-space: pre-wrap;
+                    overflow-wrap: anywhere;
+                    max-height: 300px;
+                    overflow-y: auto;
+                }
+
+                .pdm-info-box {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 10px;
+                    padding: 14px;
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 14px;
+                    color: #64748b;
+                    font-size: 12px;
+                    line-height: 1.7;
+                }
+
+                .pdm-info-box i {
+                    color: #0284c7;
+                    font-size: 16px;
+                    flex-shrink: 0;
+                }
+
+                .pdm-actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    margin-top: 25px;
+                }
+
+                .pdm-add-button,
+                .pdm-back-button {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 9px;
+                    padding: 12px 20px;
+                    border-radius: 99px;
+                    font-size: 13px;
+                    font-weight: 800;
+                    cursor: pointer;
+                    transition: .2s;
+                }
+
+                .pdm-add-button {
+                    flex: 1;
+                    min-width: 175px;
+                    border: 1px solid #059669;
+                    background: #059669;
+                    color: #ffffff;
+                }
+
+                .pdm-add-button:hover:not(:disabled) {
+                    background: #047857;
+                }
+
+                .pdm-add-button:disabled {
+                    background: #94a3b8;
+                    border-color: #94a3b8;
+                    cursor: not-allowed;
+                }
+
+                .pdm-back-button {
+                    border: 1px solid #cbd5e1;
+                    background: #ffffff;
+                    color: #334155;
+                }
+
+                .pdm-back-button:hover {
+                    background: #f1f5f9;
+                }
+
+                /* LIGHTBOX */
+
+                .pdm-lightbox-overlay {
+                    position: fixed;
+                    inset: 0;
+                    z-index: 2200;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    padding: 16px;
+                    background: rgba(2,6,23,.96);
+                }
+
+                .pdm-lightbox {
+                    display: flex;
+                    flex-direction: column;
+                    width: 100%;
+                    max-width: 1450px;
+                    height: 100%;
+                    outline: none;
+                }
+
+                .pdm-lightbox-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 15px;
+                    padding: 8px 3px 13px;
+                    color: #ffffff;
+                    font-size: 13px;
+                    font-weight: 750;
+                }
+
+                .pdm-lightbox-header strong {
+                    min-width: 0;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    color: #cbd5e1;
+                }
+
+                .pdm-lightbox-close {
+                    flex-shrink: 0;
+                }
+
+                .pdm-lightbox-stage {
+                    position: relative;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    flex: 1;
+                    min-height: 0;
+                    touch-action: pan-y;
+                }
+
+                .pdm-lightbox-image {
+                    display: block;
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                }
+
+                .pdm-lightbox-dots {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    padding: 17px 0 8px;
+                }
+
+                .pdm-lightbox-dots button {
+                    width: 8px;
+                    height: 8px;
+                    padding: 0;
+                    border: 0;
+                    border-radius: 50%;
+                    background: #64748b;
+                    cursor: pointer;
+                }
+
+                .pdm-lightbox-dots button.active {
+                    width: 23px;
+                    border-radius: 8px;
+                    background: #34d399;
+                }
+
+                .pdm-dialog button:focus-visible,
+                .pdm-lightbox button:focus-visible {
+                    outline: 3px solid #6ee7b7;
+                    outline-offset: 3px;
+                }
+
+                @keyframes pdmShow {
+                    from {
+                        opacity: 0;
+                        transform: translateY(12px) scale(.98);
+                    }
+
+                    to {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
+
+                @media (max-width: 850px) {
+                    .pdm-overlay {
+                        padding: 15px;
+                    }
+
+                    .pdm-dialog {
+                        max-height: 94dvh;
+                        border-radius: 20px;
+                    }
+
+                    .pdm-body {
+                        padding: 20px;
+                    }
+
+                    .pdm-grid {
+                        grid-template-columns: 1fr;
+                        gap: 24px;
+                    }
+
+                    .pdm-image-stage {
+                        height: 340px;
+                        max-height: none;
+                    }
+
+                    .pdm-description-section p {
+                        max-height: none;
+                    }
+                }
+
+                @media (max-width: 576px) {
+                    .pdm-overlay {
+                        padding: 0;
+                        align-items: stretch;
+                    }
+
+                    .pdm-dialog {
+                        width: 100%;
+                        height: 100dvh;
+                        max-height: 100dvh;
+                        border-radius: 0;
+                    }
+
+                    .pdm-header {
+                        padding: 18px;
+                    }
+
+                    .pdm-header-title {
+                        font-size: 17px;
+                    }
+
+                    .pdm-body {
+                        padding: 16px;
+                    }
+
+                    .pdm-grid {
+                        gap: 20px;
+                    }
+
+                    .pdm-image-stage {
+                        height: min(75vw,320px);
+                        border-radius: 16px;
+                    }
+
+                    .pdm-arrow {
+                        width: 35px;
+                        height: 35px;
+                    }
+
+                    .pdm-thumbnail {
+                        width: 60px;
+                        height: 60px;
+                        min-width: 60px;
+                        border-radius: 10px;
+                    }
+
+                    .pdm-product-name {
+                        font-size: 23px;
+                    }
+
+                    .pdm-actions {
+                        flex-direction: column;
+                    }
+
+                    .pdm-add-button,
+                    .pdm-back-button {
+                        width: 100%;
+                        min-width: 0;
+                    }
+
+                    .pdm-lightbox-overlay {
+                        padding: 9px;
+                    }
+
+                    .pdm-lightbox-header strong {
+                        max-width: 45vw;
+                    }
+
+                    .pdm-zoom-button span {
+                        display: none;
+                    }
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                    .pdm-dialog {
+                        animation: none;
+                    }
+
+                    .pdm-main-photo,
+                    .pdm-arrow,
+                    .pdm-add-button,
+                    .pdm-back-button {
+                        transition: none;
+                    }
+                }
+            `}</style>
+        </>,
+        document.body
+    );
+}

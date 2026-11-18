@@ -1,4 +1,3 @@
-
 import {
     Navigate,
     Route,
@@ -44,12 +43,12 @@ import MyRequestsPage from './pages/requests/MyRequestsPage';
 import MyRequestDetailPage from './pages/requests/MyRequestDetailPage';
 
 import DirectorSchedulePage from './pages/schedule/DirectorSchedulePage';
+import UserServiceCalendarPage from './pages/schedule/UserServiceCalendarPage';
 import EventScheduleActivityPage from './pages/schedule/EventScheduleActivityPage';
 
 import DirectorateScheduleRequestPage from './pages/requests/DirectorateScheduleRequestPage';
 import DirectorateScheduleApprovalPage from './pages/schedule/DirectorateScheduleApprovalPage';
 
-// BARU: Kalender kegiatan terintegrasi
 import IntegratedCalendarPage from './pages/schedule/IntegratedCalendarPage';
 
 import UnauthorizedPage from './pages/errors/UnauthorizedPage';
@@ -97,9 +96,7 @@ function App() {
             <ScrollToTop />
 
             <Routes>
-                {/* ======================================================
-                    PUBLIC
-                ====================================================== */}
+                {/* PUBLIC */}
 
                 <Route
                     path="/login"
@@ -116,9 +113,7 @@ function App() {
                     element={<RoleRedirect />}
                 />
 
-                {/* ======================================================
-                    USER LAYOUT
-                ====================================================== */}
+                {/* USER LAYOUT */}
 
                 <Route
                     path="/user"
@@ -145,13 +140,13 @@ function App() {
                         }
                     />
 
-                    {/* Kalender Direktorat */}
+                    {/* Kalender semua layanan untuk USER */}
 
                     <Route
                         path="director-schedule"
                         element={
                             <ProtectedRoute allowedRoles={USER_ROLES}>
-                                <DirectorSchedulePage />
+                                <UserServiceCalendarPage />
                             </ProtectedRoute>
                         }
                     />
@@ -166,8 +161,6 @@ function App() {
                             </ProtectedRoute>
                         }
                     />
-
-                    {/* Halaman Error */}
 
                     <Route
                         path="unauthorized"
@@ -248,9 +241,7 @@ function App() {
                     />
                 </Route>
 
-                {/* ======================================================
-                    ADMIN LAYOUT
-                ====================================================== */}
+                {/* ADMIN LAYOUT */}
 
                 <Route
                     path="/admin"
@@ -279,7 +270,7 @@ function App() {
                         }
                     />
 
-                    {/* Kalender Direktorat */}
+                    {/* Kalender Direktorat ADMIN */}
 
                     <Route
                         path="director-schedule"
@@ -290,7 +281,7 @@ function App() {
                         }
                     />
 
-                    {/* BARU: Kalender Kegiatan Terintegrasi */}
+                    {/* Kalender Terintegrasi ADMIN */}
 
                     <Route
                         path="integrated-calendar"
@@ -312,7 +303,7 @@ function App() {
                         }
                     />
 
-                    {/* Pengajuan Jadwal Direktorat oleh Admin */}
+                    {/* Pengajuan Jadwal Direktorat */}
 
                     <Route
                         path="request/directorate-schedule"
@@ -335,8 +326,6 @@ function App() {
                             </ProtectedRoute>
                         }
                     />
-
-                    {/* Halaman Error */}
 
                     <Route
                         path="unauthorized"

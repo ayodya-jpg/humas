@@ -62,11 +62,19 @@ class Order extends Model
         'completed_at' => 'datetime',
     ];
 
+    /*
+    |--------------------------------------------------------------------------
+    | URL FILE ASLI
+    |--------------------------------------------------------------------------
+    |
+    | Tidak ada konversi WebP maupun PDF.
+    | File diunduh dalam format aslinya.
+    |
+    */
+
     public function getProofFileUrlAttribute(): ?string
     {
-        if (
-            !$this->proof_file_path
-        ) {
+        if (!$this->proof_file_path) {
             return null;
         }
 
@@ -91,9 +99,6 @@ class Order extends Model
         );
     }
 
-    /**
-     * Seluruh riwayat revisi merchandise.
-     */
     public function revisionHistories(): HasMany
     {
         return $this
@@ -108,9 +113,6 @@ class Order extends Model
             );
     }
 
-    /**
-     * Riwayat revisi paling baru.
-     */
     public function latestRevisionHistory(): HasMany
     {
         return $this
