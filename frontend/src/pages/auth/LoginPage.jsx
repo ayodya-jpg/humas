@@ -870,62 +870,13 @@ export default function LoginPage() {
                                 </form>
 
                                 <div className="p-3 rounded-4 bg-light border">
-                                    <div className="small fw-bold text-muted mb-2">
-                                        Akun Testing
-                                    </div>
-
-                                    <div className="d-flex flex-wrap gap-2">
-                                        <button
-                                            type="button"
-                                            className="btn btn-sm btn-outline-danger rounded-pill"
-                                            onClick={() =>
-                                                fillDemoAccount(
-                                                    'superadmin'
-                                                )
-                                            }
-                                            disabled={
-                                                loading
-                                            }
-                                        >
-                                            Super Admin
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            className="btn btn-sm btn-outline-primary rounded-pill"
-                                            onClick={() =>
-                                                fillDemoAccount(
-                                                    'admin'
-                                                )
-                                            }
-                                            disabled={
-                                                loading
-                                            }
-                                        >
-                                            Admin
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            className="btn btn-sm btn-outline-success rounded-pill"
-                                            onClick={() =>
-                                                fillDemoAccount(
-                                                    'user'
-                                                )
-                                            }
-                                            disabled={
-                                                loading
-                                            }
-                                        >
-                                            User
-                                        </button>
-                                    </div>
+                                    
 
                                     <div className="small text-muted mt-2">
-                                        Password default:{' '}
+                                        Tidak memiliki akun? Hub:{' '}
 
                                         <strong>
-                                            password123
+                                            Contact HUMAS &amp; SEKPiM Telkom University Surabaya
                                         </strong>
                                     </div>
                                 </div>

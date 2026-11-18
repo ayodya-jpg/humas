@@ -10,11 +10,20 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
 class ProductController extends Controller
 {
+    private const MAX_GALLERY_IMAGES = 8;
+
+    /*
+    |--------------------------------------------------------------------------
+    | DAFTAR PRODUK
+    |--------------------------------------------------------------------------
+    */
+
     public function index(): JsonResponse
     {
         return response()->json([
@@ -26,6 +35,12 @@ class ProductController extends Controller
         ]);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | DETAIL PRODUK
+    |--------------------------------------------------------------------------
+    */
+
     public function show(Product $product): JsonResponse
     {
         return response()->json([
@@ -34,6 +49,12 @@ class ProductController extends Controller
             'data' => $product->load('category:id,name,slug,status'),
         ]);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDASI PRODUK
+    |--------------------------------------------------------------------------
+    */
 
     private function rules(?Product $product = null): array
     {
@@ -57,8 +78,7 @@ class ProductController extends Controller
                 'max:255',
                 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
                 $product
-                    ? Rule::unique('products', 'slug')
-                        ->ignore($product->id)
+                    ? Rule::unique('products', 'slug')->ignore($product->id)
                     : Rule::unique('products', 'slug'),
             ],
 
@@ -76,24 +96,19 @@ class ProductController extends Controller
 
             'type' => [
                 'required',
-                Rule::in([
-                    'checkout',
-                    'borrow',
-                    'both',
-                ]),
+                Rule::in(['checkout', 'borrow', 'both']),
             ],
 
             'sekpim_item_type' => [
                 'sometimes',
                 'nullable',
-                Rule::in([
-                    'borrow',
-                    'asset_request',
-                    'both',
-                ]),
+                Rule::in(['borrow', 'asset_request', 'both']),
             ],
 
-            // Gambar diunggah langsung dari perangkat.
+            /*
+            | Foto utama produk
+            */
+
             'image_file' => [
                 'nullable',
                 'file',
@@ -101,35 +116,101 @@ class ProductController extends Controller
                 'max:5120',
             ],
 
-            // Digunakan ketika admin ingin menghapus foto lama.
             'remove_image' => [
                 'sometimes',
                 'boolean',
             ],
 
+            /*
+            | Foto tambahan produk
+            |
+            | Dikirim melalui FormData:
+            | gallery_files[]
+            */
+
+            'gallery_files' => [
+                'sometimes',
+                'array',
+                'max:' . self::MAX_GALLERY_IMAGES,
+            ],
+
+            'gallery_files.*' => [
+                'required',
+                'file',
+                'mimes:jpg,jpeg,png,webp',
+                'max:5120',
+            ],
+
+            /*
+            | URL foto galeri yang ingin dihapus.
+            |
+            | Dikirim melalui FormData:
+            | remove_gallery_images[]
+            */
+
+            'remove_gallery_images' => [
+                'sometimes',
+                'array',
+                'max:' . self::MAX_GALLERY_IMAGES,
+            ],
+
+            'remove_gallery_images.*' => [
+                'required',
+                'string',
+                'max:2048',
+                'distinct',
+            ],
+
             'status' => [
                 'required',
-                Rule::in([
-                    'active',
-                    'inactive',
-                ]),
+                Rule::in(['active', 'inactive']),
             ],
         ];
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PESAN VALIDASI
+    |--------------------------------------------------------------------------
+    */
 
     private function messages(): array
     {
         return [
             'image_file.mimes' =>
-                'Gambar harus berupa JPG, JPEG, PNG, atau WEBP.',
+                'Foto utama harus JPG, JPEG, PNG, atau WEBP.',
 
             'image_file.max' =>
-                'Ukuran gambar maksimal 5 MB.',
+                'Ukuran foto utama maksimal 5 MB.',
 
             'image_file.file' =>
-                'Berkas gambar tidak valid.',
+                'Berkas foto utama tidak valid.',
+
+            'gallery_files.array' =>
+                'Foto tambahan harus dikirim sebagai daftar file.',
+
+            'gallery_files.max' =>
+                'Maksimal 8 foto tambahan untuk setiap produk.',
+
+            'gallery_files.*.file' =>
+                'Salah satu foto tambahan bukan berkas yang valid.',
+
+            'gallery_files.*.mimes' =>
+                'Foto tambahan harus JPG, JPEG, PNG, atau WEBP.',
+
+            'gallery_files.*.max' =>
+                'Ukuran setiap foto tambahan maksimal 5 MB.',
+
+            'remove_gallery_images.array' =>
+                'Daftar foto yang dihapus tidak valid.',
         ];
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DATA PRODUK
+    |--------------------------------------------------------------------------
+    */
 
     private function productData(
         array $data,
@@ -137,10 +218,7 @@ class ProductController extends Controller
     ): array {
         $type = $data['type'];
 
-        $sekpimType = array_key_exists(
-            'sekpim_item_type',
-            $data
-        )
+        $sekpimType = array_key_exists('sekpim_item_type', $data)
             ? $data['sekpim_item_type']
             : $product?->sekpim_item_type;
 
@@ -171,12 +249,13 @@ class ProductController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | UPLOAD FOTO PRODUK
+    | UPLOAD GAMBAR
     |--------------------------------------------------------------------------
     |
-    | Semua produk menggunakan disk public Laravel.
-    | Folder: storage/app/public/products
+    | Semua gambar disimpan pada:
+    | storage/app/public/products
     |
+    | Foto utama dan galeri menggunakan disk public Laravel.
     */
 
     private function uploadImage(Request $request): ?string
@@ -192,7 +271,7 @@ class ProductController extends Controller
 
         if (!$path) {
             throw new RuntimeException(
-                'Gagal menyimpan gambar produk.'
+                'Gagal menyimpan foto utama produk.'
             );
         }
 
@@ -201,12 +280,145 @@ class ProductController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | UPLOAD FOTO TAMBAHAN
+    |--------------------------------------------------------------------------
+    |
+    | $uploadedPaths menyimpan daftar file baru.
+    | File baru dibersihkan jika transaksi database gagal.
+    */
+
+    private function uploadGalleryImages(
+        Request $request,
+        array &$uploadedPaths
+    ): array {
+        $urls = [];
+
+        foreach ($request->file('gallery_files', []) as $file) {
+            $path = $file->store(
+                'products',
+                'public'
+            );
+
+            if (!$path) {
+                throw new RuntimeException(
+                    'Gagal menyimpan salah satu foto tambahan.'
+                );
+            }
+
+            $uploadedPaths[] = $path;
+
+            $urls[] = Storage::disk('public')->url(
+                $path
+            );
+        }
+
+        return $urls;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AMBIL FOTO GALERI LAMA
+    |--------------------------------------------------------------------------
+    */
+
+    private function galleryImages(Product $product): array
+    {
+        $images = $product->gallery_images;
+
+        if (!is_array($images)) {
+            return [];
+        }
+
+        return array_values(
+            array_unique(
+                array_filter(
+                    $images,
+                    fn ($url) =>
+                        is_string($url) &&
+                        trim($url) !== ''
+                )
+            )
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDASI JUMLAH FOTO GALERI
+    |--------------------------------------------------------------------------
+    |
+    | Maksimal 8 foto tambahan dalam kondisi akhir.
+    |
+    | Contoh:
+    | - Foto lama: 5
+    | - Dihapus: 2
+    | - Ditambah: 3
+    | - Hasil akhir: 6 foto
+    |
+    | URL yang dihapus harus termasuk milik produk tersebut.
+    */
+
+    private function prepareGallery(
+        Request $request,
+        array $existingImages = []
+    ): array {
+        $removeUrls = $request->input(
+            'remove_gallery_images',
+            []
+        );
+
+        $removeUrls = is_array($removeUrls)
+            ? $removeUrls
+            : [];
+
+        $unknownUrls = array_diff(
+            $removeUrls,
+            $existingImages
+        );
+
+        if (!empty($unknownUrls)) {
+            throw ValidationException::withMessages([
+                'remove_gallery_images' =>
+                    'Foto yang hendak dihapus tidak ditemukan pada produk ini.',
+            ]);
+        }
+
+        $remaining = array_values(
+            array_filter(
+                $existingImages,
+                fn ($url) =>
+                    !in_array($url, $removeUrls, true)
+            )
+        );
+
+        $newFiles = $request->file(
+            'gallery_files',
+            []
+        );
+
+        $newCount = is_array($newFiles)
+            ? count($newFiles)
+            : 0;
+
+        if (
+            count($remaining) + $newCount >
+            self::MAX_GALLERY_IMAGES
+        ) {
+            throw ValidationException::withMessages([
+                'gallery_files' =>
+                    'Total foto tambahan maksimal 8. Hapus beberapa foto lama sebelum menambahkan foto baru.',
+            ]);
+        }
+
+        return $remaining;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | IDENTIFIKASI FOTO LOKAL
     |--------------------------------------------------------------------------
     |
-    | File eksternal milik produk lama tidak boleh dihapus.
-    | Hanya file pada storage/products yang dapat dibersihkan.
-    |
+    | Gambar dari URL eksternal tidak boleh ikut dihapus.
+    | Hanya file /storage/products/... yang bisa dibersihkan.
     */
 
     private function localImagePath(?string $image): ?string
@@ -215,7 +427,10 @@ class ProductController extends Controller
             return null;
         }
 
-        $host = parse_url($image, PHP_URL_HOST);
+        $host = parse_url(
+            $image,
+            PHP_URL_HOST
+        );
 
         $appHost = parse_url(
             config('app.url'),
@@ -251,6 +466,71 @@ class ProductController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | BERSIHKAN FILE BARU JIKA GAGAL
+    |--------------------------------------------------------------------------
+    */
+
+    private function deleteUploadedFiles(array $paths): void
+    {
+        foreach (array_unique($paths) as $path) {
+            try {
+                Storage::disk('public')->delete(
+                    $path
+                );
+            } catch (Throwable $error) {
+                report($error);
+            }
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HAPUS FILE YANG SUDAH TIDAK DIGUNAKAN
+    |--------------------------------------------------------------------------
+    |
+    | File hanya dihapus jika URL tersebut tidak lagi
+    | dipakai sebagai foto utama ataupun foto galeri.
+    */
+
+    private function deleteRemovedImages(
+        array $oldUrls,
+        array $retainedUrls
+    ): void {
+        $retainedPaths = array_values(
+            array_filter(
+                array_map(
+                    fn ($url) =>
+                        $this->localImagePath($url),
+                    $retainedUrls
+                )
+            )
+        );
+
+        $deletedPaths = [];
+
+        foreach ($oldUrls as $url) {
+            $path = $this->localImagePath(
+                $url
+            );
+
+            if (
+                !$path ||
+                in_array($path, $retainedPaths, true) ||
+                in_array($path, $deletedPaths, true)
+            ) {
+                continue;
+            }
+
+            $deletedPaths[] = $path;
+        }
+
+        $this->deleteUploadedFiles(
+            $deletedPaths
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | TAMBAH PRODUK
     |--------------------------------------------------------------------------
     */
@@ -262,54 +542,84 @@ class ProductController extends Controller
             $this->messages()
         );
 
+        $this->prepareGallery($request);
+
         $slug = $this->uniqueSlug(
             $validated['slug'] ?? $validated['name']
         );
 
-        $newImagePath = null;
+        $uploadedPaths = [];
 
         try {
-            $newImagePath = $this->uploadImage($request);
+            /*
+            | Upload foto utama.
+            */
+
+            $mainPath = $this->uploadImage(
+                $request
+            );
+
+            if ($mainPath) {
+                $uploadedPaths[] = $mainPath;
+            }
+
+            /*
+            | Upload foto galeri.
+            */
+
+            $galleryUrls = $this->uploadGalleryImages(
+                $request,
+                $uploadedPaths
+            );
+
+            $mainUrl = $mainPath
+                ? Storage::disk('public')->url($mainPath)
+                : null;
+
+            /*
+            | Simpan data ke database.
+            */
 
             $product = DB::transaction(
                 function () use (
                     $validated,
                     $slug,
-                    $newImagePath
+                    $mainUrl,
+                    $galleryUrls
                 ): Product {
                     return Product::create([
                         ...$this->productData($validated),
 
-                        'image' => $newImagePath
-                            ? Storage::disk('public')->url(
-                                $newImagePath
-                            )
-                            : null,
-
                         'slug' => $slug,
+
+                        'image' => $mainUrl,
+
+                        'gallery_images' => $galleryUrls,
                     ]);
                 }
             );
 
             return response()->json([
                 'success' => true,
-                'message' => 'Produk berhasil ditambahkan.',
+
+                'message' =>
+                    'Produk berhasil ditambahkan.',
+
                 'data' => $product->load(
                     'category:id,name,slug,status'
                 ),
             ], 201);
         } catch (Throwable $error) {
-            if ($newImagePath) {
-                Storage::disk('public')->delete(
-                    $newImagePath
-                );
-            }
+            $this->deleteUploadedFiles(
+                $uploadedPaths
+            );
 
             report($error);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Produk gagal ditambahkan.',
+                'message' =>
+                    'Produk gagal ditambahkan.',
                 'data' => null,
             ], 500);
         }
@@ -320,10 +630,10 @@ class ProductController extends Controller
     | EDIT PRODUK
     |--------------------------------------------------------------------------
     |
-    | 1. Ada foto baru   => ganti foto lama.
-    | 2. remove_image=1  => hapus foto.
-    | 3. Tidak keduanya  => pertahankan foto lama.
+    | Foto utama dan galeri dikelola secara terpisah.
     |
+    | Foto lama tetap dipertahankan jika admin
+    | tidak memilih untuk mengganti atau menghapusnya.
     */
 
     public function update(
@@ -335,87 +645,158 @@ class ProductController extends Controller
             $this->messages()
         );
 
+        /*
+        | Ambil foto galeri sebelumnya.
+        */
+
+        $existingGallery = $this->galleryImages(
+            $product
+        );
+
+        /*
+        | Hitung galeri yang akan dipertahankan.
+        */
+
+        $remainingGallery = $this->prepareGallery(
+            $request,
+            $existingGallery
+        );
+
         $slug = !empty($validated['slug'])
             ? Str::slug($validated['slug'])
             : $product->slug;
 
-        $oldImagePath = $this->localImagePath(
-            $product->image
-        );
+        $oldMainUrl = $product->image;
 
-        $newImagePath = null;
-
-        $removeImage = $request->boolean(
+        $removeMainImage = $request->boolean(
             'remove_image'
         );
 
+        $uploadedPaths = [];
+
         try {
-            $newImagePath = $this->uploadImage(
+            /*
+            | Upload foto utama baru jika ada.
+            */
+
+            $newMainPath = $this->uploadImage(
                 $request
             );
+
+            if ($newMainPath) {
+                $uploadedPaths[] = $newMainPath;
+            }
+
+            /*
+            | Tambahkan foto galeri baru.
+            */
+
+            $addedGallery = $this->uploadGalleryImages(
+                $request,
+                $uploadedPaths
+            );
+
+            /*
+            | Gabungkan foto lama yang dipertahankan
+            | dengan foto baru.
+            */
+
+            $finalGallery = array_values(
+                array_merge(
+                    $remainingGallery,
+                    $addedGallery
+                )
+            );
+
+            /*
+            | Foto utama:
+            | - Ada upload baru: gunakan foto baru.
+            | - remove_image=1: kosongkan foto utama.
+            | - Selain itu: pertahankan foto lama.
+            */
+
+            $finalMainUrl = $newMainPath
+                ? Storage::disk('public')->url(
+                    $newMainPath
+                )
+                : (
+                    $removeMainImage
+                        ? null
+                        : $oldMainUrl
+                );
+
+            /*
+            | Perbarui database.
+            */
 
             DB::transaction(
                 function () use (
                     $product,
                     $validated,
                     $slug,
-                    $newImagePath,
-                    $removeImage
+                    $finalMainUrl,
+                    $finalGallery
                 ): void {
-                    $data = [
+                    $product->update([
                         ...$this->productData(
                             $validated,
                             $product
                         ),
 
                         'slug' => $slug,
-                    ];
 
-                    if ($newImagePath) {
-                        $data['image'] = Storage::disk(
-                            'public'
-                        )->url($newImagePath);
-                    } elseif ($removeImage) {
-                        $data['image'] = null;
-                    }
+                        'image' => $finalMainUrl,
 
-                    // Jika tidak ada perubahan gambar,
-                    // foto lama tetap digunakan.
-
-                    $product->update($data);
+                        'gallery_images' => $finalGallery,
+                    ]);
                 }
             );
 
-            // Bersihkan foto lokal lama setelah
-            // penyimpanan database berhasil.
-            if (
-                ($newImagePath || $removeImage) &&
-                $oldImagePath
-            ) {
-                Storage::disk('public')->delete(
-                    $oldImagePath
-                );
-            }
+            /*
+            | Setelah database berhasil diperbarui,
+            | bersihkan file yang tidak lagi digunakan.
+            */
+
+            $this->deleteRemovedImages(
+                array_merge(
+                    [$oldMainUrl],
+                    $existingGallery
+                ),
+
+                array_merge(
+                    [$finalMainUrl],
+                    $finalGallery
+                )
+            );
 
             return response()->json([
                 'success' => true,
-                'message' => 'Produk berhasil diperbarui.',
-                'data' => $product->refresh()->load(
-                    'category:id,name,slug,status'
-                ),
+
+                'message' =>
+                    'Produk berhasil diperbarui.',
+
+                'data' => $product
+                    ->refresh()
+                    ->load(
+                        'category:id,name,slug,status'
+                    ),
             ]);
         } catch (Throwable $error) {
-            if ($newImagePath) {
-                Storage::disk('public')->delete(
-                    $newImagePath
-                );
-            }
+            /*
+            | Jika gagal, hapus file baru saja.
+            | File lama tetap dipertahankan.
+            */
+
+            $this->deleteUploadedFiles(
+                $uploadedPaths
+            );
 
             report($error);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Produk gagal diperbarui.',
+                'message' =>
+                    'Produk gagal diperbarui.',
                 'data' => null,
             ], 500);
         }
@@ -425,39 +806,55 @@ class ProductController extends Controller
     |--------------------------------------------------------------------------
     | HAPUS PRODUK
     |--------------------------------------------------------------------------
+    |
+    | File gambar hanya dibersihkan jika penghapusan
+    | produk pada database berhasil.
     */
 
     public function destroy(Product $product): JsonResponse
     {
-        $oldImagePath = $this->localImagePath(
-            $product->image
+        $allUrls = array_merge(
+            [$product->image],
+            $this->galleryImages($product)
         );
 
         try {
             $product->delete();
-
-            if ($oldImagePath) {
-                Storage::disk('public')->delete(
-                    $oldImagePath
-                );
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Produk berhasil dihapus.',
-                'data' => null,
-            ]);
         } catch (Throwable $error) {
             report($error);
 
             return response()->json([
                 'success' => false,
+
                 'message' =>
                     'Produk gagal dihapus karena masih digunakan dalam pengajuan.',
+
                 'data' => null,
             ], 422);
         }
+
+        /*
+        | Produk sudah terhapus.
+        | Sekarang bersihkan gambar dari storage.
+        */
+
+        $this->deleteRemovedImages(
+            $allUrls,
+            []
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Produk berhasil dihapus.',
+            'data' => null,
+        ]);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | GENERATE SLUG PRODUK
+    |--------------------------------------------------------------------------
+    */
 
     private function uniqueSlug(string $name): string
     {
