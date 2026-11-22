@@ -348,7 +348,7 @@ class HumasServiceRequestController extends Controller
                     'Lampiran harus berformat PDF, DOC, DOCX, JPG, JPEG, atau PNG.',
 
                 'article_draft.max' =>
-                    'Ukuran lampiran maksimal 10 MB.',
+                    'Ukuran lampiran maksimal 5 MB.',
             ]);
 
         /*
@@ -874,7 +874,7 @@ class HumasServiceRequestController extends Controller
                     'File hasil harus berformat PDF, DOC, DOCX, JPG, JPEG, PNG, atau ZIP.',
 
                 'result_file.max' =>
-                    'Ukuran file hasil maksimal 20 MB.',
+                    'Ukuran file hasil maksimal 5 MB.',
             ]);
 
         $resultFilePath =

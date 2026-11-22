@@ -342,7 +342,7 @@ export default function HumasServiceApprovalDetailPage() {
 
             await showErrorAlert(
                 'File Terlalu Besar',
-                'Ukuran file maksimal 20 MB.'
+                'Ukuran file maksimal 5 MB.'
             );
             return;
         }
@@ -831,7 +831,7 @@ export default function HumasServiceApprovalDetailPage() {
 
                                         <div className="form-text mb-3">
                                             PDF, DOC, DOCX, JPG, PNG atau ZIP.
-                                            Maksimal 20 MB.
+                                            Maksimal 5 MB.
                                         </div>
 
                                         {resultFile && (

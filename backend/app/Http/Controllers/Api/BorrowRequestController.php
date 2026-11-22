@@ -951,7 +951,7 @@ class BorrowRequestController extends Controller
                 'Bukti serah terima harus berformat PDF, JPG, JPEG, atau PNG.',
 
             'handover_evidence.max' =>
-                'Ukuran bukti serah terima maksimal 10 MB.',
+                'Ukuran bukti serah terima maksimal 5 MB.',
         ]);
 
         $evidencePath =
@@ -1184,7 +1184,7 @@ class BorrowRequestController extends Controller
                 'Bukti pengembalian harus berformat PDF, JPG, JPEG, atau PNG.',
 
             'return_evidence.max' =>
-                'Ukuran bukti pengembalian maksimal 10 MB.',
+                'Ukuran bukti pengembalian maksimal 5 MB.',
         ]);
 
         $evidencePath =
@@ -1393,7 +1393,7 @@ class BorrowRequestController extends Controller
                 'Bukti penyerahan harus berformat PDF, JPG, JPEG, atau PNG.',
 
             'handover_evidence.max' =>
-                'Ukuran bukti penyerahan maksimal 10 MB.',
+                'Ukuran bukti penyerahan maksimal 5 MB.',
         ]);
 
         $evidencePath =
