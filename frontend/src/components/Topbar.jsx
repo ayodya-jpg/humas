@@ -1,6 +1,10 @@
-
 import { useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+
+import {
+    Link,
+    useLocation,
+    useNavigate,
+} from 'react-router-dom';
 
 import api, {
     clearLocalSession,
@@ -36,6 +40,18 @@ const createPageMap = (basePath) => [
         icon: 'bi-speedometer2',
     },
     {
+        match: (path) => path === `${basePath}/account-security`,
+        title: 'Keamanan Akun',
+        subtitle: 'Kelola pertanyaan dan jawaban pemulihan akun.',
+        icon: 'bi-shield-lock',
+    },
+    {
+        match: (path) => path === '/admin/recovery-requests',
+        title: 'Persetujuan Pemulihan Akun',
+        subtitle: 'Verifikasi identitas dan proses permintaan pemulihan akun.',
+        icon: 'bi-person-check',
+    },
+    {
         match: (path) => path === `${basePath}/request/merchandise`,
         title: 'Pengajuan Merchandise',
         subtitle: 'Pilih paket merchandise dan lengkapi data kegiatan.',
@@ -44,13 +60,13 @@ const createPageMap = (basePath) => [
     {
         match: (path) => path === `${basePath}/request/humas-service`,
         title: 'Request Liputan Humas',
-        subtitle: 'Ajukan kebutuhan liputan, dokumentasi, publikasi, atau video.',
+        subtitle: 'Ajukan kebutuhan liputan dan dokumentasi.',
         icon: 'bi-camera-reels-fill',
     },
     {
         match: (path) => path === `${basePath}/request/sekpim-borrowing`,
         title: 'Peminjaman & Request Aset',
-        subtitle: 'Ajukan peminjaman atau permintaan barang SEKPiM.',
+        subtitle: 'Ajukan peminjaman atau permintaan barang.',
         icon: 'bi-box-seam-fill',
     },
     {
@@ -60,59 +76,57 @@ const createPageMap = (basePath) => [
         icon: 'bi-clock-history',
     },
     {
-        match: (path) =>
-            path.startsWith(`${basePath}/my-requests/`) &&
-            path.endsWith('/detail'),
+        match: (path) => path.startsWith(`${basePath}/my-requests/`),
         title: 'Detail Pengajuan',
-        subtitle: 'Lihat informasi dan perkembangan status pengajuan.',
+        subtitle: 'Lihat perkembangan status pengajuan.',
         icon: 'bi-file-earmark-text-fill',
     },
     {
         match: (path) => path === '/admin/orders',
         title: 'Approval Merchandise',
-        subtitle: 'Periksa dan proses pengajuan merchandise.',
+        subtitle: 'Periksa pengajuan merchandise.',
         icon: 'bi-gift-fill',
     },
     {
         match: (path) => path.startsWith('/admin/orders/'),
         title: 'Detail Merchandise',
-        subtitle: 'Periksa detail pengajuan sebelum memberikan keputusan.',
+        subtitle: 'Detail persetujuan merchandise.',
         icon: 'bi-gift-fill',
     },
     {
         match: (path) => path === '/admin/humas-services',
         title: 'Approval Liputan Humas',
-        subtitle: 'Periksa dan proses request liputan yang masuk.',
+        subtitle: 'Periksa request liputan yang masuk.',
         icon: 'bi-camera-reels-fill',
     },
     {
         match: (path) => path.startsWith('/admin/humas-services/'),
         title: 'Detail Request Liputan',
-        subtitle: 'Periksa informasi kegiatan dan dokumen pendukung.',
+        subtitle: 'Periksa informasi kegiatan.',
         icon: 'bi-camera-reels-fill',
     },
     {
         match: (path) => path === '/admin/borrow-requests',
         title: 'Approval Peminjaman & Request Aset',
-        subtitle: 'Periksa dan proses pengajuan barang SEKPiM.',
+        subtitle: 'Periksa pengajuan barang.',
         icon: 'bi-clipboard-check-fill',
     },
     {
         match: (path) => path.startsWith('/admin/borrow-requests/'),
         title: 'Detail Pengajuan SEKPiM',
-        subtitle: 'Periksa detail barang, persetujuan, dan serah terima.',
+        subtitle: 'Periksa data dan serah terima.',
         icon: 'bi-clipboard-check-fill',
     },
     {
         match: (path) => path === '/admin/categories',
         title: 'Data Kategori',
-        subtitle: 'Kelola kategori merchandise dan perlengkapan.',
+        subtitle: 'Kelola kategori dan perlengkapan.',
         icon: 'bi-tags-fill',
     },
     {
         match: (path) => path === '/admin/categories/create',
         title: 'Tambah Kategori',
-        subtitle: 'Tambahkan kategori baru ke dalam sistem.',
+        subtitle: 'Tambahkan kategori baru.',
         icon: 'bi-plus-circle-fill',
     },
     {
@@ -126,13 +140,13 @@ const createPageMap = (basePath) => [
     {
         match: (path) => path === '/admin/products',
         title: 'Data Produk',
-        subtitle: 'Kelola merchandise, peminjaman, dan request aset.',
+        subtitle: 'Kelola merchandise dan barang.',
         icon: 'bi-boxes',
     },
     {
         match: (path) => path === '/admin/products/create',
         title: 'Tambah Produk',
-        subtitle: 'Tambahkan produk HUMAS atau barang SEKPiM.',
+        subtitle: 'Tambahkan produk baru.',
         icon: 'bi-plus-circle-fill',
     },
     {
@@ -140,19 +154,19 @@ const createPageMap = (basePath) => [
             path.startsWith('/admin/products/') &&
             path.endsWith('/edit'),
         title: 'Edit Produk',
-        subtitle: 'Perbarui informasi produk, layanan, dan stok.',
+        subtitle: 'Perbarui produk.',
         icon: 'bi-pencil-square',
     },
     {
         match: (path) => path === '/admin/users',
         title: 'Data User',
-        subtitle: 'Kelola akun, role, dan hak akses pengguna.',
+        subtitle: 'Kelola akun dan hak akses.',
         icon: 'bi-people-fill',
     },
     {
         match: (path) => path === '/admin/users/create',
         title: 'Tambah User',
-        subtitle: 'Tambahkan akun dan atur hak aksesnya.',
+        subtitle: 'Tambahkan akun.',
         icon: 'bi-person-plus-fill',
     },
     {
@@ -160,7 +174,7 @@ const createPageMap = (basePath) => [
             path.startsWith('/admin/users/') &&
             path.endsWith('/edit'),
         title: 'Edit User',
-        subtitle: 'Perbarui data, role, dan hak akses pengguna.',
+        subtitle: 'Perbarui data user.',
         icon: 'bi-pencil-square',
     },
     {
@@ -168,22 +182,19 @@ const createPageMap = (basePath) => [
             path === '/admin/unauthorized' ||
             path === '/user/unauthorized',
         title: 'Akses Ditolak',
-        subtitle: 'Akun tidak memiliki izin membuka halaman ini.',
+        subtitle: 'Akun tidak memiliki izin.',
         icon: 'bi-shield-lock-fill',
     },
 ];
 
 export default function Topbar({
-    sidebarOpen = false,
     setSidebarOpen = () => {},
-    isSidebarOpen = false,
     setIsSidebarOpen = () => {},
 }) {
     const location = useLocation();
     const navigate = useNavigate();
 
     const currentUser = getStoredUser();
-
     const role = currentUser?.role || 'user';
     const basePath = role === 'user' ? '/user' : '/admin';
 
@@ -192,22 +203,17 @@ export default function Topbar({
         [basePath]
     );
 
-    const pageInfo = useMemo(() => {
-        const found = pageMap.find(
-            (page) => page.match(location.pathname)
-        );
-
-        return found || {
-            title: 'Sistem Layanan',
-            subtitle: 'Kelola kebutuhan HUMAS dan SEKPiM.',
-            icon: 'bi-grid-fill',
-        };
-    }, [pageMap, location.pathname]);
-
-    const openSidebar = () => {
-        setSidebarOpen(true);
-        setIsSidebarOpen(true);
-    };
+    const pageInfo = useMemo(
+        () =>
+            pageMap.find(
+                (page) => page.match(location.pathname)
+            ) || {
+                title: 'Sistem Layanan',
+                subtitle: 'Kelola kebutuhan HUMAS dan SEKPiM.',
+                icon: 'bi-grid-fill',
+            },
+        [pageMap, location.pathname]
+    );
 
     const handleLogout = async () => {
         const confirmation = await showConfirmAlert({
@@ -219,7 +225,9 @@ export default function Topbar({
             confirmButtonColor: '#dc2626',
         });
 
-        if (!confirmation?.isConfirmed) return;
+        if (!confirmation?.isConfirmed) {
+            return;
+        }
 
         try {
             showLoadingAlert(
@@ -236,10 +244,6 @@ export default function Topbar({
                 'Logout Berhasil',
                 'Kamu berhasil keluar dari sistem.'
             );
-
-            navigate('/login', {
-                replace: true,
-            });
         } catch (error) {
             console.error(
                 'Logout error:',
@@ -251,14 +255,13 @@ export default function Topbar({
 
             await showErrorAlert(
                 'Logout Bermasalah',
-                error?.response?.data?.message ||
-                    'Sesi lokal sudah dihapus. Silakan login kembali.'
+                'Sesi lokal sudah dihapus. Silakan login kembali.'
             );
-
-            navigate('/login', {
-                replace: true,
-            });
         }
+
+        navigate('/login', {
+            replace: true,
+        });
     };
 
     return (
@@ -267,7 +270,10 @@ export default function Topbar({
                 <button
                     type="button"
                     className="btn btn-light rounded-circle d-lg-none topbar-menu-button"
-                    onClick={openSidebar}
+                    onClick={() => {
+                        setSidebarOpen(true);
+                        setIsSidebarOpen(true);
+                    }}
                     aria-label="Buka sidebar"
                 >
                     <i className="bi bi-list fs-4" />
@@ -289,7 +295,37 @@ export default function Topbar({
             </div>
 
             <div className="topbar-right">
-                <NotificationCenter currentUser={currentUser} />
+                <NotificationCenter
+                    currentUser={currentUser}
+                />
+
+                <Link
+                    to={`${basePath}/account-security`}
+                    className="btn btn-outline-secondary rounded-pill"
+                    title="Atur pertanyaan keamanan akun"
+                    aria-label="Keamanan akun"
+                >
+                    <i className="bi bi-shield-lock me-lg-2" />
+
+                    <span className="d-none d-xl-inline">
+                        Keamanan Akun
+                    </span>
+                </Link>
+
+                {role === 'superadmin' && (
+                    <Link
+                        to="/admin/recovery-requests"
+                        className="btn btn-outline-danger rounded-pill"
+                        title="Persetujuan pemulihan akun"
+                        aria-label="Persetujuan pemulihan akun"
+                    >
+                        <i className="bi bi-person-check me-lg-2" />
+
+                        <span className="d-none d-xl-inline">
+                            Pemulihan
+                        </span>
+                    </Link>
+                )}
 
                 <div className="topbar-user d-none d-md-flex">
                     <div className="profile-avatar bg-danger text-white">

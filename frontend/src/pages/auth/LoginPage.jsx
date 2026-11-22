@@ -5,6 +5,7 @@ import {
 } from 'react';
 
 import {
+    Link,
     useLocation,
     useNavigate,
 } from 'react-router-dom';
@@ -18,6 +19,7 @@ import {
 } from '../../components/ProtectedRoute';
 
 import PublicDirectorCalendar from '../../components/PublicDirectorCalendar';
+import PasswordRecoveryForm from './PasswordRecoveryForm';
 
 import {
     closeAlert,
@@ -27,471 +29,250 @@ import {
     showWarningAlert,
 } from '../../utils/sweetAlert';
 
-const USER_ROLE =
-    'user';
+const USER_ROLE = 'user';
 
-const isRedirectAllowedForRole =
-    (
-        path,
-        role
-    ) => {
-        if (
-            typeof path !==
-                'string' ||
-            path.trim() ===
-                ''
-        ) {
-            return false;
-        }
+const permissionRoutes = [
+    {
+        prefix: '/user/dashboard',
+        permission: 'dashboard.view',
+    },
+    {
+        prefix: '/admin/dashboard',
+        permission: 'dashboard.view',
+    },
+    {
+        prefix: '/user/request/merchandise',
+        permission: 'request.merchandise.create',
+    },
+    {
+        prefix: '/admin/request/merchandise',
+        permission: 'request.merchandise.create',
+    },
+    {
+        prefix: '/user/request/humas-service',
+        permission: 'request.humas.create',
+    },
+    {
+        prefix: '/admin/request/humas-service',
+        permission: 'request.humas.create',
+    },
+    {
+        prefix: '/user/request/sekpim-borrowing',
+        permission: 'request.borrowing.create',
+    },
+    {
+        prefix: '/admin/request/sekpim-borrowing',
+        permission: 'request.borrowing.create',
+    },
+    {
+        prefix: '/user/my-requests',
+        permission: 'request.history.view',
+    },
+    {
+        prefix: '/admin/my-requests',
+        permission: 'request.history.view',
+    },
+    {
+        prefix: '/admin/orders',
+        permission: 'approval.merchandise.view',
+    },
+    {
+        prefix: '/admin/humas-services',
+        permission: 'approval.humas.view',
+    },
+    {
+        prefix: '/admin/borrow-requests',
+        permission: 'approval.borrowing.view',
+    },
+    {
+        prefix: '/admin/categories',
+        permission: 'categories.view',
+    },
+    {
+        prefix: '/admin/products',
+        permission: 'products.view',
+    },
+    {
+        prefix: '/admin/users',
+        permission: ['users.view', 'users.manage'],
+    },
+];
 
-        if (
-            role ===
-            USER_ROLE
-        ) {
-            return (
-                path ===
-                    '/user' ||
-                path.startsWith(
-                    '/user/'
-                )
-            );
-        }
+const isRedirectAllowedForRole = (path, role) => {
+    if (typeof path !== 'string' || !path.trim()) {
+        return false;
+    }
 
-        return (
-            path ===
-                '/admin' ||
-            path.startsWith(
-                '/admin/'
-            )
-        );
-    };
+    if (role === USER_ROLE) {
+        return path === '/user' || path.startsWith('/user/');
+    }
 
-const canAccessRequestedPath =
-    (
-        path,
-        user
-    ) => {
-        if (
-            !isRedirectAllowedForRole(
-                path,
-                user?.role
-            )
-        ) {
-            return false;
-        }
+    return path === '/admin' || path.startsWith('/admin/');
+};
 
-        /*
-         * Jadwal Direktorat tersedia
-         * untuk seluruh akun login.
-         */
-        if (
-            path ===
-                '/user/director-schedule' ||
-            path.startsWith(
-                '/user/director-schedule/'
-            ) ||
-            path ===
-                '/admin/director-schedule' ||
-            path.startsWith(
-                '/admin/director-schedule/'
-            )
-        ) {
-            return true;
-        }
+const canAccessRequestedPath = (path, user) => {
+    if (!isRedirectAllowedForRole(path, user?.role)) {
+        return false;
+    }
 
-        const permissionRoutes = [
-            {
-                prefix:
-                    '/user/dashboard',
+    if (
+        path === '/user/director-schedule' ||
+        path.startsWith('/user/director-schedule/') ||
+        path === '/admin/director-schedule' ||
+        path.startsWith('/admin/director-schedule/')
+    ) {
+        return true;
+    }
 
-                permission:
-                    'dashboard.view',
-            },
+    const matchedRoute = permissionRoutes.find(
+        (route) =>
+            path === route.prefix ||
+            path.startsWith(`${route.prefix}/`)
+    );
 
-            {
-                prefix:
-                    '/admin/dashboard',
+    if (!matchedRoute) {
+        return false;
+    }
 
-                permission:
-                    'dashboard.view',
-            },
+    return hasPermission(user, matchedRoute.permission);
+};
 
-            {
-                prefix:
-                    '/user/request/merchandise',
-
-                permission:
-                    'request.merchandise.create',
-            },
-
-            {
-                prefix:
-                    '/admin/request/merchandise',
-
-                permission:
-                    'request.merchandise.create',
-            },
-
-            {
-                prefix:
-                    '/user/request/humas-service',
-
-                permission:
-                    'request.humas.create',
-            },
-
-            {
-                prefix:
-                    '/admin/request/humas-service',
-
-                permission:
-                    'request.humas.create',
-            },
-
-            {
-                prefix:
-                    '/user/request/sekpim-borrowing',
-
-                permission:
-                    'request.borrowing.create',
-            },
-
-            {
-                prefix:
-                    '/admin/request/sekpim-borrowing',
-
-                permission:
-                    'request.borrowing.create',
-            },
-
-            {
-                prefix:
-                    '/user/my-requests',
-
-                permission:
-                    'request.history.view',
-            },
-
-            {
-                prefix:
-                    '/admin/my-requests',
-
-                permission:
-                    'request.history.view',
-            },
-
-            {
-                prefix:
-                    '/admin/orders',
-
-                permission:
-                    'approval.merchandise.view',
-            },
-
-            {
-                prefix:
-                    '/admin/humas-services',
-
-                permission:
-                    'approval.humas.view',
-            },
-
-            {
-                prefix:
-                    '/admin/borrow-requests',
-
-                permission:
-                    'approval.borrowing.view',
-            },
-
-            {
-                prefix:
-                    '/admin/categories',
-
-                permission:
-                    'categories.view',
-            },
-
-            {
-                prefix:
-                    '/admin/products',
-
-                permission:
-                    'products.view',
-            },
-
-            {
-                prefix:
-                    '/admin/users',
-
-                permission: [
-                    'users.view',
-                    'users.manage',
-                ],
-            },
-        ];
-
-        const matchedRoute =
-            permissionRoutes.find(
-                (
-                    route
-                ) =>
-                    path ===
-                        route.prefix ||
-                    path.startsWith(
-                        `${route.prefix}/`
-                    )
-            );
-
-        if (
-            !matchedRoute
-        ) {
-            return false;
-        }
-
-        return hasPermission(
-            user,
-            matchedRoute
-                .permission
-        );
-    };
-
-const clearLocalSession =
-    () => {
-        localStorage.removeItem(
-            'admin_token'
-        );
-
-        localStorage.removeItem(
-            'admin_user'
-        );
-    };
+const clearLocalSession = () => {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+};
 
 export default function LoginPage() {
-    const navigate =
-        useNavigate();
+    const navigate = useNavigate();
+    const location = useLocation();
 
-    const location =
-        useLocation();
+    const recoveryMode = ['forgot', 'reset'].includes(
+        new URLSearchParams(location.search).get('mode')
+    );
 
-    const [
-        form,
-        setForm,
-    ] =
-        useState({
-            username:
-                '',
+    const [form, setForm] = useState({
+        username: '',
+        password: '',
+    });
 
-            password:
-                '',
-        });
-
-    const [
-        showPassword,
-        setShowPassword,
-    ] =
-        useState(
-            false
-        );
-
-    const [
-        loading,
-        setLoading,
-    ] =
-        useState(
-            false
-        );
+    const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     /*
     |--------------------------------------------------------------------------
-    | REDIRECT
+    | REDIRECT BERDASARKAN ROLE DAN PERMISSION
     |--------------------------------------------------------------------------
     */
 
-    const getRedirectAfterLogin =
-        useCallback(
-            (
-                user
-            ) => {
-                const requestedPath =
-                    location
-                        .state
-                        ?.from;
+    const getRedirectAfterLogin = useCallback(
+        (user) => {
+            const requestedPath = location.state?.from;
 
-                if (
-                    canAccessRequestedPath(
-                        requestedPath,
-                        user
-                    )
-                ) {
-                    return requestedPath;
-                }
+            if (canAccessRequestedPath(requestedPath, user)) {
+                return requestedPath;
+            }
 
-                return getDefaultPath(
-                    user
-                );
-            },
-            [
-                location.state,
-            ]
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | SESSION SYNC
-    |--------------------------------------------------------------------------
-    */
-
-    useEffect(
-        () => {
-            let isMounted =
-                true;
-
-            const synchronizeSession =
-                async () => {
-                    const token =
-                        localStorage.getItem(
-                            'admin_token'
-                        );
-
-                    if (
-                        !token
-                    ) {
-                        return;
-                    }
-
-                    try {
-                        const response =
-                            await api.get(
-                                '/admin/me'
-                            );
-
-                        const authenticatedUser =
-                            response
-                                ?.data
-                                ?.data;
-
-                        if (
-                            !authenticatedUser
-                                ?.role
-                        ) {
-                            throw new Error(
-                                'Data sesi tidak lengkap.'
-                            );
-                        }
-
-                        localStorage.setItem(
-                            'admin_user',
-                            JSON.stringify(
-                                authenticatedUser
-                            )
-                        );
-
-                        if (
-                            isMounted
-                        ) {
-                            navigate(
-                                getRedirectAfterLogin(
-                                    authenticatedUser
-                                ),
-                                {
-                                    replace:
-                                        true,
-                                }
-                            );
-                        }
-                    } catch (
-                        error
-                    ) {
-                        if (
-                            error
-                                ?.response
-                                ?.status !==
-                            401
-                        ) {
-                            console.error(
-                                'Session synchronization error:',
-                                error
-                                    ?.response
-                                    ?.data ||
-                                    error
-                            );
-                        }
-
-                        clearLocalSession();
-                    }
-                };
-
-            synchronizeSession();
-
-            return () => {
-                isMounted =
-                    false;
-            };
+            return getDefaultPath(user);
         },
-        [
-            getRedirectAfterLogin,
-            navigate,
-        ]
+        [location.state]
     );
 
     /*
     |--------------------------------------------------------------------------
-    | FORM
+    | SINKRONISASI SESI
     |--------------------------------------------------------------------------
     */
 
-    const handleChange =
-        (
-            event
-        ) => {
-            const {
-                name,
-                value,
-            } =
-                event.target;
+    useEffect(() => {
+        if (recoveryMode) {
+            return undefined;
+        }
 
-            setForm(
-                (
-                    previous
-                ) => ({
-                    ...previous,
+        let isMounted = true;
 
-                    [name]:
-                        value,
-                })
+        const synchronizeSession = async () => {
+            const token = localStorage.getItem('admin_token');
+
+            if (!token) {
+                return;
+            }
+
+            try {
+                const response = await api.get('/admin/me');
+                const authenticatedUser = response?.data?.data;
+
+                if (!authenticatedUser?.role) {
+                    throw new Error('Data sesi tidak lengkap.');
+                }
+
+                localStorage.setItem(
+                    'admin_user',
+                    JSON.stringify(authenticatedUser)
+                );
+
+                if (isMounted) {
+                    navigate(
+                        getRedirectAfterLogin(authenticatedUser),
+                        { replace: true }
+                    );
+                }
+            } catch (error) {
+                if (error?.response?.status !== 401) {
+                    console.error(
+                        'Session synchronization error:',
+                        error?.response?.data || error
+                    );
+                }
+
+                clearLocalSession();
+            }
+        };
+
+        synchronizeSession();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [
+        recoveryMode,
+        navigate,
+        getRedirectAfterLogin,
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | INPUT FORM
+    |--------------------------------------------------------------------------
+    */
+
+    const handleChange = (event) => {
+        const { name, value } = event.target;
+
+        setForm((previous) => ({
+            ...previous,
+            [name]: value,
+        }));
+    };
+
+    const validateForm = () => {
+        if (!form.username.trim()) {
+            showWarningAlert(
+                'Username Wajib Diisi',
+                'Masukkan username terlebih dahulu.'
             );
-        };
+            return false;
+        }
 
-    const validateForm =
-        () => {
-            if (
-                !form
-                    .username
-                    .trim()
-            ) {
-                showWarningAlert(
-                    'Username Wajib Diisi',
-                    'Masukkan username terlebih dahulu.'
-                );
+        if (!form.password) {
+            showWarningAlert(
+                'Password Wajib Diisi',
+                'Masukkan password terlebih dahulu.'
+            );
+            return false;
+        }
 
-                return false;
-            }
-
-            if (
-                !form
-                    .password
-            ) {
-                showWarningAlert(
-                    'Password Wajib Diisi',
-                    'Masukkan password terlebih dahulu.'
-                );
-
-                return false;
-            }
-
-            return true;
-        };
+        return true;
+    };
 
     /*
     |--------------------------------------------------------------------------
@@ -499,184 +280,107 @@ export default function LoginPage() {
     |--------------------------------------------------------------------------
     */
 
-    const handleSubmit =
-        async (
-            event
-        ) => {
-            event.preventDefault();
+    const handleSubmit = async (event) => {
+        event.preventDefault();
 
-            if (
-                !validateForm()
-            ) {
-                return;
+        if (!validateForm()) {
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            showLoadingAlert(
+                'Login',
+                'Memeriksa akun kamu...'
+            );
+
+            const loginResponse = await api.post(
+                '/admin/login',
+                {
+                    username: form.username.trim(),
+                    password: form.password,
+                }
+            );
+
+            const loginData = loginResponse?.data?.data;
+
+            if (!loginData?.token || !loginData?.user?.role) {
+                throw new Error('Response login tidak lengkap.');
             }
 
-            try {
-                setLoading(
-                    true
-                );
+            localStorage.setItem(
+                'admin_token',
+                loginData.token
+            );
 
-                showLoadingAlert(
-                    'Login',
-                    'Memeriksa akun kamu...'
-                );
+            localStorage.setItem(
+                'admin_user',
+                JSON.stringify(loginData.user)
+            );
 
-                const loginResponse =
-                    await api.post(
-                        '/admin/login',
-                        {
-                            username:
-                                form
-                                    .username
-                                    .trim(),
+            const meResponse = await api.get('/admin/me');
+            const authenticatedUser = meResponse?.data?.data;
 
-                            password:
-                                form
-                                    .password,
-                        }
-                    );
-
-                const loginData =
-                    loginResponse
-                        ?.data
-                        ?.data;
-
-                if (
-                    !loginData
-                        ?.token ||
-                    !loginData
-                        ?.user
-                        ?.role
-                ) {
-                    throw new Error(
-                        'Response login tidak lengkap.'
-                    );
-                }
-
-                localStorage.setItem(
-                    'admin_token',
-                    loginData.token
-                );
-
-                localStorage.setItem(
-                    'admin_user',
-                    JSON.stringify(
-                        loginData.user
-                    )
-                );
-
-                const meResponse =
-                    await api.get(
-                        '/admin/me'
-                    );
-
-                const authenticatedUser =
-                    meResponse
-                        ?.data
-                        ?.data;
-
-                if (
-                    !authenticatedUser
-                        ?.role
-                ) {
-                    throw new Error(
-                        'Data akun terbaru tidak dapat diambil.'
-                    );
-                }
-
-                localStorage.setItem(
-                    'admin_user',
-                    JSON.stringify(
-                        authenticatedUser
-                    )
-                );
-
-                closeAlert();
-
-                await showSuccessAlert(
-                    'Login Berhasil',
-                    `Selamat datang, ${authenticatedUser.name}.`
-                );
-
-                navigate(
-                    getRedirectAfterLogin(
-                        authenticatedUser
-                    ),
-                    {
-                        replace:
-                            true,
-                    }
-                );
-            } catch (
-                error
-            ) {
-                console.error(
-                    'Login error:',
-                    error
-                        ?.response
-                        ?.data ||
-                        error
-                );
-
-                clearLocalSession();
-
-                closeAlert();
-
-                await showErrorAlert(
-                    'Login Gagal',
-                    error
-                        ?.response
-                        ?.data
-                        ?.message ||
-                        error
-                            ?.message ||
-                        'Username atau password tidak sesuai.'
-                );
-            } finally {
-                setLoading(
-                    false
+            if (!authenticatedUser?.role) {
+                throw new Error(
+                    'Data akun terbaru tidak dapat diambil.'
                 );
             }
-        };
+
+            localStorage.setItem(
+                'admin_user',
+                JSON.stringify(authenticatedUser)
+            );
+
+            closeAlert();
+
+            await showSuccessAlert(
+                'Login Berhasil',
+                `Selamat datang, ${authenticatedUser.name}.`
+            );
+
+            navigate(
+                getRedirectAfterLogin(authenticatedUser),
+                { replace: true }
+            );
+        } catch (error) {
+            console.error(
+                'Login error:',
+                error?.response?.data || error
+            );
+
+            clearLocalSession();
+            closeAlert();
+
+            await showErrorAlert(
+                'Login Gagal',
+                error?.response?.data?.message ||
+                    error?.message ||
+                    'Username atau password tidak sesuai.'
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const storedUser = getStoredUser();
 
     /*
     |--------------------------------------------------------------------------
-    | DEMO ACCOUNT
-    |--------------------------------------------------------------------------
-    */
-
-    const fillDemoAccount =
-        (
-            username
-        ) => {
-            setForm({
-                username,
-
-                password:
-                    'password123',
-            });
-        };
-
-    const storedUser =
-        getStoredUser();
-
-    /*
-    |--------------------------------------------------------------------------
-    | VIEW
+    | TAMPILAN
     |--------------------------------------------------------------------------
     */
 
     return (
         <main className="director-login-page">
             <div className="director-login-glow director-login-glow-1" />
-
             <div className="director-login-glow director-login-glow-2" />
 
             <div className="container-fluid px-3 px-lg-5">
                 <div className="row min-vh-100 align-items-center g-4 g-xl-5 py-4 py-xl-5">
-                    {/* =====================================================
-                        CALENDAR
-                    ===================================================== */}
+
+                    {/* KALENDER PUBLIK */}
 
                     <div className="col-xl-8">
                         <div className="director-login-brand">
@@ -685,13 +389,8 @@ export default function LoginPage() {
                                     <img
                                         src="/images/logo-putih-tus.png"
                                         alt="Telkom University Surabaya"
-                                        onError={(
-                                            event
-                                        ) => {
-                                            event
-                                                .currentTarget
-                                                .style
-                                                .display =
+                                        onError={(event) => {
+                                            event.currentTarget.style.display =
                                                 'none';
                                         }}
                                     />
@@ -712,176 +411,166 @@ export default function LoginPage() {
                         <PublicDirectorCalendar />
                     </div>
 
-                    {/* =====================================================
-                        LOGIN
-                    ===================================================== */}
+                    {/* LOGIN DAN RECOVERY */}
 
                     <div className="col-xl-4">
-                        <section className="card border-0 shadow-lg rounded-5 director-login-card">
-                            <div className="card-body p-4 p-lg-5">
-                                <div className="text-center mb-4">
-                                    <div className="login-icon mx-auto mb-3">
-                                        <i className="bi bi-shield-lock-fill" />
-                                    </div>
-
-                                    <span className="badge rounded-pill bg-danger-subtle text-danger px-3 py-2 mb-3">
-                                        Sistem Layanan Internal
-                                    </span>
-
-                                    <h2 className="fw-black mb-2">
-                                        Selamat Datang
-                                    </h2>
-
-                                    <p className="text-muted mb-0">
-                                        Masukkan username dan password untuk masuk ke sistem.
-                                    </p>
-                                </div>
-
-                                {storedUser
-                                    ?.role && (
-                                    <div className="alert alert-info border-0 rounded-4">
-                                        <i className="bi bi-arrow-clockwise me-2" />
-
-                                        Memeriksa sesi akun yang tersimpan.
-                                    </div>
-                                )}
-
-                                <form
-                                    onSubmit={
-                                        handleSubmit
-                                    }
-                                >
-                                    <div className="mb-3">
-                                        <label
-                                            htmlFor="username"
-                                            className="form-label fw-bold"
-                                        >
-                                            Username
-                                        </label>
-
-                                        <div className="input-group input-group-lg">
-                                            <span className="input-group-text bg-light border-end-0">
-                                                <i className="bi bi-person-fill text-danger" />
-                                            </span>
-
-                                            <input
-                                                id="username"
-                                                type="text"
-                                                name="username"
-                                                className="form-control border-start-0"
-                                                placeholder="Masukkan username"
-                                                value={
-                                                    form.username
-                                                }
-                                                onChange={
-                                                    handleChange
-                                                }
-                                                disabled={
-                                                    loading
-                                                }
-                                                autoComplete="username"
-                                                autoFocus
-                                            />
+                        {recoveryMode ? (
+                            <PasswordRecoveryForm />
+                        ) : (
+                            <section className="card border-0 shadow-lg rounded-5 director-login-card">
+                                <div className="card-body p-4 p-lg-5">
+                                    <div className="text-center mb-4">
+                                        <div className="login-icon mx-auto mb-3">
+                                            <i className="bi bi-shield-lock-fill" />
                                         </div>
+
+                                        <span className="badge rounded-pill bg-danger-subtle text-danger px-3 py-2 mb-3">
+                                            Sistem Layanan Internal
+                                        </span>
+
+                                        <h2 className="fw-black mb-2">
+                                            Selamat Datang
+                                        </h2>
+
+                                        <p className="text-muted mb-0">
+                                            Masukkan username dan password
+                                            untuk masuk ke sistem.
+                                        </p>
                                     </div>
 
-                                    <div className="mb-4">
-                                        <label
-                                            htmlFor="password"
-                                            className="form-label fw-bold"
-                                        >
-                                            Password
-                                        </label>
+                                    {storedUser?.role && (
+                                        <div className="alert alert-info border-0 rounded-4">
+                                            <i className="bi bi-arrow-clockwise me-2" />
+                                            Memeriksa sesi akun yang tersimpan.
+                                        </div>
+                                    )}
 
-                                        <div className="input-group input-group-lg">
-                                            <span className="input-group-text bg-light border-end-0">
-                                                <i className="bi bi-key-fill text-danger" />
-                                            </span>
-
-                                            <input
-                                                id="password"
-                                                type={
-                                                    showPassword
-                                                        ? 'text'
-                                                        : 'password'
-                                                }
-                                                name="password"
-                                                className="form-control border-start-0 border-end-0"
-                                                placeholder="Masukkan password"
-                                                value={
-                                                    form.password
-                                                }
-                                                onChange={
-                                                    handleChange
-                                                }
-                                                disabled={
-                                                    loading
-                                                }
-                                                autoComplete="current-password"
-                                            />
-
-                                            <button
-                                                type="button"
-                                                className="btn btn-outline-secondary border-start-0"
-                                                onClick={() =>
-                                                    setShowPassword(
-                                                        (
-                                                            previous
-                                                        ) =>
-                                                            !previous
-                                                    )
-                                                }
-                                                disabled={
-                                                    loading
-                                                }
+                                    <form onSubmit={handleSubmit}>
+                                        <div className="mb-3">
+                                            <label
+                                                htmlFor="username"
+                                                className="form-label fw-bold"
                                             >
-                                                <i
-                                                    className={`bi ${
-                                                        showPassword
-                                                            ? 'bi-eye-slash-fill'
-                                                            : 'bi-eye-fill'
-                                                    }`}
+                                                Username
+                                            </label>
+
+                                            <div className="input-group input-group-lg">
+                                                <span className="input-group-text bg-light border-end-0">
+                                                    <i className="bi bi-person-fill text-danger" />
+                                                </span>
+
+                                                <input
+                                                    id="username"
+                                                    type="text"
+                                                    name="username"
+                                                    className="form-control border-start-0"
+                                                    placeholder="Masukkan username"
+                                                    value={form.username}
+                                                    onChange={handleChange}
+                                                    disabled={loading}
+                                                    autoComplete="username"
+                                                    autoFocus
                                                 />
-                                            </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="mb-3">
+                                            <label
+                                                htmlFor="password"
+                                                className="form-label fw-bold"
+                                            >
+                                                Password
+                                            </label>
+
+                                            <div className="input-group input-group-lg">
+                                                <span className="input-group-text bg-light border-end-0">
+                                                    <i className="bi bi-key-fill text-danger" />
+                                                </span>
+
+                                                <input
+                                                    id="password"
+                                                    type={
+                                                        showPassword
+                                                            ? 'text'
+                                                            : 'password'
+                                                    }
+                                                    name="password"
+                                                    className="form-control border-start-0 border-end-0"
+                                                    placeholder="Masukkan password"
+                                                    value={form.password}
+                                                    onChange={handleChange}
+                                                    disabled={loading}
+                                                    autoComplete="current-password"
+                                                />
+
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline-secondary border-start-0"
+                                                    onClick={() =>
+                                                        setShowPassword(
+                                                            (previous) =>
+                                                                !previous
+                                                        )
+                                                    }
+                                                    disabled={loading}
+                                                    aria-label={
+                                                        showPassword
+                                                            ? 'Sembunyikan password'
+                                                            : 'Lihat password'
+                                                    }
+                                                >
+                                                    <i
+                                                        className={`bi ${
+                                                            showPassword
+                                                                ? 'bi-eye-slash-fill'
+                                                                : 'bi-eye-fill'
+                                                        }`}
+                                                    />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="d-flex justify-content-end mb-4">
+                                            <Link
+                                                to="/login?mode=forgot"
+                                                className="text-danger small fw-bold text-decoration-none"
+                                            >
+                                                <i className="bi bi-question-circle me-1" />
+                                                Lupa Password?
+                                            </Link>
+                                        </div>
+
+                                        <button
+                                            type="submit"
+                                            className="btn btn-danger btn-lg rounded-pill w-100 mb-4"
+                                            disabled={loading}
+                                        >
+                                            {loading ? (
+                                                <>
+                                                    <span className="spinner-border spinner-border-sm me-2" />
+                                                    Memproses...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <i className="bi bi-box-arrow-in-right me-2" />
+                                                    Masuk Sistem
+                                                </>
+                                            )}
+                                        </button>
+                                    </form>
+
+                                    <div className="p-3 rounded-4 bg-light border">
+                                        <div className="small text-muted">
+                                            Tidak memiliki akun? Hubungi{' '}
+                                            <strong>
+                                                HUMAS &amp; SEKPiM
+                                                Telkom University Surabaya
+                                            </strong>
                                         </div>
                                     </div>
-
-                                    <button
-                                        type="submit"
-                                        className="btn btn-danger btn-lg rounded-pill w-100 mb-4"
-                                        disabled={
-                                            loading
-                                        }
-                                    >
-                                        {loading ? (
-                                            <>
-                                                <span className="spinner-border spinner-border-sm me-2" />
-
-                                                Memproses...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <i className="bi bi-box-arrow-in-right me-2" />
-
-                                                Masuk Sistem
-                                            </>
-                                        )}
-                                    </button>
-                                </form>
-
-                                <div className="p-3 rounded-4 bg-light border">
-                                    
-
-                                    <div className="small text-muted mt-2">
-                                        Tidak memiliki akun? Hub:{' '}
-
-                                        <strong>
-                                            Contact HUMAS &amp; SEKPiM Telkom University Surabaya
-                                        </strong>
-                                    </div>
                                 </div>
-                            </div>
-                        </section>
+                            </section>
+                        )}
 
                         <p className="text-center text-white-50 small mt-4 mb-0">
                             © HUMAS &amp; SEKPiM Telkom University Surabaya
