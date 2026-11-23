@@ -19,12 +19,37 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 | PUBLIC
 |--------------------------------------------------------------------------
+|
+| Endpoint publik yang dapat diakses tanpa login.
+|
+*/
+
+/*
+|--------------------------------------------------------------------------
+| LOGIN
+|--------------------------------------------------------------------------
+|
+| Middleware login.attempts:
+|
+| - Membatasi percobaan login gagal.
+| - Membatasi percobaan berdasarkan username + IP.
+| - Membatasi total percobaan gagal berdasarkan IP.
+| - Mengembalikan HTTP 429 ketika batas terlampaui.
+|
+| Middleware harus terdaftar di bootstrap/app.php.
+|
 */
 
 Route::post('/admin/login', [
     AuthController::class,
     'login',
-]);
+])->middleware('login.attempts');
+
+/*
+|--------------------------------------------------------------------------
+| KALENDER PUBLIK
+|--------------------------------------------------------------------------
+*/
 
 Route::get('/event-schedules/public', [
     EventScheduleController::class,
@@ -35,6 +60,10 @@ Route::get('/event-schedules/public', [
 |--------------------------------------------------------------------------
 | AUTHENTICATED
 |--------------------------------------------------------------------------
+|
+| Seluruh endpoint dalam grup ini memerlukan
+| token Laravel Sanctum yang valid.
+|
 */
 
 Route::middleware('auth:sanctum')->group(function (): void {
@@ -63,6 +92,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:dashboard.view')
         ->group(function (): void {
+
             Route::get('/dashboard/analytics', [
                 DashboardController::class,
                 'analytics',
@@ -126,15 +156,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
         'destroy',
     ])->whereNumber('eventSchedule');
 
-
-    Route::get(
-        '/integrated-calendar/user-events',
-        [
-            UserCalendarAvailabilityController::class,
-            'index',
-        ]
-    );
-
+    Route::get('/integrated-calendar/user-events', [
+        UserCalendarAvailabilityController::class,
+        'index',
+    ]);
 
     /*
     |--------------------------------------------------------------------------
@@ -212,6 +237,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::middleware(
         'permission:categories.view,categories.manage,products.manage,request.merchandise.create,request.borrowing.create'
     )->group(function (): void {
+
         Route::get('/categories', [
             CategoryController::class,
             'index',
@@ -232,6 +258,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::middleware(
         'permission:products.view,products.manage,request.merchandise.create,request.borrowing.create'
     )->group(function (): void {
+
         Route::get('/products', [
             ProductController::class,
             'index',
@@ -251,6 +278,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:request.history.view')
         ->group(function (): void {
+
             Route::get('/my-orders', [
                 OrderController::class,
                 'myOrders',
@@ -284,6 +312,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:request.merchandise.create')
         ->group(function (): void {
+
             Route::post('/orders', [
                 OrderController::class,
                 'store',
@@ -304,6 +333,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::middleware(
         'permission:request.history.view,approval.merchandise.view'
     )->group(function (): void {
+
         Route::get('/orders/{id}', [
             OrderController::class,
             'show',
@@ -318,6 +348,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:approval.merchandise.view')
         ->group(function (): void {
+
             Route::get('/orders', [
                 OrderController::class,
                 'index',
@@ -336,6 +367,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:approval.merchandise.process')
         ->group(function (): void {
+
             Route::put('/orders/{id}/approve', [
                 OrderController::class,
                 'approve',
@@ -365,6 +397,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:request.humas.create')
         ->group(function (): void {
+
             Route::post('/humas-service-requests', [
                 HumasServiceRequestController::class,
                 'store',
@@ -380,6 +413,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::middleware(
         'permission:request.history.view,approval.humas.view'
     )->group(function (): void {
+
         Route::get('/humas-service-requests/{id}', [
             HumasServiceRequestController::class,
             'show',
@@ -394,6 +428,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:approval.humas.view')
         ->group(function (): void {
+
             Route::get('/humas-service-requests', [
                 HumasServiceRequestController::class,
                 'index',
@@ -408,6 +443,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:approval.humas.process')
         ->group(function (): void {
+
             Route::put('/humas-service-requests/{id}/approve', [
                 HumasServiceRequestController::class,
                 'approve',
@@ -432,6 +468,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:request.borrowing.create')
         ->group(function (): void {
+
             Route::post('/borrow-requests', [
                 BorrowRequestController::class,
                 'store',
@@ -447,6 +484,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::middleware(
         'permission:request.history.view,approval.borrowing.view'
     )->group(function (): void {
+
         Route::get('/borrow-requests/{id}', [
             BorrowRequestController::class,
             'show',
@@ -461,6 +499,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:approval.borrowing.view')
         ->group(function (): void {
+
             Route::get('/borrow-requests', [
                 BorrowRequestController::class,
                 'index',
@@ -475,6 +514,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:approval.borrowing.process')
         ->group(function (): void {
+
             Route::put('/borrow-requests/{id}/approve', [
                 BorrowRequestController::class,
                 'approve',
@@ -509,6 +549,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:products.manage')
         ->group(function (): void {
+
             Route::post('/products', [
                 ProductController::class,
                 'store',
@@ -538,6 +579,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::middleware('permission:categories.manage')
         ->group(function (): void {
+
             Route::post('/categories', [
                 CategoryController::class,
                 'store',
@@ -563,9 +605,17 @@ Route::middleware('auth:sanctum')->group(function (): void {
     |--------------------------------------------------------------------------
     | USER MANAGEMENT
     |--------------------------------------------------------------------------
+    |
+    | Pengelolaan akun tetap menggunakan
+    | permission users.view dan users.manage.
+    |
+    | Pemeriksaan Superadmin untuk operasi sensitif
+    | harus tetap dilakukan oleh UserController.
+    |
     */
 
     Route::prefix('admin')->group(function (): void {
+
         Route::get('/users/permissions', [
             UserController::class,
             'permissions',

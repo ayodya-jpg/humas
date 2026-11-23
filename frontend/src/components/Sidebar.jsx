@@ -1,4 +1,3 @@
-
 import {
     useCallback,
     useEffect,
@@ -18,6 +17,12 @@ import {
     getStoredUser,
     hasPermission,
 } from './ProtectedRoute';
+
+/*
+|--------------------------------------------------------------------------
+| KONSTANTA
+|--------------------------------------------------------------------------
+*/
 
 const EMPTY_BADGES = {
     merchandisePending: 0,
@@ -47,6 +52,12 @@ const SCHEDULE_APPROVAL_ROLES = [
     'superadmin',
 ];
 
+/*
+|--------------------------------------------------------------------------
+| HELPER
+|--------------------------------------------------------------------------
+*/
+
 const extractResponseData = (response) => {
     const payload = response?.data?.data;
 
@@ -63,6 +74,20 @@ const extractResponseData = (response) => {
 
 const getRoleLabel = (role) =>
     ROLE_LABELS[role] || role || 'Pengguna';
+
+/*
+|--------------------------------------------------------------------------
+| STRUKTUR MENU SIDEBAR
+|--------------------------------------------------------------------------
+|
+| Seluruh menu layanan tetap dipertahankan.
+|
+| Perubahan:
+| - Data User diganti nama menjadi Manajemen User.
+| - Persetujuan pemulihan tetap berada di tab Manajemen User.
+| - Profil & Keamanan berada dalam Manajemen Akun.
+|
+*/
 
 const createMenuGroups = (basePath) => [
     {
@@ -207,12 +232,28 @@ const createMenuGroups = (basePath) => [
         ],
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | MANAJEMEN SISTEM
+    |--------------------------------------------------------------------------
+    |
+    | Menu ini khusus akun admin.
+    |
+    | Manajemen User menggunakan halaman terpadu:
+    |
+    | /admin/users
+    |
+    | Tab persetujuan pemulihan hanya akan
+    | ditampilkan untuk role Superadmin.
+    |
+    */
+
     {
         title: 'Manajemen Sistem',
         adminOnly: true,
         items: [
             {
-                label: 'Data User',
+                label: 'Manajemen User',
                 icon: 'bi-people-fill',
                 path: '/admin/users',
                 permission: [
@@ -237,15 +278,61 @@ const createMenuGroups = (basePath) => [
                 permission: null,
                 badgeKey: null,
             },
+            {
+                label: 'Profil & Keamanan',
+                icon: 'bi-person-gear',
+                path: `${basePath}/account-security`,
+                permission: null,
+                publicAuthenticated: true,
+                badgeKey: null,
+            },
         ],
     },
+
+    /*
+    |--------------------------------------------------------------------------
+    | MANAJEMEN AKUN PRIBADI
+    |--------------------------------------------------------------------------
+    |
+    | Berlaku untuk seluruh pengguna terautentikasi.
+    |
+    | User, Admin, dan Superadmin dapat:
+    | - Mengedit profil pribadi
+    | - Mengatur pertanyaan keamanan
+    |
+    | Tidak dapat mengubah role atau permission
+    | melalui halaman profil pribadi.
+    |
+    */
+
+    // {
+    //     title: 'Manajemen Akun',//
+    //     items: [
+    //         {
+    //             label: 'Profil & Keamanan',
+    //             icon: 'bi-person-gear',
+    //             path: `${basePath}/account-security`,
+    //             permission: null,
+    //             publicAuthenticated: true,
+    //             badgeKey: null,
+    //         },
+    //     ],//
+    // },
 ];
 
-const isItemAllowed = (item, currentUser) => {
-    if (item.publicAuthenticated) {
-        return true;
-    }
+/*
+|--------------------------------------------------------------------------
+| PEMERIKSAAN MENU
+|--------------------------------------------------------------------------
+|
+| Pemeriksaan ini hanya untuk tampilan sidebar.
+|
+| Keamanan akses sesungguhnya tetap wajib
+| dilakukan di backend Laravel.
+|
+*/
 
+const isItemAllowed = (item, currentUser) => {
     if (item.superadminOnly) {
         return currentUser?.role === 'superadmin';
     }
@@ -262,11 +349,21 @@ const isItemAllowed = (item, currentUser) => {
         );
     }
 
+    if (item.publicAuthenticated) {
+        return true;
+    }
+
     return hasPermission(
         currentUser,
         item.permission
     );
 };
+
+/*
+|--------------------------------------------------------------------------
+| SIDEBAR COMPONENT
+|--------------------------------------------------------------------------
+*/
 
 export default function Sidebar({
     sidebarOpen = false,
@@ -276,16 +373,23 @@ export default function Sidebar({
 }) {
     const location = useLocation();
 
-    const [badges, setBadges] = useState(EMPTY_BADGES);
+    const [badges, setBadges] = useState(
+        EMPTY_BADGES
+    );
 
     const currentUser = getStoredUser();
 
     const role = currentUser?.role || 'user';
+
     const isUserRole = role === 'user';
 
-    const basePath = isUserRole ? '/user' : '/admin';
+    const basePath = isUserRole
+        ? '/user'
+        : '/admin';
 
-    const defaultPath = getDefaultPath(currentUser);
+    const defaultPath = getDefaultPath(
+        currentUser
+    );
 
     const isOpen =
         Boolean(sidebarOpen) ||
@@ -329,10 +433,16 @@ export default function Sidebar({
     |--------------------------------------------------------------------------
     | LOAD BADGES
     |--------------------------------------------------------------------------
+    |
+    | Tetap mempertahankan badge approval
+    | dan stok produk dari implementasi lama.
+    |
     */
 
     const fetchBadgeData = useCallback(async () => {
-        const token = localStorage.getItem('admin_token');
+        const token = localStorage.getItem(
+            'admin_token'
+        );
 
         if (!token) {
             setBadges(EMPTY_BADGES);
@@ -343,7 +453,10 @@ export default function Sidebar({
         const requestKeys = [];
 
         if (canViewMerchandiseApproval) {
-            requests.push(api.get('/orders'));
+            requests.push(
+                api.get('/orders')
+            );
+
             requestKeys.push('orders');
         }
 
@@ -351,6 +464,7 @@ export default function Sidebar({
             requests.push(
                 api.get('/humas-service-requests')
             );
+
             requestKeys.push('humas');
         }
 
@@ -358,11 +472,15 @@ export default function Sidebar({
             requests.push(
                 api.get('/borrow-requests')
             );
+
             requestKeys.push('borrowing');
         }
 
         if (canViewProducts) {
-            requests.push(api.get('/products'));
+            requests.push(
+                api.get('/products')
+            );
+
             requestKeys.push('products');
         }
 
@@ -370,6 +488,7 @@ export default function Sidebar({
             requests.push(
                 api.get('/event-schedule-requests')
             );
+
             requestKeys.push('schedules');
         }
 
@@ -394,13 +513,16 @@ export default function Sidebar({
                             result.value?.data?.data;
 
                         resultMap[key] =
-                            Array.isArray(payload?.requests)
+                            Array.isArray(
+                                payload?.requests
+                            )
                                 ? payload.requests
                                 : [];
                     } else {
-                        resultMap[key] = extractResponseData(
-                            result.value
-                        );
+                        resultMap[key] =
+                            extractResponseData(
+                                result.value
+                            );
                     }
                 } else {
                     resultMap[key] = [];
@@ -414,32 +536,43 @@ export default function Sidebar({
             });
 
             const orders = resultMap.orders || [];
-            const humasRequests = resultMap.humas || [];
+
+            const humasRequests =
+                resultMap.humas || [];
+
             const borrowRequests =
                 resultMap.borrowing || [];
-            const products = resultMap.products || [];
+
+            const products =
+                resultMap.products || [];
+
             const scheduleRequests =
                 resultMap.schedules || [];
 
             setBadges({
                 merchandisePending: orders.filter(
-                    (item) => item.status === 'pending'
+                    (item) =>
+                        item.status === 'pending'
                 ).length,
 
                 humasPending: humasRequests.filter(
-                    (item) => item.status === 'pending'
+                    (item) =>
+                        item.status === 'pending'
                 ).length,
 
                 borrowingPending: borrowRequests.filter(
-                    (item) => item.status === 'pending'
+                    (item) =>
+                        item.status === 'pending'
                 ).length,
 
                 schedulePending: scheduleRequests.filter(
-                    (item) => item.status === 'pending'
+                    (item) =>
+                        item.status === 'pending'
                 ).length,
 
                 lowStock: products.filter(
-                    (item) => Number(item.stock || 0) <= 5
+                    (item) =>
+                        Number(item.stock || 0) <= 5
                 ).length,
             });
         } catch (error) {
@@ -458,12 +591,24 @@ export default function Sidebar({
         canViewScheduleApproval,
     ]);
 
+    /*
+    |--------------------------------------------------------------------------
+    | REFRESH BADGE KETIKA HALAMAN BERUBAH
+    |--------------------------------------------------------------------------
+    */
+
     useEffect(() => {
         fetchBadgeData();
     }, [
         fetchBadgeData,
         location.pathname,
     ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | REFRESH BADGE BERKALA
+    |--------------------------------------------------------------------------
+    */
 
     useEffect(() => {
         const intervalId = window.setInterval(
@@ -472,13 +617,15 @@ export default function Sidebar({
         );
 
         return () => {
-            window.clearInterval(intervalId);
+            window.clearInterval(
+                intervalId
+            );
         };
     }, [fetchBadgeData]);
 
     /*
     |--------------------------------------------------------------------------
-    | FILTER MENU BERDASARKAN ROLE & PERMISSION
+    | FILTER MENU
     |--------------------------------------------------------------------------
     */
 
@@ -493,19 +640,28 @@ export default function Sidebar({
                 .map((group) => ({
                     ...group,
 
-                    items: group.items.filter((item) =>
-                        isItemAllowed(item, currentUser)
+                    items: group.items.filter(
+                        (item) =>
+                            isItemAllowed(
+                                item,
+                                currentUser
+                            )
                     ),
                 }))
                 .filter(
-                    (group) => group.items.length > 0
+                    (group) =>
+                        group.items.length > 0
                 ),
-        [menuGroups, currentUser, isUserRole]
+        [
+            menuGroups,
+            currentUser,
+            isUserRole,
+        ]
     );
 
     /*
     |--------------------------------------------------------------------------
-    | UI HELPERS
+    | CLOSE SIDEBAR
     |--------------------------------------------------------------------------
     */
 
@@ -513,6 +669,17 @@ export default function Sidebar({
         setSidebarOpen(false);
         setIsSidebarOpen(false);
     };
+
+    /*
+    |--------------------------------------------------------------------------
+    | ACTIVE MENU
+    |--------------------------------------------------------------------------
+    |
+    | Menu Manajemen User tetap aktif ketika
+    | pengguna membuka tab profil/pemulihan
+    | atau halaman edit user.
+    |
+    */
 
     const isActiveMenu = (item) => {
         if (
@@ -530,7 +697,7 @@ export default function Sidebar({
                         '/admin/users/'
                     ) &&
                     location.pathname !==
-                    '/admin/users/create'
+                        '/admin/users/create'
                 )
             );
         }
@@ -543,10 +710,20 @@ export default function Sidebar({
         );
     };
 
-    const getBadgeValue = (badgeKey) => {
-        if (!badgeKey) return 0;
+    /*
+    |--------------------------------------------------------------------------
+    | BADGE HELPERS
+    |--------------------------------------------------------------------------
+    */
 
-        return Number(badges[badgeKey] || 0);
+    const getBadgeValue = (badgeKey) => {
+        if (!badgeKey) {
+            return 0;
+        }
+
+        return Number(
+            badges[badgeKey] || 0
+        );
     };
 
     const getBadgeClass = (badgeKey) => {
@@ -571,14 +748,16 @@ export default function Sidebar({
 
     /*
     |--------------------------------------------------------------------------
-    | RENDER SIDEBAR
+    | RENDER
     |--------------------------------------------------------------------------
     */
 
     return (
         <>
             <aside
-                className={`sidebar ${isOpen ? 'show' : ''}`}
+                className={`sidebar ${
+                    isOpen ? 'show' : ''
+                }`}
             >
                 {/* BRAND */}
 
@@ -644,7 +823,8 @@ export default function Sidebar({
 
                     <div className="min-w-0">
                         <div className="sidebar-user-name text-truncate">
-                            {currentUser?.name || 'Pengguna'}
+                            {currentUser?.name ||
+                                'Pengguna'}
                         </div>
 
                         <div className="sidebar-user-role">
@@ -653,7 +833,7 @@ export default function Sidebar({
                     </div>
                 </div>
 
-                {/* MENUS */}
+                {/* SIDEBAR MENUS */}
 
                 <nav className="sidebar-nav">
                     {allowedGroups.map((group) => (
@@ -666,58 +846,68 @@ export default function Sidebar({
                             </div>
 
                             <div className="sidebar-menu">
-                                {group.items.map((item) => {
-                                    const active = isActiveMenu(
-                                        item
-                                    );
+                                {group.items.map(
+                                    (item) => {
+                                        const active =
+                                            isActiveMenu(
+                                                item
+                                            );
 
-                                    const badgeValue = getBadgeValue(
-                                        item.badgeKey
-                                    );
+                                        const badgeValue =
+                                            getBadgeValue(
+                                                item.badgeKey
+                                            );
 
-                                    return (
-                                        <Link
-                                            key={`${group.title}-${item.path}-${item.label}`}
-                                            to={item.path}
-                                            className={`sidebar-link ${
-                                                active ? 'active' : ''
-                                            }`}
-                                            onClick={closeSidebar}
-                                        >
-                                            <span className="sidebar-link-icon">
-                                                <i
-                                                    className={`bi ${item.icon}`}
-                                                />
-                                            </span>
-
-                                            <span className="sidebar-link-text">
-                                                {item.label}
-                                            </span>
-
-                                            {badgeValue > 0 && (
-                                                <span
-                                                    className={`sidebar-badge ${getBadgeClass(
-                                                        item.badgeKey
-                                                    )}`}
-                                                >
-                                                    {badgeValue > 99
-                                                        ? '99+'
-                                                        : badgeValue}
+                                        return (
+                                            <Link
+                                                key={`${group.title}-${item.path}-${item.label}`}
+                                                to={item.path}
+                                                className={`sidebar-link ${
+                                                    active
+                                                        ? 'active'
+                                                        : ''
+                                                }`}
+                                                onClick={closeSidebar}
+                                            >
+                                                <span className="sidebar-link-icon">
+                                                    <i
+                                                        className={`bi ${item.icon}`}
+                                                    />
                                                 </span>
-                                            )}
 
-                                            {active &&
-                                                badgeValue === 0 && (
-                                                    <span className="sidebar-link-indicator">
-                                                        <i className="bi bi-chevron-right" />
+                                                <span className="sidebar-link-text">
+                                                    {item.label}
+                                                </span>
+
+                                                {badgeValue > 0 && (
+                                                    <span
+                                                        className={`sidebar-badge ${
+                                                            getBadgeClass(
+                                                                item.badgeKey
+                                                            )
+                                                        }`}
+                                                    >
+                                                        {badgeValue > 99
+                                                            ? '99+'
+                                                            : badgeValue}
                                                     </span>
                                                 )}
-                                        </Link>
-                                    );
-                                })}
+
+                                                {active &&
+                                                    badgeValue === 0 && (
+                                                        <span className="sidebar-link-indicator">
+                                                            <i className="bi bi-chevron-right" />
+                                                        </span>
+                                                    )}
+                                            </Link>
+                                        );
+                                    }
+                                )}
                             </div>
                         </div>
                     ))}
+
+                    {/* EMPTY MENU */}
 
                     {allowedGroups.length === 0 && (
                         <div className="p-3">
@@ -743,7 +933,8 @@ export default function Sidebar({
                         </div>
 
                         <div className="small">
-                            Sistem layanan terpadu Telkom University Surabaya.
+                            Sistem layanan terpadu
+                            Telkom University Surabaya.
                         </div>
                     </div>
                 </div>
